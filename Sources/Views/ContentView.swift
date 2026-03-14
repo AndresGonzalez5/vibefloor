@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var projects: [Project] = ProjectStore.load()
     @State private var selection: SidebarSelection? = ContentView.initialSelection()
     @StateObject private var surfaceCache = TerminalSurfaceCache()
+    @State private var saveWork: DispatchWorkItem?
 
     private static func initialSelection() -> SidebarSelection? {
         let projects = ProjectStore.load()
@@ -70,7 +71,11 @@ struct ContentView: View {
         }
         .environmentObject(surfaceCache)
         .onChange(of: projects) { _, newValue in
-            ProjectStore.save(newValue)
+            // Debounce saves to avoid rapid I/O from activity updates
+            saveWork?.cancel()
+            let work = DispatchWorkItem { ProjectStore.save(newValue) }
+            saveWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
         }
     }
 }

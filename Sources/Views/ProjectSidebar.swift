@@ -21,25 +21,43 @@ struct ProjectSidebar: View {
     @State private var newWorkstreamName = ""
     @State private var projectToDelete: UUID?
     @State private var expandedProjects: Set<UUID> = []
+    @State private var cachedSortedIDs: [UUID] = []
     @AppStorage("ff2.sortOrder") private var sortOrder: ProjectSortOrder = .recent
 
-    private var sortedProjectIDs: [UUID] {
-        let sorted: [Project]
+    /// Index from UUID to project array index for O(1) lookups.
+    private var projectIndex: [UUID: Int] {
+        Dictionary(uniqueKeysWithValues: projects.enumerated().map { ($1.id, $0) })
+    }
+
+    /// Index from workstream UUID to (project index, workstream index).
+    private var workstreamIndex: [UUID: (Int, Int)] {
+        var result: [UUID: (Int, Int)] = [:]
+        for (pi, project) in projects.enumerated() {
+            for (wi, ws) in project.workstreams.enumerated() {
+                result[ws.id] = (pi, wi)
+            }
+        }
+        return result
+    }
+
+    private func recomputeSortedIDs() -> [UUID] {
         switch sortOrder {
         case .recent:
-            sorted = projects.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+            return projects.sorted { $0.lastAccessedAt > $1.lastAccessedAt }.map(\.id)
         case .alphabetical:
-            sorted = projects.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return projects.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }.map(\.id)
         }
-        return sorted.map(\.id)
     }
 
     private func projectBinding(for id: UUID) -> Binding<Project> {
         Binding(
-            get: { projects.first(where: { $0.id == id })! },
+            get: {
+                if let idx = projectIndex[id] { return projects[idx] }
+                return projects.first(where: { $0.id == id })!
+            },
             set: { newValue in
-                if let index = projects.firstIndex(where: { $0.id == id }) {
-                    projects[index] = newValue
+                if let idx = projectIndex[id] {
+                    projects[idx] = newValue
                 }
             }
         )
@@ -50,7 +68,7 @@ struct ProjectSidebar: View {
         VStack(spacing: 0) {
             ScrollViewReader { scrollProxy in
             List(selection: $selection) {
-                ForEach(sortedProjectIDs, id: \.self) { projectID in
+                ForEach(cachedSortedIDs, id: \.self) { projectID in
                     let projectBind = projectBinding(for: projectID)
                     let project = projectBind.wrappedValue
                     let hasChildren = !project.workstreams.isEmpty
@@ -73,7 +91,8 @@ struct ProjectSidebar: View {
                     .tag(SidebarSelection.project(project.id))
 
                     if hasChildren && expandedProjects.contains(project.id) {
-                        ForEach(project.workstreams.sorted { $0.lastAccessedAt > $1.lastAccessedAt }) { workstream in
+                        let sortedWS = project.workstreams.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+                        ForEach(sortedWS) { workstream in
                             WorkstreamRow(
                                 name: workstream.name,
                                 onArchive: { archiveWorkstream(workstream.id, in: &projectBind.wrappedValue) }
@@ -99,6 +118,10 @@ struct ProjectSidebar: View {
             }
             .onChange(of: selection) { _, sel in
                 guard let sel else { return }
+                if case .workstream(let wsID) = sel,
+                   let (pi, _) = workstreamIndex[wsID] {
+                    expandedProjects.insert(projects[pi].id)
+                }
                 withAnimation {
                     scrollProxy.scrollTo(sel, anchor: .center)
                 }
@@ -132,24 +155,17 @@ struct ProjectSidebar: View {
             .frame(height: max(80, geo.size.height * 0.2))
         }
         }
-        .onChange(of: selection) { _, sel in
-            guard let sel else { return }
-            if case .workstream(let wsID) = sel {
-                if let project = projects.first(where: { $0.workstreams.contains(where: { $0.id == wsID }) }) {
-                    expandedProjects.insert(project.id)
-                }
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .terminalActivity)) { notification in
             guard let wsID = notification.object as? UUID else { return }
-            if let projectIndex = projects.firstIndex(where: { $0.workstreams.contains(where: { $0.id == wsID }) }),
-               let wsIndex = projects[projectIndex].workstreams.firstIndex(where: { $0.id == wsID }) {
-                let now = Date()
-                projects[projectIndex].lastAccessedAt = now
-                projects[projectIndex].workstreams[wsIndex].lastAccessedAt = now
-                onProjectsChanged()
-            }
+            guard let (pi, wi) = workstreamIndex[wsID] else { return }
+            let now = Date()
+            projects[pi].lastAccessedAt = now
+            projects[pi].workstreams[wi].lastAccessedAt = now
+            onProjectsChanged()
         }
+        .onAppear { cachedSortedIDs = recomputeSortedIDs() }
+        .onChange(of: sortOrder) { _, _ in cachedSortedIDs = recomputeSortedIDs() }
+        .onChange(of: projects.count) { _, _ in cachedSortedIDs = recomputeSortedIDs() }
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 8)
