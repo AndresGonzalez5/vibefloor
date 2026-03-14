@@ -93,6 +93,12 @@ struct TerminalContainerView: View {
                     .opacity(activeTab == .browser ? 1 : 0)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToAgent)) { _ in
+            activeTab = .claude
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToTerminal)) { _ in
+            activeTab = .workspace
+        }
         .onReceive(NotificationCenter.default.publisher(for: .retryBrowser)) { _ in
             activeTab = .browser
         }

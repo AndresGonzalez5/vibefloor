@@ -7,6 +7,8 @@ extension Notification.Name {
     static let openDirectory = Notification.Name("ff2.openDirectory")
     static let openSettings = Notification.Name("ff2.openSettings")
     static let retryBrowser = Notification.Name("ff2.retryBrowser")
+    static let switchToAgent = Notification.Name("ff2.switchToAgent")
+    static let switchToTerminal = Notification.Name("ff2.switchToTerminal")
 }
 
 @main
@@ -74,9 +76,19 @@ struct FF2App: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
-            // Cmd+Shift+B: retry/reload browser
+            // Cmd+Shift+A/T/B: switch workstream tabs
             CommandGroup(after: .toolbar) {
-                Button("Reload Browser") {
+                Button("Coding Agent") {
+                    NotificationCenter.default.post(name: .switchToAgent, object: nil)
+                }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+
+                Button("Terminal") {
+                    NotificationCenter.default.post(name: .switchToTerminal, object: nil)
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+
+                Button("Browser") {
                     NotificationCenter.default.post(name: .retryBrowser, object: nil)
                 }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
