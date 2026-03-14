@@ -93,6 +93,9 @@ struct TerminalContainerView: View {
                     .opacity(activeTab == .browser ? 1 : 0)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .retryBrowser)) { _ in
+            activeTab = .browser
+        }
     }
 
     private var envVars: [String: String] {
