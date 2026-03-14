@@ -1,5 +1,5 @@
 // ABOUTME: Embedded WKWebView for previewing local dev servers.
-// ABOUTME: Simple browser with navigation bar, back/forward, reload.
+// ABOUTME: Simple browser with navigation bar, back/forward, reload, home.
 
 import SwiftUI
 import WebKit
@@ -12,6 +12,7 @@ struct BrowserView: View {
     @State private var isLoading = false
     @State private var canGoBack = false
     @State private var canGoForward = false
+    @State private var connectionError = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,7 +35,7 @@ struct BrowserView: View {
                 .foregroundStyle(canGoForward ? .primary : .quaternary)
 
                 Button(action: {
-                    if isLoading { webView.stopLoading() } else { webView.reload() }
+                    if isLoading { webView.stopLoading() } else { retry() }
                 }) {
                     Image(systemName: isLoading ? "xmark" : "arrow.clockwise")
                         .font(.system(size: 11))
@@ -58,28 +59,71 @@ struct BrowserView: View {
 
             Divider()
 
-            // Web content
-            WebViewRepresentable(
-                webView: webView,
-                isLoading: $isLoading,
-                canGoBack: $canGoBack,
-                canGoForward: $canGoForward,
-                urlText: $urlText
-            )
+            // Content
+            ZStack {
+                WebViewRepresentable(
+                    webView: webView,
+                    isLoading: $isLoading,
+                    canGoBack: $canGoBack,
+                    canGoForward: $canGoForward,
+                    urlText: $urlText,
+                    connectionError: $connectionError
+                )
+                .opacity(connectionError ? 0 : 1)
+
+                if connectionError {
+                    VStack(spacing: 16) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.tertiary)
+                        Text("Server not responding")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                        Text(urlText)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                        HStack(spacing: 4) {
+                            Text("Press")
+                            Text(Image(systemName: "command"))
+                            Text(Image(systemName: "shift"))
+                            Text("B to retry")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        Button("Retry") { retry() }
+                            .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
         }
         .onAppear {
             urlText = defaultURL
             navigateTo(defaultURL)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .retryBrowser)) { _ in
+            retry()
+        }
     }
 
     private func navigateTo(_ urlString: String) {
+        connectionError = false
         var resolved = urlString
         if !resolved.contains("://") {
             resolved = "http://\(resolved)"
         }
         guard let url = URL(string: resolved) else { return }
         webView.load(URLRequest(url: url))
+    }
+
+    private func retry() {
+        connectionError = false
+        if let url = webView.url {
+            webView.load(URLRequest(url: url))
+        } else {
+            navigateTo(defaultURL)
+        }
     }
 }
 
@@ -89,6 +133,7 @@ struct WebViewRepresentable: NSViewRepresentable {
     @Binding var canGoBack: Bool
     @Binding var canGoForward: Bool
     @Binding var urlText: String
+    @Binding var connectionError: Bool
 
     func makeNSView(context: Context) -> WKWebView {
         webView.navigationDelegate = context.coordinator
@@ -110,11 +155,13 @@ struct WebViewRepresentable: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
             parent.isLoading = true
+            parent.connectionError = false
             updateState(webView)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parent.isLoading = false
+            parent.connectionError = false
             updateState(webView)
         }
 
@@ -125,6 +172,14 @@ struct WebViewRepresentable: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             parent.isLoading = false
+            let nsError = error as NSError
+            // Connection refused, host not found, network issues
+            if nsError.domain == NSURLErrorDomain &&
+               [NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost,
+                NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet,
+                NSURLErrorTimedOut].contains(nsError.code) {
+                parent.connectionError = true
+            }
             updateState(webView)
         }
 

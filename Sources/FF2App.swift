@@ -6,6 +6,7 @@ import SwiftUI
 extension Notification.Name {
     static let openDirectory = Notification.Name("ff2.openDirectory")
     static let openSettings = Notification.Name("ff2.openSettings")
+    static let retryBrowser = Notification.Name("ff2.retryBrowser")
 }
 
 @main
@@ -72,6 +73,13 @@ struct FF2App: App {
                     NotificationCenter.default.post(name: .openSettings, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
+            }
+            // Cmd+Shift+B: retry/reload browser
+            CommandGroup(after: .toolbar) {
+                Button("Reload Browser") {
+                    NotificationCenter.default.post(name: .retryBrowser, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
             }
         }
     }
