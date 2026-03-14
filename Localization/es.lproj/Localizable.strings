@@ -10,9 +10,12 @@
 "No workstreams yet" = "Aún no hay flujos de trabajo";
 "Workstreams" = "Flujos de trabajo";
 "Click to open" = "Haz clic para abrir";
+"Press " = "Pulsa ";
+"to create one." = "para crear uno.";
 
 /* Sidebar */
 "Drop a folder here" = "Arrastra una carpeta aquí";
+"to add a project" = "para añadir un proyecto";
 "Recent" = "Recientes";
 "A-Z" = "A-Z";
 

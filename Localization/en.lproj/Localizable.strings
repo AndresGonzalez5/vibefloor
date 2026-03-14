@@ -10,9 +10,12 @@
 "No workstreams yet" = "No workstreams yet";
 "Workstreams" = "Workstreams";
 "Click to open" = "Click to open";
+"Press " = "Press ";
+"to create one." = "to create one.";
 
 /* Sidebar */
 "Drop a folder here" = "Drop a folder here";
+"to add a project" = "to add a project";
 "Recent" = "Recent";
 "A-Z" = "A-Z";
 

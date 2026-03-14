@@ -10,9 +10,12 @@
 "No workstreams yet" = "Inga arbetsflöden ännu";
 "Workstreams" = "Arbetsflöden";
 "Click to open" = "Klicka för att öppna";
+"Press " = "Tryck ";
+"to create one." = "för att skapa ett.";
 
 /* Sidebar */
 "Drop a folder here" = "Släpp en mapp här";
+"to add a project" = "för att lägga till ett projekt";
 "Recent" = "Senaste";
 "A-Z" = "A-Ö";
 

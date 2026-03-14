@@ -34,7 +34,7 @@ struct ProjectOverviewView: View {
                         Text("No workstreams yet")
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                        Text("Press \(Image(systemName: "command")) N to create one.")
+                        (Text("Press ") + Text(Image(systemName: "command")) + Text(" N ") + Text("to create one."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

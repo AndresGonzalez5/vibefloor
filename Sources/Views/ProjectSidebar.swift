@@ -136,7 +136,7 @@ struct ProjectSidebar: View {
                 Text("Drop a folder here")
                     .font(.system(.body, weight: .medium))
                     .foregroundStyle(.tertiary)
-                Text("\(Image(systemName: "command"))\(Image(systemName: "shift")) N to add a project")
+                (Text(Image(systemName: "command")) + Text(Image(systemName: "shift")) + Text(" N ") + Text("to add a project"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()

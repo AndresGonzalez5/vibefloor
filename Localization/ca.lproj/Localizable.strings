@@ -10,9 +10,12 @@
 "No workstreams yet" = "Encara no hi ha fluxos de treball";
 "Workstreams" = "Fluxos de treball";
 "Click to open" = "Fes clic per obrir";
+"Press " = "Prem ";
+"to create one." = "per crear-ne un.";
 
 /* Sidebar */
 "Drop a folder here" = "Deixa anar una carpeta aquí";
+"to add a project" = "per afegir un projecte";
 "Recent" = "Recents";
 "A-Z" = "A-Z";
 
