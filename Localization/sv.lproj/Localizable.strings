@@ -55,4 +55,11 @@
 "Default Browser" = "Standardwebbläsare";
 "Browser" = "Webbläsare";
 "No supported browsers found" = "Inga webbläsare hittades";
+"Coding Agent" = "Kodningsagent";
+"Bypass permission prompts" = "Hoppa över behörighetsförfrågningar";
+"When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "När aktiverad kommer kodningsagenten inte att be om bekräftelse innan ändringar görs. Använd med försiktighet: agenten kan redigera filer, köra kommandon och göra commits utan att fråga.";
+"Default External Browser" = "Standard extern webbläsare";
+"External Terminal" = "Extern terminal";
+"Requires tmux to be installed." = "Kräver att tmux är installerat.";
+"URL" = "URL";
 "Done" = "Klar";
