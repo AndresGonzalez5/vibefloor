@@ -5,32 +5,38 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var projects: [Project] = ProjectStore.load()
-    @State private var selectedProjectID: UUID?
+    @State private var selectedWorkstreamID: UUID?
     @StateObject private var surfaceCache = TerminalSurfaceCache()
 
     var body: some View {
         NavigationSplitView {
             ProjectSidebar(
                 projects: $projects,
-                selectedProjectID: $selectedProjectID
+                selectedWorkstreamID: $selectedWorkstreamID,
+                onProjectsChanged: { ProjectStore.save(projects) }
             )
             .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 350)
         } detail: {
-            if let selectedProjectID, let project = projects.first(where: { $0.id == selectedProjectID }) {
+            if let selectedWorkstreamID,
+               let project = projects.first(where: { $0.workstreams.contains(where: { $0.id == selectedWorkstreamID }) }),
+               let workstream = project.workstreams.first(where: { $0.id == selectedWorkstreamID }) {
                 TerminalContainerView(
-                    projectID: project.id,
+                    workstreamID: selectedWorkstreamID,
                     workingDirectory: project.directory
                 )
-                .id(project.id)
+                .id(selectedWorkstreamID)
+                .navigationTitle(workstream.name)
+                .navigationSubtitle(project.name)
             } else {
                 VStack(spacing: 12) {
-                    Text("No project selected")
+                    Text("No workstream selected")
                         .font(.title2)
                         .foregroundStyle(.secondary)
-                    Text("Add a project from the sidebar to get started.")
+                    Text("Add a project, then create a workstream to get started.")
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("ff2")
             }
         }
         .environmentObject(surfaceCache)

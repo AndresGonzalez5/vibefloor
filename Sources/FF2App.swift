@@ -19,12 +19,18 @@ struct FF2App: App {
         .windowStyle(.automatic)
         .defaultSize(width: 1200, height: 800)
         .commands {
-            // Replace default Cmd+N (new window) with "add project"
             CommandGroup(replacing: .newItem) {
+                // Cmd+N: context-sensitive (add project if none selected, else add workstream)
+                Button("New") {
+                    NotificationCenter.default.post(name: .addNew, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                // Cmd+Shift+N: always add project
                 Button("New Project") {
                     NotificationCenter.default.post(name: .addProject, object: nil)
                 }
-                .keyboardShortcut("n", modifiers: .command)
+                .keyboardShortcut("n", modifiers: [.command, .shift])
             }
         }
     }

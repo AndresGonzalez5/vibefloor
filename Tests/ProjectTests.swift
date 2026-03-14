@@ -1,5 +1,5 @@
-// ABOUTME: Tests for the Project model.
-// ABOUTME: Validates creation, identity, and equality behavior.
+// ABOUTME: Tests for Project and Workstream models.
+// ABOUTME: Validates creation, identity, equality, serialization, and workstream management.
 
 import XCTest
 @testable import ff2
@@ -69,5 +69,52 @@ final class ProjectTests: XCTestCase {
         ProjectStore.save(projects)
         let loaded = ProjectStore.load()
         XCTAssertEqual(projects, loaded)
+    }
+
+    func testProjectDefaultsToNoWorkstreams() {
+        let project = Project(name: "test", directory: "/test")
+        XCTAssertTrue(project.workstreams.isEmpty)
+    }
+
+    func testWorkstreamCreation() {
+        let ws = Workstream(name: "feature-auth")
+        XCTAssertEqual(ws.name, "feature-auth")
+    }
+
+    func testProjectWithWorkstreams() {
+        var project = Project(name: "app", directory: "/app")
+        project.workstreams.append(Workstream(name: "backend"))
+        project.workstreams.append(Workstream(name: "frontend"))
+        XCTAssertEqual(project.workstreams.count, 2)
+        XCTAssertNotEqual(project.workstreams[0].id, project.workstreams[1].id)
+    }
+
+    func testWorkstreamsCodableRoundTrip() throws {
+        let project = Project(
+            name: "app",
+            directory: "/app",
+            workstreams: [
+                Workstream(name: "main"),
+                Workstream(name: "bugfix"),
+            ]
+        )
+        let data = try JSONEncoder().encode(project)
+        let decoded = try JSONDecoder().decode(Project.self, from: data)
+        XCTAssertEqual(project, decoded)
+        XCTAssertEqual(decoded.workstreams.count, 2)
+        XCTAssertEqual(decoded.workstreams[0].name, "main")
+        XCTAssertEqual(decoded.workstreams[1].name, "bugfix")
+    }
+
+    func testProjectStoreWithWorkstreams() {
+        let projects = [
+            Project(name: "one", directory: "/one", workstreams: [
+                Workstream(name: "dev"),
+            ]),
+        ]
+        ProjectStore.save(projects)
+        let loaded = ProjectStore.load()
+        XCTAssertEqual(loaded.first?.workstreams.count, 1)
+        XCTAssertEqual(loaded.first?.workstreams.first?.name, "dev")
     }
 }

@@ -11,6 +11,7 @@ final class TerminalView: NSView, NSTextInputClient {
     private var trackingArea: NSTrackingArea?
     private var markedText = NSMutableAttributedString()
     private var keyTextAccumulator: [String]?
+    private var resizeDebounceWork: DispatchWorkItem?
 
     init(app: ghostty_app_t, workingDirectory: String? = nil) {
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
@@ -92,7 +93,27 @@ final class TerminalView: NSView, NSTextInputClient {
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
         let w = UInt32(newSize.width * scale)
         let h = UInt32(newSize.height * scale)
-        if w > 0 && h > 0 {
+        guard w > 0 && h > 0 else { return }
+
+        // Debounce rapid resizes (e.g., sidebar toggle animation) to avoid flicker.
+        // If we're in an animation, batch the resize to the end.
+        resizeDebounceWork?.cancel()
+        if NSAnimationContext.current.duration > 0 {
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, let surface = self.surface else { return }
+                let currentScale = self.window?.backingScaleFactor ?? 2.0
+                let cw = UInt32(self.bounds.width * currentScale)
+                let ch = UInt32(self.bounds.height * currentScale)
+                if cw > 0 && ch > 0 {
+                    ghostty_surface_set_size(surface, cw, ch)
+                }
+            }
+            resizeDebounceWork = work
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + NSAnimationContext.current.duration,
+                execute: work
+            )
+        } else {
             ghostty_surface_set_size(surface, w, h)
         }
     }
