@@ -9,9 +9,10 @@ struct SettingsView: View {
     private var availableLanguages: [(code: String, name: String)] {
         var languages: [(String, String)] = [("", NSLocalizedString("System Default", comment: ""))]
         let bundles = Bundle.main.localizations.filter { $0 != "Base" }.sorted()
-        let locale = Locale.current
         for code in bundles {
-            let name = locale.localizedString(forLanguageCode: code) ?? code
+            // Show the language name in its own language (e.g., "Català", "Español")
+            let nativeLocale = Locale(identifier: code)
+            let name = nativeLocale.localizedString(forLanguageCode: code) ?? code
             languages.append((code, name.capitalized))
         }
         return languages

@@ -22,7 +22,13 @@ targets:
     platform: macOS
     sources:
       - Sources
-      - path: Localization
+      - path: Localization/en.lproj/Localizable.strings
+        buildPhase: resources
+      - path: Localization/ca.lproj/Localizable.strings
+        buildPhase: resources
+      - path: Localization/es.lproj/Localizable.strings
+        buildPhase: resources
+      - path: Localization/sv.lproj/Localizable.strings
         buildPhase: resources
     settings:
       base:

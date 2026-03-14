@@ -1,0 +1,41 @@
+/* Menu */
+"New" = "Nuevo";
+"New Project" = "Nuevo proyecto";
+
+/* Content View */
+"No project selected" = "Ningún proyecto seleccionado";
+"Add a project from the sidebar to get started." = "Añade un proyecto desde la barra lateral para empezar.";
+
+/* Project Overview */
+"No workstreams yet" = "Aún no hay flujos de trabajo";
+"Workstreams" = "Flujos de trabajo";
+"Click to open" = "Haz clic para abrir";
+
+/* Sidebar */
+"Drop a folder here" = "Arrastra una carpeta aquí";
+"Recent" = "Recientes";
+"A-Z" = "A-Z";
+
+/* Alerts */
+"Remove Project" = "Eliminar proyecto";
+"Cancel" = "Cancelar";
+"Remove" = "Eliminar";
+
+/* Sheets */
+"Add Project" = "Añadir proyecto";
+"Directory" = "Directorio";
+"Project Name" = "Nombre del proyecto";
+"Add" = "Añadir";
+"Add Workstream" = "Añadir flujo de trabajo";
+"Workstream Name" = "Nombre del flujo de trabajo";
+
+/* File Picker */
+"Choose a project directory" = "Elige un directorio de proyecto";
+"Select" = "Seleccionar";
+
+/* Settings */
+"Settings" = "Ajustes";
+"Language" = "Idioma";
+"System Default" = "Predeterminado del sistema";
+"Restart the app for the language change to take effect." = "Reinicia la aplicación para que el cambio de idioma surta efecto.";
+"Done" = "Hecho";

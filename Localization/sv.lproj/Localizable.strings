@@ -1,0 +1,41 @@
+/* Menu */
+"New" = "Ny";
+"New Project" = "Nytt projekt";
+
+/* Content View */
+"No project selected" = "Inget projekt valt";
+"Add a project from the sidebar to get started." = "Lägg till ett projekt från sidofältet för att komma igång.";
+
+/* Project Overview */
+"No workstreams yet" = "Inga arbetsflöden ännu";
+"Workstreams" = "Arbetsflöden";
+"Click to open" = "Klicka för att öppna";
+
+/* Sidebar */
+"Drop a folder here" = "Släpp en mapp här";
+"Recent" = "Senaste";
+"A-Z" = "A-Ö";
+
+/* Alerts */
+"Remove Project" = "Ta bort projekt";
+"Cancel" = "Avbryt";
+"Remove" = "Ta bort";
+
+/* Sheets */
+"Add Project" = "Lägg till projekt";
+"Directory" = "Katalog";
+"Project Name" = "Projektnamn";
+"Add" = "Lägg till";
+"Add Workstream" = "Lägg till arbetsflöde";
+"Workstream Name" = "Namn på arbetsflöde";
+
+/* File Picker */
+"Choose a project directory" = "Välj en projektkatalog";
+"Select" = "Välj";
+
+/* Settings */
+"Settings" = "Inställningar";
+"Language" = "Språk";
+"System Default" = "Systemstandard";
+"Restart the app for the language change to take effect." = "Starta om appen för att språkändringen ska träda i kraft.";
+"Done" = "Klar";
