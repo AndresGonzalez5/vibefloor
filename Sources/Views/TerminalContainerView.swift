@@ -107,7 +107,7 @@ struct TerminalContainerView: View {
                     surfaceID: workspaceID,
                     workingDirectory: workingDirectory,
                     command: workspaceCommand,
-                    initialInput: workspaceCommand == nil ? "ls\n" : nil,
+                    initialInput: nil,
                     isFocused: activeTab == .workspace,
                     environmentVars: envVars
                 )
