@@ -12,6 +12,7 @@ extension Notification.Name {
     static let toggleSidebar = Notification.Name("ff2.toggleSidebar")
     static let switchByNumber = Notification.Name("ff2.switchByNumber") // object: Int (1-9)
     // switchToInfo, switchToAgent, switchToTerminal replaced by switchByNumber
+    static let dismissOverlay = Notification.Name("ff2.dismissOverlay")
     static let openExternalBrowser = Notification.Name("ff2.openExternalBrowser")
     static let clearProjects = Notification.Name("ff2.clearProjects")
     static let openExternalTerminal = Notification.Name("ff2.openExternalTerminal")
@@ -89,40 +90,12 @@ struct FF2App: App {
                 }
                 .keyboardShortcut("/", modifiers: [.command, .shift])
             }
-            // View menu: sidebar toggle
+            // View menu
             CommandGroup(after: .sidebar) {
                 Button("Toggle Sidebar") {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
                 .keyboardShortcut("s", modifiers: [.command, .control])
-            }
-            // Hidden shortcuts (not shown in menus, but active)
-            CommandGroup(after: .toolbar) {
-                Button("Project") {
-                    NotificationCenter.default.post(name: .switchToProject, object: nil)
-                }
-                .keyboardShortcut("0", modifiers: .command)
-                .hidden()
-
-                ForEach(1...9, id: \.self) { n in
-                    Button("") {
-                        NotificationCenter.default.post(name: .switchByNumber, object: n)
-                    }
-                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
-                    .hidden()
-                }
-
-                Divider()
-
-                Button("Open in External Browser") {
-                    NotificationCenter.default.post(name: .openExternalBrowser, object: nil)
-                }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
-
-                Button("Open in External Terminal") {
-                    NotificationCenter.default.post(name: .openExternalTerminal, object: nil)
-                }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
 
                 Divider()
 
@@ -135,6 +108,29 @@ struct FF2App: App {
                     NotificationCenter.default.post(name: .prevTab, object: nil)
                 }
                 .keyboardShortcut("[", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Open in External Browser") {
+                    NotificationCenter.default.post(name: .openExternalBrowser, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+
+                Button("Open in External Terminal") {
+                    NotificationCenter.default.post(name: .openExternalTerminal, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+            }
+            // Hidden shortcuts (active but not in menus)
+            CommandGroup(after: .toolbar) {
+                Button("") { NotificationCenter.default.post(name: .dismissOverlay, object: nil) }
+                    .keyboardShortcut(.escape, modifiers: []).hidden()
+                Button("") { NotificationCenter.default.post(name: .switchToProject, object: nil) }
+                    .keyboardShortcut("0", modifiers: .command).hidden()
+                ForEach(1...9, id: \.self) { n in
+                    Button("") { NotificationCenter.default.post(name: .switchByNumber, object: n) }
+                        .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command).hidden()
+                }
             }
         }
     }

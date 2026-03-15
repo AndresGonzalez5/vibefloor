@@ -170,6 +170,11 @@ struct ContentView: View {
                 selectionBeforeSettings = oldValue
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .dismissOverlay)) { _ in
+            if selection == .settings || selection == .help {
+                selection = selectionBeforeSettings
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
             NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
         }
