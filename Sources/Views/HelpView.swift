@@ -22,35 +22,76 @@ struct HelpView: View {
 
                 // Shortcuts
                 Form {
-                    Section("Navigation") {
-                        ShortcutRow(keys: "0", description: "Project view")
+                    Section {
+                        ShortcutRow(keys: ",", description: "Settings")
+                        ShortcutRow(keys: "?", shift: true, description: "Help")
+                        ShortcutRow(keys: "N", description: "New workstream or project")
+                        ShortcutRow(keys: "N", shift: true, description: "New project")
+                    } header: {
+                        ShortcutSectionHeader(title: "Global", description: "Available everywhere")
+                    }
+
+                    Section {
+                        ShortcutRow(keys: "0", description: "Back to project view")
                         ShortcutRow(keys: "1", description: "Info tab")
                         ShortcutRow(keys: "2", description: "Coding Agent tab")
                         ShortcutRow(keys: "3", description: "Terminal tab")
                         ShortcutRow(keys: "4", description: "Browser tab")
-                        ShortcutRow(keys: "[ ]", shift: true, description: "Cycle tabs")
+                        ShortcutRow(keys: "[", shift: true, description: "Previous tab")
+                        ShortcutRow(keys: "]", shift: true, description: "Next tab")
+                    } header: {
+                        ShortcutSectionHeader(title: "Workstream Tabs", description: "When a workstream is active")
                     }
 
-                    Section("Projects & Workstreams") {
-                        ShortcutRow(keys: "N", description: "New workstream (in project) or project")
-                        ShortcutRow(keys: "N", shift: true, description: "New project")
+                    Section {
+                        ShortcutRow(keys: "1-9", description: "Open workstream by position")
+                    } header: {
+                        ShortcutSectionHeader(title: "Project View", description: "When viewing a project")
                     }
 
-                    Section("External Apps") {
+                    Section {
                         ShortcutRow(keys: "O", shift: true, description: "Open in external browser")
                         ShortcutRow(keys: "E", shift: true, description: "Open in external terminal")
-                    }
-
-                    Section("App") {
-                        ShortcutRow(keys: ",", description: "Settings")
-                        ShortcutRow(keys: "?", shift: true, description: "Help")
+                    } header: {
+                        ShortcutSectionHeader(title: "External Apps", description: "Opens the current workstream directory")
                     }
                 }
                 .formStyle(.grouped)
                 .scrollDisabled(true)
+
+                // Credits
+                VStack(spacing: 4) {
+                    Text("Built by David Poblador i Garcia")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text("with the support of")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        Link("All Tuner Labs", destination: URL(string: "https://alltuner.com")!)
+                            .font(.caption)
+                    }
+                    Link("davidpoblador.com", destination: URL(string: "https://davidpoblador.com")!)
+                        .font(.caption)
+                }
+                .padding(.bottom, 32)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct ShortcutSectionHeader: View {
+    let title: String
+    let description: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            Text(description)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 }
 
