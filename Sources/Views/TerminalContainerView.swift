@@ -152,17 +152,15 @@ struct TerminalContainerView: View {
             }
         }
         .onAppear { prewarmSurfaces() }
-        .onReceive(NotificationCenter.default.publisher(for: .switchToInfo)) { _ in
-            activeTab = .info
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .switchToAgent)) { _ in
-            activeTab = .claude
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .switchToTerminal)) { _ in
-            activeTab = .workspace
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .retryBrowser)) { _ in
-            activeTab = .browser
+        .onReceive(NotificationCenter.default.publisher(for: .switchByNumber)) { notification in
+            guard let n = notification.object as? Int else { return }
+            switch n {
+            case 1: activeTab = .info
+            case 2: activeTab = .claude
+            case 3: activeTab = .workspace
+            case 4: activeTab = .browser
+            default: break
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .nextTab)) { _ in
             switch activeTab {

@@ -9,9 +9,8 @@ extension Notification.Name {
     static let openHelp = Notification.Name("ff2.openHelp")
     static let retryBrowser = Notification.Name("ff2.retryBrowser")
     static let switchToProject = Notification.Name("ff2.switchToProject")
-    static let switchToInfo = Notification.Name("ff2.switchToInfo")
-    static let switchToAgent = Notification.Name("ff2.switchToAgent")
-    static let switchToTerminal = Notification.Name("ff2.switchToTerminal")
+    static let switchByNumber = Notification.Name("ff2.switchByNumber") // object: Int (1-9)
+    // switchToInfo, switchToAgent, switchToTerminal replaced by switchByNumber
     static let openExternalBrowser = Notification.Name("ff2.openExternalBrowser")
     static let clearProjects = Notification.Name("ff2.clearProjects")
     static let openExternalTerminal = Notification.Name("ff2.openExternalTerminal")
@@ -89,32 +88,19 @@ struct FF2App: App {
                 }
                 .keyboardShortcut("/", modifiers: [.command, .shift])
             }
-            // Cmd+0: project view, Cmd+1-4: workstream tabs
+            // Cmd+0: project view, Cmd+1-9: context-sensitive
             CommandGroup(after: .toolbar) {
                 Button("Project") {
                     NotificationCenter.default.post(name: .switchToProject, object: nil)
                 }
                 .keyboardShortcut("0", modifiers: .command)
 
-                Button("Info") {
-                    NotificationCenter.default.post(name: .switchToInfo, object: nil)
+                ForEach(1...9, id: \.self) { n in
+                    Button("Switch \(n)") {
+                        NotificationCenter.default.post(name: .switchByNumber, object: n)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
                 }
-                .keyboardShortcut("1", modifiers: .command)
-
-                Button("Coding Agent") {
-                    NotificationCenter.default.post(name: .switchToAgent, object: nil)
-                }
-                .keyboardShortcut("2", modifiers: .command)
-
-                Button("Terminal") {
-                    NotificationCenter.default.post(name: .switchToTerminal, object: nil)
-                }
-                .keyboardShortcut("3", modifiers: .command)
-
-                Button("Browser") {
-                    NotificationCenter.default.post(name: .retryBrowser, object: nil)
-                }
-                .keyboardShortcut("4", modifiers: .command)
 
                 Divider()
 

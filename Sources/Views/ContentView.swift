@@ -116,6 +116,18 @@ struct ContentView: View {
             default: NSApp.appearance = nil
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchByNumber)) { notification in
+            guard let n = notification.object as? Int else { return }
+            // In project view: Cmd+N jumps to Nth workstream
+            if case .project(let pid) = selection,
+               let project = projects.first(where: { $0.id == pid }) {
+                let sorted = project.workstreams.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+                if n >= 1 && n <= sorted.count {
+                    selection = .workstream(sorted[n - 1].id)
+                }
+            }
+            // In workstream view: Cmd+1-4 switches tabs (handled by TerminalContainerView)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .switchToProject)) { _ in
             // Go back to project view from any workstream
             if let wsID = selection?.workstreamID,

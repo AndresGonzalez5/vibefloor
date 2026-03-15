@@ -198,8 +198,8 @@ private struct WorkstreamRow: View {
                 Spacer()
                 if let n = shortcutNumber {
                     Text("\(Image(systemName: "command"))\(n)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.quaternary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                         .padding(.trailing, 4)
                 }
                 if isHovering {
