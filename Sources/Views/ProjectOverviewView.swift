@@ -10,6 +10,7 @@ struct ProjectOverviewView: View {
 
     @State private var editingAlias = false
     @State private var aliasText = ""
+    @State private var repoInfo: GitRepoInfo?
 
     private let columns = [
         GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 20)
@@ -58,6 +59,12 @@ struct ProjectOverviewView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 48)
 
+                // Git info
+                if let info = repoInfo {
+                    RepoInfoCard(info: info)
+                        .padding(.horizontal, 24)
+                }
+
                 // Workstreams section
                 if project.workstreams.isEmpty {
                     VStack(spacing: 12) {
@@ -90,6 +97,7 @@ struct ProjectOverviewView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { repoInfo = GitOperations.repoInfo(at: project.directory) }
     }
 
     private func commitAlias() {
@@ -98,6 +106,58 @@ struct ProjectOverviewView: View {
         project.name = name
         editingAlias = false
         onProjectChanged()
+    }
+}
+
+private struct RepoInfoCard: View {
+    let info: GitRepoInfo
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: info.isRepo ? "checkmark.circle.fill" : "xmark.circle")
+                    .foregroundStyle(info.isRepo ? .green : .secondary)
+                Text(info.isRepo ? "Git Repository" : "Not a Git Repository")
+                    .font(.system(.body, weight: .medium))
+                Spacer()
+                if info.isDirty {
+                    Text("Uncommitted changes")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            if info.isRepo {
+                HStack(spacing: 24) {
+                    if let branch = info.branch {
+                        Label(branch, systemImage: "arrow.triangle.branch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let count = info.commitCount {
+                        Label("\(count) commits", systemImage: "clock")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let remote = info.remoteURL {
+                    Text(remote)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
 }
 

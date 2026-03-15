@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("ff2.bypassPermissions") private var bypassPermissions: Bool = false
     @AppStorage("ff2.defaultTerminal") private var defaultTerminal: String = ""
     @AppStorage("ff2.defaultBrowser") private var defaultBrowser: String = ""
+    @AppStorage("ff2.branchPrefix") private var branchPrefix: String = "ff2"
     @AppStorage("ff2.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
 
     @EnvironmentObject private var appEnv: AppEnvironment
@@ -78,6 +79,12 @@ struct SettingsView: View {
                 Text("Default location when adding new projects.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                TextField("Branch prefix", text: $branchPrefix)
+                    .textFieldStyle(.roundedBorder)
+                Text("e.g. \(branchPrefix.isEmpty ? "ff2" : branchPrefix)/deploy-ludicrous-speed")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.tertiary)
             }
 
             // MARK: - Terminal

@@ -252,11 +252,22 @@ struct ProjectSidebar: View {
 
     private func addWorkstream(for projectID: UUID) {
         guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
+        let project = projects[index]
 
-        let existingNames = Set(projects[index].workstreams.map(\.name))
+        // Workstreams require a git repo
+        guard GitOperations.isGitRepo(at: project.directory) else { return }
+
+        let existingNames = Set(project.workstreams.map(\.name))
         let name = NameGenerator.generate(avoiding: existingNames)
 
-        let workstream = Workstream(name: name)
+        let worktreePath = GitOperations.createWorktree(
+            projectPath: project.directory,
+            projectName: project.name,
+            workstreamName: name,
+            branchPrefix: branchPrefix
+        )
+
+        let workstream = Workstream(name: name, worktreePath: worktreePath)
         projects[index].workstreams.append(workstream)
         expandedProjects.insert(projectID)
         selection = .workstream(workstream.id)
@@ -266,6 +277,13 @@ struct ProjectSidebar: View {
     @EnvironmentObject private var surfaceCache: TerminalSurfaceCache
 
     private func archiveWorkstream(_ workstreamID: UUID, in project: inout Project) {
+        if let ws = project.workstreams.first(where: { $0.id == workstreamID }) {
+            GitOperations.removeWorktree(
+                projectPath: project.directory,
+                workstreamName: ws.name,
+                projectName: project.name
+            )
+        }
         surfaceCache.removeWorkstreamSurfaces(for: workstreamID)
         project.workstreams.removeAll { $0.id == workstreamID }
         if case .workstream(let id) = selection, id == workstreamID {
@@ -308,6 +326,7 @@ struct ProjectSidebar: View {
     }
 
     @AppStorage("ff2.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
+    @AppStorage("ff2.branchPrefix") private var branchPrefix: String = "ff2"
 
     private func openDirectoryPicker() {
         let panel = NSOpenPanel()
@@ -337,6 +356,9 @@ struct ProjectSidebar: View {
             newProjectError = error.localizedDescription
             return
         }
+
+        // Initialize git repo in the new directory
+        GitOperations.initRepo(at: dirURL.path)
 
         showingNewProjectName = false
         addProject(name: name, directory: dirURL.path)

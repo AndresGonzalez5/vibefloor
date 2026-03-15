@@ -6,12 +6,20 @@ import Foundation
 struct Workstream: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
+    var worktreePath: String?
     var lastAccessedAt: Date
 
-    init(name: String, id: UUID = UUID(), lastAccessedAt: Date = Date()) {
+    init(name: String, worktreePath: String? = nil, id: UUID = UUID(), lastAccessedAt: Date = Date()) {
         self.id = id
         self.name = name
+        self.worktreePath = worktreePath
         self.lastAccessedAt = lastAccessedAt
+    }
+
+    /// The working directory for this workstream's terminals.
+    /// Uses the worktree path if available, otherwise falls back to the project directory.
+    func workingDirectory(projectDirectory: String) -> String {
+        worktreePath ?? projectDirectory
     }
 }
 

@@ -51,7 +51,7 @@ struct ContentView: View {
             } else if let workstream = activeWorkstream, let project = activeProject {
                 TerminalContainerView(
                     workstreamID: workstream.id,
-                    workingDirectory: project.directory,
+                    workingDirectory: workstream.workingDirectory(projectDirectory: project.directory),
                     projectName: project.name,
                     workstreamName: workstream.name
                 )
