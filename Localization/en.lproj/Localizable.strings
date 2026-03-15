@@ -21,6 +21,11 @@
 
 /* Alerts */
 "Remove Project" = "Remove Project";
+"Archive Workstream" = "Archive Workstream";
+"Archive" = "Archive";
+"Archive Anyway" = "Archive Anyway";
+"This workstream has uncommitted changes that will be lost." = "This workstream has uncommitted changes that will be lost.";
+"The worktree and its branch will be removed." = "The worktree and its branch will be removed.";
 "Cancel" = "Cancel";
 "Remove" = "Remove";
 

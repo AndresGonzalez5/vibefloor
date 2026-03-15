@@ -144,6 +144,12 @@ enum GitOperations {
         }
     }
 
+    /// Check if a worktree has uncommitted changes (staged, unstaged, or untracked files).
+    static func hasUncommittedChanges(at path: String) -> Bool {
+        guard let status = run("git", args: ["status", "--porcelain"], in: path) else { return false }
+        return !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// List existing worktrees for a project.
     static func listWorktrees(at projectPath: String) -> [String] {
         guard let output = run("git", args: ["worktree", "list", "--porcelain"], in: projectPath) else {

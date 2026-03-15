@@ -20,6 +20,8 @@ struct ProjectSidebar: View {
     @State private var newProjectError = ""
     @State private var isDropTargeted = false
     @State private var projectToDelete: UUID?
+    @State private var workstreamToArchive: UUID?
+    @State private var archiveWarningDirty = false
     @State private var expandedProjects: Set<UUID> = []
     @State private var cachedSortedIDs: [UUID] = []
     @AppStorage("ff2.sortOrder") private var sortOrder: ProjectSortOrder = .recent
@@ -98,7 +100,7 @@ struct ProjectSidebar: View {
                             WorkstreamRow(
                                 name: workstream.name,
                                 isPathValid: appEnv.isPathValid(workstream.worktreePath),
-                                onArchive: { archiveWorkstream(workstream.id, in: &projectBind.wrappedValue) }
+                                onArchive: { confirmArchive(workstream) }
                             )
                             .tag(SidebarSelection.workstream(workstream.id))
                             .padding(.leading, 22)
@@ -261,6 +263,24 @@ struct ProjectSidebar: View {
                 Text("Remove \"\(project.name)\" from the list? Files in \(project.directory) will not be deleted.")
             }
         }
+        .alert(
+            "Archive Workstream",
+            isPresented: Binding(
+                get: { workstreamToArchive != nil },
+                set: { if !$0 { workstreamToArchive = nil } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) { workstreamToArchive = nil }
+            Button(archiveWarningDirty ? "Archive Anyway" : "Archive", role: .destructive) {
+                performArchive()
+            }
+        } message: {
+            if archiveWarningDirty {
+                Text("This workstream has uncommitted changes that will be lost.")
+            } else {
+                Text("The worktree and its branch will be removed.")
+            }
+        }
     }
 
     // MARK: - Workstream management
@@ -295,6 +315,22 @@ struct ProjectSidebar: View {
     @EnvironmentObject private var appEnv: AppEnvironment
 
     @AppStorage("ff2.tmuxMode") private var tmuxModeForArchive: Bool = false
+
+    private func confirmArchive(_ workstream: Workstream) {
+        if let path = workstream.worktreePath, GitOperations.hasUncommittedChanges(at: path) {
+            archiveWarningDirty = true
+        } else {
+            archiveWarningDirty = false
+        }
+        workstreamToArchive = workstream.id
+    }
+
+    private func performArchive() {
+        guard let wsID = workstreamToArchive,
+              let (pi, _) = workstreamIndex[wsID] else { return }
+        archiveWorkstream(wsID, in: &projects[pi])
+        workstreamToArchive = nil
+    }
 
     private func archiveWorkstream(_ workstreamID: UUID, in project: inout Project) {
         // Capture what we need for background cleanup

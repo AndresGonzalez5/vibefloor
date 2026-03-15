@@ -21,6 +21,11 @@
 
 /* Alerts */
 "Remove Project" = "Eliminar proyecto";
+"Archive Workstream" = "Archivar flujo de trabajo";
+"Archive" = "Archivar";
+"Archive Anyway" = "Archivar de todos modos";
+"This workstream has uncommitted changes that will be lost." = "Este flujo de trabajo tiene cambios sin confirmar que se perderán.";
+"The worktree and its branch will be removed." = "El árbol de trabajo y su rama se eliminarán.";
 "Cancel" = "Cancelar";
 "Remove" = "Eliminar";
 
