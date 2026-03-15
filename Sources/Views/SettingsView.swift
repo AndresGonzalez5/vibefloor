@@ -147,10 +147,7 @@ struct SettingsView: View {
                 .onChange(of: appearance) { _, newValue in
                     applyAppearance(newValue)
                 }
-            }
 
-            // MARK: - Language
-            Section("Language") {
                 Picker("Language", selection: $languageOverride) {
                     ForEach(availableLanguages, id: \.code) { lang in
                         Text(lang.name).tag(lang.code)
