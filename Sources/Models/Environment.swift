@@ -17,6 +17,11 @@ final class AppEnvironment: ObservableObject {
     // Worktree path validity cache
     @Published private var pathValidityCache: [String: Bool] = [:]
 
+    // GitHub info cache
+    @Published private var githubRepoCache: [String: GitHubRepoInfo] = [:]
+    @Published private var githubPRCache: [String: [GitHubPR]] = [:]
+    @Published private var githubBranchPRCache: [String: GitHubPR] = [:] // key: "dir|branch"
+
     func refresh() {
         isDetecting = true
         Task.detached {
@@ -111,6 +116,46 @@ final class AppEnvironment: ObservableObject {
             await MainActor.run {
                 self.pathValidityCache.merge(results) { _, new in new }
                 self.missingProjectIDs = missing
+            }
+        }
+    }
+
+    // MARK: - GitHub
+
+    var ghAvailable: Bool {
+        toolStatus.gh.isInstalled && toolStatus.ghAuthDetail != "Not authenticated"
+    }
+
+    func githubRepo(for directory: String) -> GitHubRepoInfo? {
+        githubRepoCache[directory]
+    }
+
+    func githubPRs(for directory: String) -> [GitHubPR] {
+        githubPRCache[directory] ?? []
+    }
+
+    func githubPR(for directory: String, branch: String) -> GitHubPR? {
+        githubBranchPRCache["\(directory)|\(branch)"]
+    }
+
+    func refreshGitHubInfo(for directory: String, branch: String? = nil) {
+        guard ghAvailable, let ghPath = toolStatus.gh.path else { return }
+        guard GitHubOperations.hasGitHubRemote(at: directory) else { return }
+
+        Task.detached {
+            let repo = GitHubOperations.repoInfo(ghPath: ghPath, at: directory)
+            let prs = GitHubOperations.openPRs(ghPath: ghPath, at: directory)
+            var branchPR: GitHubPR?
+            if let branch {
+                branchPR = GitHubOperations.prForBranch(ghPath: ghPath, at: directory, branch: branch)
+            }
+
+            await MainActor.run {
+                if let repo { self.githubRepoCache[directory] = repo }
+                self.githubPRCache[directory] = prs
+                if let branch, let pr = branchPR {
+                    self.githubBranchPRCache["\(directory)|\(branch)"] = pr
+                }
             }
         }
     }

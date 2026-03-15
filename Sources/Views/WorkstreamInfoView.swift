@@ -7,7 +7,9 @@ struct WorkstreamInfoView: View {
     let workstreamName: String
     let workingDirectory: String
     let projectName: String
+    let projectDirectory: String
 
+    @EnvironmentObject var appEnv: AppEnvironment
     @State private var branchName: String?
     @State private var docFiles: [DocFile] = []
     @State private var selectedDoc: String?
@@ -55,10 +57,26 @@ struct WorkstreamInfoView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                // GitHub PR for this branch
+                if appEnv.ghAvailable, let branch = branchName,
+                   let pr = appEnv.githubPR(for: projectDirectory, branch: branch) {
+                    Section("Pull Request") {
+                        LabeledContent("#\(pr.number)") {
+                            Text(pr.title)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                        LabeledContent("Status") {
+                            Text(pr.state)
+                                .foregroundStyle(pr.state == "OPEN" ? .green : .secondary)
+                        }
+                    }
+                }
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(maxHeight: 200)
+            .frame(maxHeight: branchName.flatMap({ appEnv.githubPR(for: projectDirectory, branch: $0) }) != nil ? 320 : 200)
 
             // Document tabs
             if !docFiles.isEmpty {
@@ -104,7 +122,10 @@ struct WorkstreamInfoView: View {
     private func loadInfo() {
         Task.detached {
             let branch = GitOperations.repoInfo(at: workingDirectory).branch
-            await MainActor.run { branchName = branch }
+            await MainActor.run {
+                branchName = branch
+                appEnv.refreshGitHubInfo(for: projectDirectory, branch: branch)
+            }
         }
 
         let dir = workingDirectory

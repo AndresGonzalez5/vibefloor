@@ -74,6 +74,48 @@ struct ProjectOverviewView: View {
                 }
             }
 
+            // MARK: - GitHub
+            if appEnv.ghAvailable, let ghInfo = appEnv.githubRepo(for: project.directory) {
+                Section("GitHub") {
+                    LabeledContent("Repository") {
+                        Text(ghInfo.name)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let desc = ghInfo.description, !desc.isEmpty {
+                        LabeledContent("Description") {
+                            Text(desc)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    LabeledContent("Stars") {
+                        Text("\(ghInfo.stars)")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    LabeledContent("Open Issues") {
+                        Text("\(ghInfo.openIssues)")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    let prs = appEnv.githubPRs(for: project.directory)
+                    if !prs.isEmpty {
+                        LabeledContent("Open PRs") {
+                            Text("\(prs.count)")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(prs, id: \.number) { pr in
+                            LabeledContent("#\(pr.number)") {
+                                Text(pr.title)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            }
+
             // MARK: - Workstreams
             Section {
                 if project.workstreams.isEmpty {
@@ -111,7 +153,10 @@ struct ProjectOverviewView: View {
         }
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { appEnv.refreshRepoInfo(for: project.directory) }
+        .onAppear {
+            appEnv.refreshRepoInfo(for: project.directory)
+            appEnv.refreshGitHubInfo(for: project.directory)
+        }
     }
 
     private func abbreviatePath(_ path: String) -> String {

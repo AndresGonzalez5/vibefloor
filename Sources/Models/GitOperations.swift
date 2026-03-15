@@ -52,7 +52,28 @@ enum GitOperations {
         )
     }
 
-    /// Create a git worktree for a workstream.
+    /// Detect the default branch (origin/main, origin/master, main, master).
+    static func defaultBranch(at path: String) -> String {
+        // Try remote HEAD first
+        if let ref = run("git", args: ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"], in: path) {
+            return ref.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Check if origin/main or origin/master exist
+        for branch in ["origin/main", "origin/master"] {
+            if run("git", args: ["rev-parse", "--verify", branch], in: path) != nil {
+                return branch
+            }
+        }
+        // Fallback to local main/master
+        for branch in ["main", "master"] {
+            if run("git", args: ["rev-parse", "--verify", branch], in: path) != nil {
+                return branch
+            }
+        }
+        return "HEAD"
+    }
+
+    /// Create a git worktree for a workstream, branching off the default branch.
     /// Returns the worktree path on success, nil on failure.
     static func createWorktree(projectPath: String, projectName: String, workstreamName: String, branchPrefix: String = "ff2") -> String? {
         let worktreeDir = AppConstants.worktreesDirectory
@@ -63,30 +84,48 @@ enum GitOperations {
             ? workstreamName
             : "\(branchPrefix)/\(workstreamName)"
 
+        let baseBranch = defaultBranch(at: projectPath)
+
         // Create parent directories
         try? FileManager.default.createDirectory(
             at: worktreeDir.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
 
+        // Create worktree with new branch based off the default branch
         let result = run(
             "git",
-            args: ["worktree", "add", "-b", branchName, worktreeDir.path],
+            args: ["worktree", "add", "-b", branchName, worktreeDir.path, baseBranch],
             in: projectPath
         )
 
-        if result != nil {
-            return worktreeDir.path
+        if result == nil {
+            // Branch might already exist, try without -b
+            let fallback = run(
+                "git",
+                args: ["worktree", "add", worktreeDir.path, branchName],
+                in: projectPath
+            )
+            guard fallback != nil else { return nil }
         }
 
-        // Branch might already exist, try without -b
-        let fallback = run(
-            "git",
-            args: ["worktree", "add", worktreeDir.path, branchName],
-            in: projectPath
-        )
+        // Symlink .env files from the main repo
+        symlinkEnvFiles(from: projectPath, to: worktreeDir.path)
 
-        return fallback != nil ? worktreeDir.path : nil
+        return worktreeDir.path
+    }
+
+    /// Symlink .env and .env.local from main repo to worktree if they exist.
+    private static func symlinkEnvFiles(from projectPath: String, to worktreePath: String) {
+        let envFiles = [".env", ".env.local"]
+        let fm = FileManager.default
+        for file in envFiles {
+            let source = URL(fileURLWithPath: projectPath).appendingPathComponent(file)
+            let destination = URL(fileURLWithPath: worktreePath).appendingPathComponent(file)
+            guard fm.fileExists(atPath: source.path) else { continue }
+            guard !fm.fileExists(atPath: destination.path) else { continue }
+            try? fm.createSymbolicLink(at: destination, withDestinationURL: source)
+        }
     }
 
     /// Remove a git worktree.

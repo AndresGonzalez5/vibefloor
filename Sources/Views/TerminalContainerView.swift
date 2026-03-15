@@ -35,6 +35,7 @@ enum WorkstreamTab: Hashable {
 struct TerminalContainerView: View {
     let workstreamID: UUID
     let workingDirectory: String
+    let projectDirectory: String
     let projectName: String
     let workstreamName: String
     let bypassPermissions: Bool
@@ -113,7 +114,8 @@ struct TerminalContainerView: View {
                 WorkstreamInfoView(
                     workstreamName: workstreamName,
                     workingDirectory: workingDirectory,
-                    projectName: projectName
+                    projectName: projectName,
+                    projectDirectory: projectDirectory
                 )
             case .claude:
                 SingleTerminalView(
@@ -193,6 +195,8 @@ struct TerminalContainerView: View {
         var vars = [
             "FF_PROJECT": projectName,
             "FF_WORKSTREAM": workstreamName,
+            "FF_PROJECT_DIR": projectDirectory,
+            "FF_WORKTREE_DIR": workingDirectory,
         ]
         if agentTeams {
             vars["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"

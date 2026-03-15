@@ -52,6 +52,7 @@ struct ContentView: View {
                 TerminalContainerView(
                     workstreamID: workstream.id,
                     workingDirectory: workstream.workingDirectory(projectDirectory: project.directory),
+                    projectDirectory: project.directory,
                     projectName: project.name,
                     workstreamName: workstream.name,
                     bypassPermissions: workstream.bypassPermissions
