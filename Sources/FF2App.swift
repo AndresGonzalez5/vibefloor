@@ -9,6 +9,7 @@ extension Notification.Name {
     static let openHelp = Notification.Name("ff2.openHelp")
     static let retryBrowser = Notification.Name("ff2.retryBrowser")
     static let switchToProject = Notification.Name("ff2.switchToProject")
+    static let toggleSidebar = Notification.Name("ff2.toggleSidebar")
     static let switchByNumber = Notification.Name("ff2.switchByNumber") // object: Int (1-9)
     // switchToInfo, switchToAgent, switchToTerminal replaced by switchByNumber
     static let openExternalBrowser = Notification.Name("ff2.openExternalBrowser")
@@ -88,18 +89,27 @@ struct FF2App: App {
                 }
                 .keyboardShortcut("/", modifiers: [.command, .shift])
             }
-            // Cmd+0: project view, Cmd+1-9: context-sensitive
+            // View menu: sidebar toggle
+            CommandGroup(after: .sidebar) {
+                Button("Toggle Sidebar") {
+                    NotificationCenter.default.post(name: .toggleSidebar, object: nil)
+                }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            }
+            // Hidden shortcuts (not shown in menus, but active)
             CommandGroup(after: .toolbar) {
                 Button("Project") {
                     NotificationCenter.default.post(name: .switchToProject, object: nil)
                 }
                 .keyboardShortcut("0", modifiers: .command)
+                .hidden()
 
                 ForEach(1...9, id: \.self) { n in
-                    Button("Switch \(n)") {
+                    Button("") {
                         NotificationCenter.default.post(name: .switchByNumber, object: n)
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+                    .hidden()
                 }
 
                 Divider()

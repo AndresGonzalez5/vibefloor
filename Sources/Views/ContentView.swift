@@ -170,6 +170,9 @@ struct ContentView: View {
                 selectionBeforeSettings = oldValue
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
+            NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .openHelp)) { _ in
             if selection == .help {
                 selection = selectionBeforeSettings
