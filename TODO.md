@@ -8,7 +8,6 @@
 - [ ] Build and ship a standalone CLI binary (like `code` for VS Code)
 - [ ] Homebrew cask for installation
 - [ ] Code signing and notarization for distribution
-- [ ] App icon
 - [ ] All Tuner Labs logo image in help view (needs asset)
 
 ## Features
@@ -83,6 +82,8 @@
 - [x] Teardown script runs before worktree removal on archive
 - [x] .env symlink guarded by setting (default on)
 - [x] Script info displayed in workstream Info tab
+- [x] App icon (factory floor + Poblenou skyline)
+- [x] Landing page website with Tailwind CSS build
 
 ## Probably not needed
 - [ ] Claude Agent SDK integration (TypeScript): CLI + tmux + session-id covers our needs
