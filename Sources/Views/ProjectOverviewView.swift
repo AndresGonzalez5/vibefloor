@@ -11,6 +11,9 @@ struct ProjectOverviewView: View {
 
     @EnvironmentObject var appEnv: AppEnvironment
     @AppStorage("ff2.workstreamSortOrder") private var workstreamSortOrder: ProjectSortOrder = .recent
+    @State private var worktrees: [WorktreeInfo] = []
+    @State private var showingPruneConfirm = false
+    @State private var isPruning = false
 
     var body: some View {
         Form {
@@ -162,12 +165,84 @@ struct ProjectOverviewView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            // MARK: - Worktrees
+            if !worktrees.isEmpty {
+                Section {
+                    ForEach(worktrees) { wt in
+                        WorktreeInfoRow(worktree: wt, abbreviatePath: abbreviatePath)
+                    }
+
+                    if prunableCount > 0 {
+                        Button(action: { showingPruneConfirm = true }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 12))
+                                Text("Prune \(prunableCount) clean worktree\(prunableCount == 1 ? "" : "s")")
+                            }
+                            .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isPruning)
+                    }
+                } header: {
+                    HStack {
+                        Text("Git Worktrees")
+                        Spacer()
+                        Text("\(worktrees.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams.")
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             appEnv.refreshRepoInfo(for: project.directory)
             appEnv.refreshGitHubInfo(for: project.directory)
+            refreshWorktrees()
+        }
+        .alert("Prune Worktrees", isPresented: $showingPruneConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Prune", role: .destructive) { pruneWorktrees() }
+        } message: {
+            Text("Remove \(prunableCount) worktree\(prunableCount == 1 ? "" : "s") with no uncommitted changes? Associated workstreams will also be removed from the sidebar.")
+        }
+    }
+
+    private var prunableCount: Int {
+        worktrees.filter { !$0.isMain && !$0.isDirty }.count
+    }
+
+    private func refreshWorktrees() {
+        let dir = project.directory
+        Task.detached {
+            let wts = GitOperations.listWorktreesWithInfo(at: dir)
+            await MainActor.run {
+                worktrees = wts
+            }
+        }
+    }
+
+    private func pruneWorktrees() {
+        isPruning = true
+        let dir = project.directory
+        let prunablePaths = Set(worktrees.filter { !$0.isMain && !$0.isDirty }.map(\.path))
+        Task.detached {
+            GitOperations.pruneCleanWorktrees(at: dir)
+            await MainActor.run {
+                // Remove workstreams whose worktree paths were pruned
+                project.workstreams.removeAll { ws in
+                    guard let path = ws.worktreePath else { return false }
+                    return prunablePaths.contains(path)
+                }
+                onProjectChanged()
+                isPruning = false
+                refreshWorktrees()
+            }
         }
     }
 
@@ -186,6 +261,45 @@ struct ProjectOverviewView: View {
             return "~" + path.dropFirst(home.count)
         }
         return path
+    }
+}
+
+private struct WorktreeInfoRow: View {
+    let worktree: WorktreeInfo
+    let abbreviatePath: (String) -> String
+
+    var body: some View {
+        HStack {
+            Image(systemName: worktree.isMain ? "folder.fill" : "arrow.triangle.branch")
+                .foregroundStyle(worktree.isMain ? .blue : .secondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(worktree.branch ?? "detached")
+                    .font(.system(.body, design: .monospaced))
+                Text(abbreviatePath(worktree.path))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            if worktree.isMain {
+                Text("main")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if worktree.isDirty {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(.orange)
+                        .frame(width: 6, height: 6)
+                    Text("Uncommitted changes")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } else {
+                Text("Clean")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+        }
     }
 }
 

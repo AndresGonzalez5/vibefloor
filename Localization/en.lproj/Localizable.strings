@@ -68,3 +68,10 @@
 "Requires tmux to be installed." = "Requires tmux to be installed.";
 "URL" = "URL";
 "Done" = "Done";
+
+/* Worktrees */
+"Git Worktrees" = "Git Worktrees";
+"Prune Worktrees" = "Prune Worktrees";
+"Prune" = "Prune";
+"Clean" = "Clean";
+"Uncommitted changes" = "Uncommitted changes";

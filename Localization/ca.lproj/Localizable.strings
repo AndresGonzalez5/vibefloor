@@ -68,3 +68,10 @@
 "Requires tmux to be installed." = "Requereix tmux instal·lat.";
 "URL" = "URL";
 "Done" = "Fet";
+
+/* Worktrees */
+"Git Worktrees" = "Arbres de treball Git";
+"Prune Worktrees" = "Netejar arbres de treball";
+"Prune" = "Netejar";
+"Clean" = "Net";
+"Uncommitted changes" = "Canvis sense confirmar";

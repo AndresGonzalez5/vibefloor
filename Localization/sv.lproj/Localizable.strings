@@ -68,3 +68,10 @@
 "Requires tmux to be installed." = "Kräver att tmux är installerat.";
 "URL" = "URL";
 "Done" = "Klar";
+
+/* Worktrees */
+"Git Worktrees" = "Git-arbetsträd";
+"Prune Worktrees" = "Rensa arbetsträd";
+"Prune" = "Rensa";
+"Clean" = "Rent";
+"Uncommitted changes" = "Ospara ändringar";

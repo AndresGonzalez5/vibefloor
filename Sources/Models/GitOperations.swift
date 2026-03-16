@@ -11,6 +11,15 @@ struct GitRepoInfo {
     let isDirty: Bool
 }
 
+struct WorktreeInfo: Identifiable {
+    let path: String
+    let branch: String?
+    let isDirty: Bool
+    let isMain: Bool
+
+    var id: String { path }
+}
+
 enum GitOperations {
     /// Check if a directory is a git repository.
     static func isGitRepo(at path: String) -> Bool {
@@ -150,14 +159,56 @@ enum GitOperations {
         return !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// List existing worktrees for a project.
-    static func listWorktrees(at projectPath: String) -> [String] {
+    /// List existing worktrees for a project with branch and dirty status.
+    static func listWorktreesWithInfo(at projectPath: String) -> [WorktreeInfo] {
         guard let output = run("git", args: ["worktree", "list", "--porcelain"], in: projectPath) else {
             return []
         }
-        return output.components(separatedBy: "\n")
-            .filter { $0.hasPrefix("worktree ") }
-            .map { String($0.dropFirst("worktree ".count)) }
+
+        let mainPath = URL(fileURLWithPath: projectPath).standardizedFileURL.path
+
+        var results: [WorktreeInfo] = []
+        var currentPath: String?
+        var currentBranch: String?
+
+        for line in output.components(separatedBy: "\n") {
+            if line.hasPrefix("worktree ") {
+                // Flush previous entry
+                if let path = currentPath {
+                    let isMain = URL(fileURLWithPath: path).standardizedFileURL.path == mainPath
+                    let dirty = !isMain && hasUncommittedChanges(at: path)
+                    results.append(WorktreeInfo(path: path, branch: currentBranch, isDirty: dirty, isMain: isMain))
+                }
+                currentPath = String(line.dropFirst("worktree ".count))
+                currentBranch = nil
+            } else if line.hasPrefix("branch refs/heads/") {
+                currentBranch = String(line.dropFirst("branch refs/heads/".count))
+            }
+        }
+        // Flush last entry
+        if let path = currentPath {
+            let isMain = URL(fileURLWithPath: path).standardizedFileURL.path == mainPath
+            let dirty = !isMain && hasUncommittedChanges(at: path)
+            results.append(WorktreeInfo(path: path, branch: currentBranch, isDirty: dirty, isMain: isMain))
+        }
+
+        return results
+    }
+
+    /// Remove all worktrees that have no uncommitted changes. Returns count of pruned worktrees.
+    @discardableResult
+    static func pruneCleanWorktrees(at projectPath: String) -> Int {
+        let worktrees = listWorktreesWithInfo(at: projectPath)
+        var pruned = 0
+        for wt in worktrees where !wt.isMain && !wt.isDirty {
+            let result = run("git", args: ["worktree", "remove", wt.path], in: projectPath)
+            if result != nil {
+                pruned += 1
+            }
+        }
+        // Clean up stale entries
+        _ = run("git", args: ["worktree", "prune"], in: projectPath)
+        return pruned
     }
 
     // MARK: - Private

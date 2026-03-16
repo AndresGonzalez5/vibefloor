@@ -68,3 +68,10 @@
 "Requires tmux to be installed." = "Requiere tmux instalado.";
 "URL" = "URL";
 "Done" = "Hecho";
+
+/* Worktrees */
+"Git Worktrees" = "Árboles de trabajo Git";
+"Prune Worktrees" = "Limpiar árboles de trabajo";
+"Prune" = "Limpiar";
+"Clean" = "Limpio";
+"Uncommitted changes" = "Cambios sin confirmar";
