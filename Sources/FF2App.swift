@@ -122,6 +122,11 @@ struct FF2App: App {
                 }
                 .keyboardShortcut("[", modifiers: [.command, .shift])
 
+                Button("Address Bar") {
+                    NotificationCenter.default.post(name: .focusAddressBar, object: nil)
+                }
+                .keyboardShortcut("l", modifiers: .command)
+
                 Button("Focus Agent") {
                     NotificationCenter.default.post(name: .focusAgent, object: nil)
                 }

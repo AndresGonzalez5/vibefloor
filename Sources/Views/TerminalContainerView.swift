@@ -118,11 +118,12 @@ struct TerminalContainerView: View {
             // Tab bar
             HStack(spacing: 0) {
                 ForEach(Array(tabs.enumerated()), id: \.element) { index, tab in
+                    let customIndex = index - 2 // skip Info and Agent
                     WorkspaceTabButton(
                         tab: tab,
                         label: tabLabel(tab),
                         icon: tabIcon(tab),
-                        shortcut: index < 9 ? "\(index + 1)" : nil,
+                        shortcut: tabShortcut(tab) ?? (customIndex >= 0 && customIndex < 9 ? "\(customIndex + 1)" : nil),
                         isActive: activeTab == tab,
                         onSelect: { activeTab = tab },
                         onClose: tab.isCloseable ? { closeTab(tab) } : nil
@@ -216,8 +217,11 @@ struct TerminalContainerView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchByNumber)) { notification in
-            guard let n = notification.object as? Int, n >= 1, n <= tabs.count else { return }
-            activeTab = tabs[n - 1]
+            guard let n = notification.object as? Int, n >= 1 else { return }
+            // Cmd+1-9 maps to custom tabs (after Info and Agent)
+            let customTabs = Array(tabs.dropFirst(2))
+            guard n <= customTabs.count else { return }
+            activeTab = customTabs[n - 1]
         }
         .onReceive(NotificationCenter.default.publisher(for: .nextTab)) { _ in
             guard let idx = tabs.firstIndex(of: activeTab) else { return }
@@ -260,9 +264,9 @@ struct TerminalContainerView: View {
 
     private func tabShortcut(_ tab: WorkspaceTab) -> String? {
         switch tab {
-        case .agent: return "\u{21A9}"
         case .info: return "I"
-        case .terminal, .browser: return nil
+        case .agent: return "\u{21A9}"
+        default: return nil
         }
     }
 

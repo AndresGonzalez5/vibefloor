@@ -4,6 +4,10 @@
 import SwiftUI
 import WebKit
 
+extension Notification.Name {
+    static let focusAddressBar = Notification.Name("factoryfloor.focusAddressBar")
+}
+
 struct BrowserView: View {
     let defaultURL: String
 
@@ -13,6 +17,8 @@ struct BrowserView: View {
     @State private var canGoBack = false
     @State private var canGoForward = false
     @State private var connectionError = false
+    @State private var pageTitle: String?
+    @FocusState private var urlFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,6 +57,7 @@ struct BrowserView: View {
                 TextField("URL", text: $urlText)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12, design: .monospaced))
+                    .focused($urlFieldFocused)
                     .onSubmit { navigateTo(urlText) }
             }
             .padding(.horizontal, 8)
@@ -67,7 +74,8 @@ struct BrowserView: View {
                     canGoBack: $canGoBack,
                     canGoForward: $canGoForward,
                     urlText: $urlText,
-                    connectionError: $connectionError
+                    connectionError: $connectionError,
+                    pageTitle: $pageTitle
                 )
                 .opacity(connectionError ? 0 : 1)
 
@@ -105,6 +113,9 @@ struct BrowserView: View {
         .onReceive(NotificationCenter.default.publisher(for: .retryBrowser)) { _ in
             retry()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .focusAddressBar)) { _ in
+            urlFieldFocused = true
+        }
     }
 
     private func navigateTo(_ urlString: String) {
@@ -134,6 +145,7 @@ struct WebViewRepresentable: NSViewRepresentable {
     @Binding var canGoForward: Bool
     @Binding var urlText: String
     @Binding var connectionError: Bool
+    @Binding var pageTitle: String?
 
     func makeNSView(context: Context) -> WKWebView {
         webView.navigationDelegate = context.coordinator
@@ -189,6 +201,7 @@ struct WebViewRepresentable: NSViewRepresentable {
             if let url = webView.url?.absoluteString {
                 parent.urlText = url
             }
+            parent.pageTitle = webView.title
         }
     }
 }

@@ -119,7 +119,6 @@ final class TerminalView: NSView, NSTextInputClient {
 
     override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
-        logger.info("becomeFirstResponder: result=\(result) surface=\(self.surface != nil)")
         if result, let surface {
             ghostty_surface_set_focus(surface, true)
         }
@@ -128,7 +127,6 @@ final class TerminalView: NSView, NSTextInputClient {
 
     override func resignFirstResponder() -> Bool {
         let result = super.resignFirstResponder()
-        logger.info("resignFirstResponder: result=\(result)")
         if result, let surface {
             ghostty_surface_set_focus(surface, false)
         }
@@ -211,11 +209,9 @@ final class TerminalView: NSView, NSTextInputClient {
 
     override func keyDown(with event: NSEvent) {
         guard let surface else {
-            logger.warning("keyDown: no surface")
             interpretKeyEvents([event])
             return
         }
-        logger.info("keyDown: surface=\(String(describing: surface)) key=\(event.keyCode)")
 
         let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
 
