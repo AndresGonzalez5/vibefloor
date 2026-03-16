@@ -1,0 +1,14 @@
+{
+  "name": "ff2-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bunx @tailwindcss/cli -i src/styles.css -o dist/styles.css --watch & bun run serve",
+    "build": "bunx @tailwindcss/cli -i src/styles.css -o dist/styles.css --minify && cp src/index.html dist/index.html",
+    "serve": "bun --hot serve.ts"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.1",
+    "tailwindcss": "^4.2.1"
+  }
+}

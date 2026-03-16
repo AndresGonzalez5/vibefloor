@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ff2 - AI-Powered Development Workspace</title>
+<meta name="description" content="A macOS app that manages git worktrees, Claude Code sessions, and dev servers from a single window.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script>
+// Blocking: apply theme before paint
+(function(){
+  var t = localStorage.getItem('ff2-theme');
+  if (t === 'light') { document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light'); }
+  else if (t === 'system' || !t) {
+    if (!window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light');
+    }
+  }
+})();
+</script>
+</head>
+<body class="font-sans antialiased overflow-x-hidden transition-colors duration-300" style="background:var(--bg);color:var(--fg)">
+
+<!-- Navigation -->
+<nav class="fixed top-0 left-0 right-0 z-50 px-8 py-4 backdrop-blur-xl border-b transition-all" style="background:var(--nav-bg);border-color:var(--fg-faint)">
+  <div class="max-w-[1100px] mx-auto flex items-center justify-between">
+    <a href="#" class="font-mono font-bold text-xl no-underline" style="color:var(--fg)">
+      <span class="text-wine-light mr-0.5">~</span>ff2
+    </a>
+    <ul class="flex items-center gap-8 list-none">
+      <li class="hidden md:block"><a href="#features" class="font-mono text-sm no-underline transition-colors hover:text-[var(--fg)]" style="color:var(--fg-muted)">Features</a></li>
+      <li class="hidden md:block"><a href="#how-it-works" class="font-mono text-sm no-underline transition-colors hover:text-[var(--fg)]" style="color:var(--fg-muted)">How it works</a></li>
+      <li class="hidden md:block"><a href="#config" class="font-mono text-sm no-underline transition-colors hover:text-[var(--fg)]" style="color:var(--fg-muted)">Config</a></li>
+      <li><a href="https://github.com/anthropics/ff2" class="bg-wine text-[var(--fg)] px-4 py-2 rounded-md font-mono text-xs no-underline transition-all hover:bg-wine-light hover:-translate-y-px">GitHub</a></li>
+      <li>
+        <button id="theme-toggle" class="w-8 h-8 rounded-md border flex items-center justify-center cursor-pointer transition-all hover:text-[var(--fg)]" style="background:none;border-color:var(--fg-faint);color:var(--fg-muted)" aria-label="Toggle theme">
+          <svg class="icon-moon w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="icon-sun w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-system w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </button>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="min-h-screen flex flex-col justify-center relative pt-20 overflow-hidden">
+  <!-- Glow -->
+  <div class="absolute -top-[30%] -right-[20%] w-[70%] h-[70%] rounded-full pointer-events-none animate-pulse-glow" style="background:radial-gradient(ellipse, var(--color-wine-glow) 0%, transparent 70%)"></div>
+
+  <div class="max-w-[1100px] mx-auto px-8 w-full">
+    <!-- Badge -->
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-xs mb-8 border animate-fade-up" style="background:var(--fg-faint);border-color:var(--fg-faint);color:var(--fg-muted)">
+      <span class="w-1.5 h-1.5 bg-wine-light rounded-full animate-blink"></span>
+      macOS native &middot; Ghostty terminal &middot; Claude Code
+    </div>
+
+    <h1 class="font-mono font-bold leading-[1.05] tracking-tighter mb-6 animate-fade-up-1 text-[clamp(3rem,7vw,5.5rem)]">
+      Your <span class="bg-gradient-to-br from-wine-light to-[#9e4a60] bg-clip-text text-transparent">AI&#8209;powered</span><br>
+      dev workspace.
+    </h1>
+
+    <p class="text-lg max-w-[540px] leading-relaxed mb-10 animate-fade-up-2" style="color:var(--fg-muted)">
+      ff2 manages git worktrees, Claude Code sessions, and dev servers
+      from a single window. Each workstream gets its own branch, terminal,
+      and AI agent &mdash; all running in parallel.
+    </p>
+
+    <div class="flex gap-4 flex-wrap animate-fade-up-3">
+      <a href="https://github.com/anthropics/ff2/releases" class="inline-flex items-center gap-2 bg-wine text-[var(--fg)] px-6 py-3 rounded-lg font-mono text-sm font-medium border border-wine-light no-underline transition-all hover:bg-wine-light hover:-translate-y-0.5 hover:shadow-[0_8px_30px_var(--color-wine-glow)]">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+      <a href="https://github.com/anthropics/ff2" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-mono text-sm border no-underline transition-all hover:-translate-y-0.5" style="color:var(--fg-dim);border-color:var(--fg-faint);background:transparent">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        View source
+      </a>
+    </div>
+
+    <!-- Terminal preview -->
+    <div class="mt-16 rounded-xl overflow-hidden border animate-fade-up-4" style="background:var(--bg-surface);border-color:var(--fg-faint);box-shadow:0 25px 80px var(--shadow)">
+      <div class="flex items-center gap-1.5 px-4 py-3 border-b" style="background:var(--bg-elevated);border-color:var(--fg-faint)">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
+        <span class="flex-1 text-center font-mono text-[0.7rem] mr-12" style="color:var(--fg-muted)">ff2 &mdash; my-project &mdash; deploy-auth-fix</span>
+      </div>
+      <div class="flex gap-0 px-3 border-b" style="background:rgba(44,40,38,0.6);border-color:var(--fg-faint)">
+        <span class="px-3.5 py-2 font-mono text-[0.7rem] border-b-2 border-transparent" style="color:var(--fg-muted)">Info</span>
+        <span class="px-3.5 py-2 font-mono text-[0.7rem] border-b-2 border-wine-light" style="color:var(--fg);background:rgba(247,244,243,0.03)">Coding Agent</span>
+        <span class="px-3.5 py-2 font-mono text-[0.7rem] border-b-2 border-transparent" style="color:var(--fg-muted)">Terminal</span>
+        <span class="px-3.5 py-2 font-mono text-[0.7rem] border-b-2 border-transparent" style="color:var(--fg-muted)">Browser</span>
+        <span class="px-3.5 py-2 font-mono text-[0.7rem] border-b-2 border-transparent" style="color:var(--fg-muted)">Setup</span>
+        <span class="px-3.5 py-2 font-mono text-[0.7rem] border-b-2 border-transparent" style="color:var(--fg-muted)">Run</span>
+      </div>
+      <div class="p-5 font-mono text-[0.8rem] leading-loose min-h-[180px]">
+        <div><span class="text-wine-light">$</span> <span>claude</span> <span style="color:var(--fg-muted)">--resume</span> <span class="text-[#c49a6c]">a1b2c3d4</span> <span style="color:var(--fg-muted)">--name</span> <span class="text-[#c49a6c]">deploy-auth-fix</span></div>
+        <div style="color:var(--fg-muted)">Resuming session...</div>
+        <div>&nbsp;</div>
+        <div><span class="text-[#6b9e78]">claude</span> <span style="color:var(--fg-muted)">Fix the authentication timeout bug in the login handler.</span></div>
+        <div style="color:var(--fg-muted)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The JWT expiry check is using seconds instead of milliseconds.</div>
+        <div>&nbsp;</div>
+        <div><span class="text-[#6b9e78]">&#10003;</span> <span style="color:var(--fg-muted)">Reading src/auth/handler.ts</span></div>
+        <div><span class="text-[#6b9e78]">&#10003;</span> <span style="color:var(--fg-muted)">Editing token validation logic</span></div>
+        <div><span class="text-[#6b9e78]">&#10003;</span> <span style="color:var(--fg-muted)">Running tests... 47 passed</span></div>
+        <div><span class="text-wine-light">$</span> <span class="inline-block w-2 h-4 align-text-bottom animate-cursor" style="background:var(--fg)"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Features -->
+<section id="features" class="py-24">
+  <div class="max-w-[1100px] mx-auto px-8">
+    <div class="reveal">
+      <div class="font-mono text-[0.7rem] font-semibold uppercase tracking-widest text-wine-light mb-4">Features</div>
+      <h2 class="font-mono text-[clamp(1.6rem,3.5vw,2.2rem)] font-bold tracking-tight mb-4 leading-tight">Everything in one window.</h2>
+      <p class="max-w-[560px] leading-relaxed" style="color:var(--fg-muted)">
+        No more juggling terminals, browsers, and git clients.
+        Each workstream is a self-contained development environment.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-px mt-14 rounded-xl overflow-hidden border reveal" style="background:var(--fg-faint);border-color:var(--fg-faint)">
+      <div class="p-8 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+        <div class="w-10 h-10 flex items-center justify-center rounded-[10px] border mb-5 text-lg" style="background:var(--color-wine-glow);border-color:rgba(91,35,51,0.3)">&#9735;</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Git Worktrees</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">Each workstream gets its own branch and worktree. Switch between tasks without stashing, with .env files automatically symlinked.</p>
+      </div>
+      <div class="p-8 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+        <div class="w-10 h-10 flex items-center justify-center rounded-[10px] border mb-5 text-lg" style="background:var(--color-wine-glow);border-color:rgba(91,35,51,0.3)">&#9672;</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Claude Code</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">Integrated AI agent with session persistence. Resume conversations across app restarts with automatic session IDs.</p>
+      </div>
+      <div class="p-8 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+        <div class="w-10 h-10 flex items-center justify-center rounded-[10px] border mb-5 text-lg" style="background:var(--color-wine-glow);border-color:rgba(91,35,51,0.3)">&#9638;</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Tmux Persistence</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">Agent sessions survive app restarts via tmux on a dedicated socket. No more lost context or interrupted workflows.</p>
+      </div>
+      <div class="p-8 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+        <div class="w-10 h-10 flex items-center justify-center rounded-[10px] border mb-5 text-lg" style="background:var(--color-wine-glow);border-color:rgba(91,35,51,0.3)">&#9881;</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Setup &amp; Run Scripts</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">Configure setup, run, and teardown scripts per project. Compatible with emdash, conductor, and superset configs.</p>
+      </div>
+      <div class="p-8 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+        <div class="w-10 h-10 flex items-center justify-center rounded-[10px] border mb-5 text-lg" style="background:var(--color-wine-glow);border-color:rgba(91,35,51,0.3)">&#9741;</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Embedded Browser</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">WKWebView browser tab with deterministic port allocation. Preview your app without leaving the workspace.</p>
+      </div>
+      <div class="p-8 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+        <div class="w-10 h-10 flex items-center justify-center rounded-[10px] border mb-5 text-lg" style="background:var(--color-wine-glow);border-color:rgba(91,35,51,0.3)">&#10022;</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">GitHub Integration</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">See repo info, open PRs, and branch PR status directly in the project view. Powered by the gh CLI.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- How it works -->
+<section id="how-it-works" class="py-24">
+  <div class="max-w-[1100px] mx-auto px-8">
+    <div class="reveal">
+      <div class="font-mono text-[0.7rem] font-semibold uppercase tracking-widest text-wine-light mb-4">How it works</div>
+      <h2 class="font-mono text-[clamp(1.6rem,3.5vw,2.2rem)] font-bold tracking-tight mb-4 leading-tight">Three steps to parallel development.</h2>
+      <p class="max-w-[560px] leading-relaxed" style="color:var(--fg-muted)">
+        Go from repo to running workstream in seconds. Each workstream is isolated and self-contained.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-14 relative steps-container reveal">
+      <div class="text-center relative">
+        <div class="w-12 h-12 flex items-center justify-center mx-auto mb-6 rounded-full border-2 border-wine font-mono font-bold text-wine-light relative z-10" style="background:var(--bg)">1</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Add a project</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">Drop a directory on the sidebar, or create a new one. ff2 detects git repos, installed tools, and GitHub connections automatically.</p>
+      </div>
+      <div class="text-center relative">
+        <div class="w-12 h-12 flex items-center justify-center mx-auto mb-6 rounded-full border-2 border-wine font-mono font-bold text-wine-light relative z-10" style="background:var(--bg)">2</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Create a workstream</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">A new git worktree with a fresh branch, a Claude Code session, a terminal, and a browser tab. All wired up and ready to go.</p>
+      </div>
+      <div class="text-center relative">
+        <div class="w-12 h-12 flex items-center justify-center mx-auto mb-6 rounded-full border-2 border-wine font-mono font-bold text-wine-light relative z-10" style="background:var(--bg)">3</div>
+        <h3 class="font-mono text-sm font-semibold mb-2">Code with AI</h3>
+        <p class="text-sm leading-relaxed" style="color:var(--fg-muted)">The coding agent renames your branch to match the task. Setup scripts install dependencies. Switch between workstreams without losing state.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Config -->
+<section id="config" class="py-24">
+  <div class="max-w-[1100px] mx-auto px-8">
+    <div class="reveal">
+      <div class="font-mono text-[0.7rem] font-semibold uppercase tracking-widest text-wine-light mb-4">Configuration</div>
+      <h2 class="font-mono text-[clamp(1.6rem,3.5vw,2.2rem)] font-bold tracking-tight mb-4 leading-tight">Drop-in script config.</h2>
+      <p class="max-w-[560px] leading-relaxed" style="color:var(--fg-muted)">
+        Automate your workstream lifecycle with setup, run, and teardown scripts.
+        Install dependencies when a worktree is created, start dev servers on demand,
+        and clean up resources when archiving. Add a
+        <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded" style="background:var(--bg-elevated)">.ff2.json</code>
+        to your repo, or use your existing config from
+        <a href="https://emdash.sh" class="text-wine-light hover:underline">emdash</a>,
+        <a href="https://conductor.build" class="text-wine-light hover:underline">conductor</a>, or
+        <a href="https://superset.sh" class="text-wine-light hover:underline">superset</a>.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-14 items-start reveal">
+      <!-- Code block -->
+      <div class="rounded-[10px] overflow-hidden border" style="background:var(--bg-surface);border-color:var(--fg-faint)">
+        <div class="flex items-center justify-between px-4 py-3 border-b font-mono text-[0.7rem]" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-muted)">
+          <span>.ff2.json</span>
+          <span class="opacity-50">project root</span>
+        </div>
+        <pre class="p-5 font-mono text-[0.78rem] leading-relaxed overflow-x-auto"><code><span style="color:var(--fg-muted)">{</span>
+  <span class="text-[#c49a6c]">"setup"</span><span style="color:var(--fg-muted)">:</span> <span class="text-[#6b9e78]">"npm install"</span><span style="color:var(--fg-muted)">,</span>
+
+  <span class="text-[#c49a6c]">"run"</span><span style="color:var(--fg-muted)">:</span> <span class="text-[#6b9e78]">"PORT=$FF_PORT npm run dev"</span><span style="color:var(--fg-muted)">,</span>
+
+  <span class="text-[#c49a6c]">"teardown"</span><span style="color:var(--fg-muted)">:</span> <span class="text-[#6b9e78]">"docker-compose down"</span>
+<span style="color:var(--fg-muted)">}</span></code></pre>
+      </div>
+
+      <!-- Fallback list -->
+      <div>
+        <p class="text-sm leading-relaxed mb-6" style="color:var(--fg-muted)">
+          No config file? ff2 looks for these formats in order:
+        </p>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-4 p-4 rounded-lg border transition-colors" style="background:var(--bg-surface);border-color:var(--fg-faint)">
+            <span class="font-mono text-[0.7rem] font-semibold text-wine-light w-6 shrink-0">1</span>
+            <div>
+              <h4 class="font-mono text-sm font-medium">.ff2.json</h4>
+              <p class="text-xs" style="color:var(--fg-muted)">Native config with setup, run, teardown</p>
+            </div>
+          </div>
+          <a href="https://emdash.sh" class="flex items-center gap-4 p-4 rounded-lg border transition-colors no-underline" style="background:var(--bg-surface);border-color:var(--fg-faint);color:inherit">
+            <span class="font-mono text-[0.7rem] font-semibold text-wine-light w-6 shrink-0">2</span>
+            <div>
+              <h4 class="font-mono text-sm font-medium">.emdash.json</h4>
+              <p class="text-xs" style="color:var(--fg-muted)">emdash.sh format (scripts object)</p>
+            </div>
+          </a>
+          <a href="https://conductor.build" class="flex items-center gap-4 p-4 rounded-lg border transition-colors no-underline" style="background:var(--bg-surface);border-color:var(--fg-faint);color:inherit">
+            <span class="font-mono text-[0.7rem] font-semibold text-wine-light w-6 shrink-0">3</span>
+            <div>
+              <h4 class="font-mono text-sm font-medium">conductor.json</h4>
+              <p class="text-xs" style="color:var(--fg-muted)">conductor.build format (scripts.archive for teardown)</p>
+            </div>
+          </a>
+          <a href="https://superset.sh" class="flex items-center gap-4 p-4 rounded-lg border transition-colors no-underline" style="background:var(--bg-surface);border-color:var(--fg-faint);color:inherit">
+            <span class="font-mono text-[0.7rem] font-semibold text-wine-light w-6 shrink-0">4</span>
+            <div>
+              <h4 class="font-mono text-sm font-medium">.superset/config.json</h4>
+              <p class="text-xs" style="color:var(--fg-muted)">superset.sh format (arrays, no run command)</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Shortcuts -->
+<section id="shortcuts" class="py-24">
+  <div class="max-w-[1100px] mx-auto px-8">
+    <div class="reveal">
+      <div class="font-mono text-[0.7rem] font-semibold uppercase tracking-widest text-wine-light mb-4">Keyboard-first</div>
+      <h2 class="font-mono text-[clamp(1.6rem,3.5vw,2.2rem)] font-bold tracking-tight mb-4 leading-tight">Navigate without the mouse.</h2>
+      <p class="max-w-[560px] leading-relaxed" style="color:var(--fg-muted)">
+        Context-sensitive shortcuts that adapt to whether you're in a project view or a workstream.
+      </p>
+    </div>
+
+    <div class="reveal">
+      <!-- Global -->
+      <div class="mt-14">
+        <h3 class="font-mono text-xs font-semibold uppercase tracking-wide text-wine-light mb-2 pl-2">Global</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-px rounded-xl overflow-hidden border" style="background:var(--fg-faint);border-color:var(--fg-faint)">
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">New workstream or project</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">N</kbd></span>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">Settings</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">,</kbd></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project view -->
+      <div class="mt-8">
+        <h3 class="font-mono text-xs font-semibold uppercase tracking-wide text-wine-light mb-2 pl-2">Project view</h3>
+        <div class="grid grid-cols-1 gap-px rounded-xl overflow-hidden border" style="background:var(--fg-faint);border-color:var(--fg-faint)">
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">Open workstream by position</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">1-9</kbd></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workstream view -->
+      <div class="mt-8">
+        <h3 class="font-mono text-xs font-semibold uppercase tracking-wide text-wine-light mb-2 pl-2">Workstream view</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-px rounded-xl overflow-hidden border" style="background:var(--fg-faint);border-color:var(--fg-faint)">
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">Back to project</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">0</kbd></span>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">Info / Agent / Terminal / Browser</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">1-4</kbd></span>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">Setup / Run</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">5-6</kbd></span>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">Cycle tabs</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8679;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">[ ]</kbd></span>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">External browser</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8679;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">O</kbd></span>
+          </div>
+          <div class="flex items-center justify-between px-6 py-4 transition-colors" style="background:var(--bg)" onmouseenter="this.style.background='var(--bg-surface)'" onmouseleave="this.style.background='var(--bg)'">
+            <span class="text-sm" style="color:var(--fg-dim)">External terminal</span>
+            <span class="flex gap-1"><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8984;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">&#8679;</kbd><kbd class="inline-flex items-center justify-center min-w-7 h-[26px] px-1.5 rounded font-mono text-[0.7rem] border-b-2" style="background:var(--bg-elevated);border-color:var(--fg-faint);color:var(--fg-dim)">E</kbd></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-12 border-t relative" style="border-color:var(--fg-faint)">
+  <div class="max-w-[1100px] mx-auto px-8">
+    <div class="flex justify-between items-center flex-wrap gap-6">
+      <div class="text-sm" style="color:var(--fg-muted)">
+        Built by <a href="https://davidpoblador.com" class="text-wine-light no-underline hover:text-[var(--fg)] transition-colors">David Poblador i Garcia</a>
+        &middot; with the support of <a href="https://alltuner.com" class="text-wine-light no-underline hover:text-[var(--fg)] transition-colors">All Tuner Labs</a>
+      </div>
+      <div class="flex gap-6">
+        <a href="https://github.com/anthropics/ff2" class="font-mono text-xs no-underline transition-colors hover:text-[var(--fg)]" style="color:var(--fg-muted)">GitHub</a>
+        <a href="https://davidpoblador.com" class="font-mono text-xs no-underline transition-colors hover:text-[var(--fg)]" style="color:var(--fg-muted)">Contact</a>
+      </div>
+    </div>
+  </div>
+  <svg class="w-full h-[60px] block mt-8" viewBox="0 100 1200 130" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="transparent"/><stop offset="20%" stop-color="#5B2333"/><stop offset="80%" stop-color="#5B2333"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>
+    <path d="M20,220 L80,220 L80,200 L120,200 L120,220 L170,220 L170,195 L220,195 L220,220 L240,220 L240,130 L256,130 L256,220 L280,220 L280,205 L320,205 L320,220 L340,220 L340,200 L360,190 L380,200 L400,190 L420,200 L440,190 L460,200 L480,200 L480,220 L520,220 L520,140 L538,140 L538,220 L560,220 L560,190 L630,190 L630,220 L660,220 L660,115 L676,115 L676,220 L700,220 L700,200 L735,200 L735,180 L770,180 L770,220 L800,220 L800,150 L816,150 L816,220 L882,220 Q882,100 915,100 Q948,100 948,220 L1040,220 L1040,205 L1080,205 L1080,220 L1120,220 L1120,190 L1160,190 L1160,220 L1180,220" fill="none" stroke="url(#skyGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+  </svg>
+</footer>
+
+<script>
+// Theme toggle: cycles dark -> light -> system
+(function() {
+  var themes = ['dark', 'light', 'system'];
+  var toggle = document.getElementById('theme-toggle');
+  var html = document.documentElement;
+
+  function getSystemTheme() {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+
+  function applyTheme(pref) {
+    var effective = pref === 'system' ? getSystemTheme() : pref;
+    html.className = html.className.replace(/\b(dark|light)\b/g, '').trim();
+    html.classList.add(effective);
+    html.setAttribute('data-pref', pref);
+    toggle.querySelectorAll('svg').forEach(function(s) { s.classList.add('hidden'); });
+    if (pref === 'light') toggle.querySelector('.icon-sun').classList.remove('hidden');
+    else if (pref === 'dark') toggle.querySelector('.icon-moon').classList.remove('hidden');
+    else toggle.querySelector('.icon-system').classList.remove('hidden');
+  }
+
+  applyTheme(localStorage.getItem('ff2-theme') || 'dark');
+
+  toggle.addEventListener('click', function() {
+    var current = html.getAttribute('data-pref') || 'dark';
+    var next = themes[(themes.indexOf(current) + 1) % themes.length];
+    localStorage.setItem('ff2-theme', next);
+    applyTheme(next);
+  });
+
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function() {
+    if (html.getAttribute('data-pref') === 'system') applyTheme('system');
+  });
+})();
+
+// Intersection Observer for reveal animations
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
+</script>
+
+</body>
+</html>
