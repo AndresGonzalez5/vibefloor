@@ -15,7 +15,6 @@ struct WorkstreamInfoView: View {
     @State private var branchName: String?
     @State private var docFiles: [DocFile] = []
     @State private var selectedDoc: String?
-    @State private var docExpanded = false
 
     struct DocFile: Identifiable {
         let name: String
@@ -26,38 +25,36 @@ struct WorkstreamInfoView: View {
     private static let docFileNames = ["README.md", "CLAUDE.md", "AGENTS.md"]
 
     var body: some View {
-        GeometryReader { geo in
         VStack(spacing: 0) {
-            // Top pane: metadata (tapping it collapses docs)
+            // Pinned header
+            VStack(spacing: 4) {
+                Text(projectName)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                Text(workstreamName)
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                if let branch = branchName {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.caption)
+                        Text(branch)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                DirectoryRow(path: workingDirectory, defaultTerminal: defaultTerminal)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .background(.bar)
+
+            Divider()
+
+            // Scrollable content: metadata + doc tabs + rendered docs
             ScrollView {
                 VStack(spacing: 0) {
-                    // Workstream header
-                    VStack(spacing: 4) {
-                        Text(projectName)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-
-                        Text(workstreamName)
-                            .font(.system(size: 22, weight: .bold, design: .monospaced))
-
-                        if let branch = branchName {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .font(.caption)
-                                Text(branch)
-                            }
-                            .foregroundStyle(.secondary)
-                        }
-
-                        DirectoryRow(path: workingDirectory, defaultTerminal: defaultTerminal)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    .padding(.bottom, 4)
-
                     Form {
-
                         // GitHub PR
                         if appEnv.ghAvailable, let branch = branchName,
                            let pr = appEnv.githubPR(for: projectDirectory, branch: branch) {
@@ -113,55 +110,37 @@ struct WorkstreamInfoView: View {
                                 }
                             }
                         }
-
                     }
                     .formStyle(.grouped)
                     .scrollDisabled(true)
-                }
-            }
-            .frame(height: docExpanded ? geo.size.height * 0.2 : geo.size.height * 0.5)
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) { docExpanded = false }
-            }
 
-            // Document viewer
-            if !docFiles.isEmpty {
-                HStack(spacing: 0) {
-                    ForEach(docFiles) { doc in
-                        DocTabButton(
-                            name: doc.name,
-                            isActive: selectedDoc == doc.name,
-                            action: { selectedDoc = doc.name }
-                        )
+                    // Doc tabs + content
+                    if !docFiles.isEmpty {
+                        HStack(spacing: 0) {
+                            ForEach(docFiles) { doc in
+                                DocTabButton(
+                                    name: doc.name,
+                                    isActive: selectedDoc == doc.name,
+                                    action: { selectedDoc = doc.name }
+                                )
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 4)
+
+                        Divider()
+                            .padding(.horizontal, 16)
+
+                        if let selected = selectedDoc,
+                           let doc = docFiles.first(where: { $0.name == selected }) {
+                            MarkdownContentView(markdown: doc.content)
+                                .id(selected)
+                        }
                     }
-                    Spacer()
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) { docExpanded.toggle() }
-                    }) {
-                        Image(systemName: docExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24, height: 24)
-                    }
-                    .buttonStyle(.plain)
-                    .help(docExpanded ? "Collapse" : "Expand")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
-                .background(.bar)
-
-                Divider()
-
-                if let selected = selectedDoc,
-                   let doc = docFiles.first(where: { $0.name == selected }) {
-                    MarkdownContentView(markdown: doc.content)
-                        .id(selected)
-                } else {
-                    Spacer()
                 }
             }
-        } // VStack
-        } // GeometryReader
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { loadInfo() }
     } // body
