@@ -42,11 +42,11 @@ struct ContentView: View {
         if selection == .settings {
             SettingsView()
                 .navigationTitle("Settings")
-                .navigationSubtitle("ff2")
+                .navigationSubtitle(AppConstants.appName)
         } else if selection == .help {
             HelpView()
                 .navigationTitle("Help")
-                .navigationSubtitle("ff2")
+                .navigationSubtitle(AppConstants.appName)
         } else if let workstream = activeWorkstream, let project = activeProject {
             TerminalContainerView(
                 workstreamID: workstream.id,
@@ -68,7 +68,7 @@ struct ContentView: View {
                 onProjectChanged: { ProjectStore.save(projects) }
             )
             .navigationTitle(project.name)
-            .navigationSubtitle("ff2")
+            .navigationSubtitle(AppConstants.appName)
         } else {
             VStack(spacing: 12) {
                 Text("No project selected")
@@ -86,7 +86,7 @@ struct ContentView: View {
                     .padding(.horizontal, 40)
                     .padding(.bottom, 10)
             }
-            .navigationTitle("ff2")
+            .navigationTitle(AppConstants.appName)
         }
     }
 
@@ -169,7 +169,7 @@ struct ContentView: View {
             appEnvironment.refreshAllRepoInfo(projects: projects)
             appEnvironment.refreshPathValidity(projects: projects)
             // Apply saved appearance
-            switch UserDefaults.standard.string(forKey: "ff2.appearance") ?? "system" {
+            switch UserDefaults.standard.string(forKey: "factoryfloor.appearance") ?? "system" {
             case "light": NSApp.appearance = NSAppearance(named: .aqua)
             case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
             default: NSApp.appearance = nil
@@ -240,7 +240,7 @@ struct ContentView: View {
             dir = nil
         }
         guard let dir else { return }
-        let terminalBundleID = UserDefaults.standard.string(forKey: "ff2.defaultTerminal") ?? ""
+        let terminalBundleID = UserDefaults.standard.string(forKey: "factoryfloor.defaultTerminal") ?? ""
         if !terminalBundleID.isEmpty,
            let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: terminalBundleID) {
             let config = NSWorkspace.OpenConfiguration()
@@ -289,7 +289,7 @@ struct ContentView: View {
 }
 
 enum ProjectStore {
-    private static let key = "ff2.projects"
+    private static let key = "factoryfloor.projects"
 
     static func load() -> [Project] {
         guard let data = UserDefaults.standard.data(forKey: key) else { return [] }

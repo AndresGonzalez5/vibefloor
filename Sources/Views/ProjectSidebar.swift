@@ -5,8 +5,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension Notification.Name {
-    static let addProject = Notification.Name("ff2.addProject")
-    static let addNew = Notification.Name("ff2.addNew")
+    static let addProject = Notification.Name("factoryfloor.addProject")
+    static let addNew = Notification.Name("factoryfloor.addNew")
 }
 
 struct ProjectSidebar: View {
@@ -24,7 +24,7 @@ struct ProjectSidebar: View {
     @State private var archiveWarningDirty = false
     @State private var expandedProjects: Set<UUID> = []
     @State private var cachedSortedIDs: [UUID] = []
-    @AppStorage("ff2.sortOrder") private var sortOrder: ProjectSortOrder = .recent
+    @AppStorage("factoryfloor.sortOrder") private var sortOrder: ProjectSortOrder = .recent
 
     /// Index from UUID to project array index for O(1) lookups.
     private var projectIndex: [UUID: Int] {
@@ -286,8 +286,8 @@ struct ProjectSidebar: View {
 
     // MARK: - Workstream management
 
-    @AppStorage("ff2.bypassPermissions") private var defaultBypass: Bool = false
-    @AppStorage("ff2.symlinkEnv") private var symlinkEnv: Bool = true
+    @AppStorage("factoryfloor.bypassPermissions") private var defaultBypass: Bool = false
+    @AppStorage("factoryfloor.symlinkEnv") private var symlinkEnv: Bool = true
 
     private func addWorkstream(for projectID: UUID, bypassPermissions: Bool? = nil) {
         guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
@@ -317,7 +317,7 @@ struct ProjectSidebar: View {
     @EnvironmentObject private var surfaceCache: TerminalSurfaceCache
     @EnvironmentObject private var appEnv: AppEnvironment
 
-    @AppStorage("ff2.tmuxMode") private var tmuxModeForArchive: Bool = false
+    @AppStorage("factoryfloor.tmuxMode") private var tmuxModeForArchive: Bool = false
 
     private func confirmArchive(_ workstream: Workstream) {
         if let path = workstream.worktreePath, GitOperations.hasUncommittedChanges(at: path) {
@@ -392,8 +392,8 @@ struct ProjectSidebar: View {
         return true
     }
 
-    @AppStorage("ff2.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
-    @AppStorage("ff2.branchPrefix") private var branchPrefix: String = "ff2"
+    @AppStorage("factoryfloor.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
+    @AppStorage("factoryfloor.branchPrefix") private var branchPrefix: String = "ff"
 
     private func openDirectoryPicker() {
         let panel = NSOpenPanel()

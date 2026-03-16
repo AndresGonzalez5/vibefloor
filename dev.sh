@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# ABOUTME: Dev script for building and running ff2.
+# ABOUTME: Dev script for building and running Factory Floor.
 # ABOUTME: Usage: ./dev.sh [command] [args]
 
 set -e
+
+PROJECT="FactoryFloor.xcodeproj"
+SCHEME="FactoryFloor"
+TEST_SCHEME="FactoryFloorTests"
+URL_SCHEME="factoryfloor"
+APP_NAME="Factory Floor"
 
 # Resolve a path to absolute
 resolve_dir() {
@@ -14,44 +20,44 @@ resolve_dir() {
 case "${1:-run}" in
   build)
     xcodegen generate
-    xcodebuild -project ff2.xcodeproj -scheme ff2 -configuration Debug build
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug build
     ;;
   build-release)
     xcodegen generate
-    xcodebuild -project ff2.xcodeproj -scheme ff2 -configuration Release build
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release build
     ;;
   test)
     xcodegen generate
-    xcodebuild -project ff2.xcodeproj -scheme ff2Tests -configuration Debug test
+    xcodebuild -project "$PROJECT" -scheme "$TEST_SCHEME" -configuration Debug test
     ;;
   run)
     shift 2>/dev/null || true
     DIR=$(resolve_dir "${1:-.}")
-    open "ff2://$DIR"
+    open "$URL_SCHEME://$DIR"
     ;;
   br)
     shift 2>/dev/null || true
     DIR=$(resolve_dir "${1:-.}")
     xcodegen generate
-    xcodebuild -project ff2.xcodeproj -scheme ff2 -configuration Debug build
-    pkill -f "ff2.app/Contents/MacOS/ff2" 2>/dev/null || true
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug build
+    pkill -f "$APP_NAME.app/Contents/MacOS" 2>/dev/null || true
     sleep 0.5
-    open "ff2://$DIR"
+    open "$URL_SCHEME://$DIR"
     ;;
   br-release)
     shift 2>/dev/null || true
     DIR=$(resolve_dir "${1:-.}")
     xcodegen generate
-    xcodebuild -project ff2.xcodeproj -scheme ff2 -configuration Release build
-    pkill -f "ff2.app/Contents/MacOS/ff2" 2>/dev/null || true
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release build
+    pkill -f "$APP_NAME.app/Contents/MacOS" 2>/dev/null || true
     sleep 0.5
-    APP=$(find ~/Library/Developer/Xcode/DerivedData -path '*/ff2-*/Build/Products/Release/ff2.app' -type d 2>/dev/null | head -1)
+    APP=$(find ~/Library/Developer/Xcode/DerivedData -path "*/$SCHEME-*/Build/Products/Release/$APP_NAME.app" -type d 2>/dev/null | head -1)
     open -a "$APP" --args "$DIR"
     ;;
   clean)
-    xcodebuild -project ff2.xcodeproj -scheme ff2 -configuration Debug clean 2>/dev/null || true
-    xcodebuild -project ff2.xcodeproj -scheme ff2 -configuration Release clean 2>/dev/null || true
-    rm -rf ~/Library/Developer/Xcode/DerivedData/ff2-*
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug clean 2>/dev/null || true
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release clean 2>/dev/null || true
+    rm -rf ~/Library/Developer/Xcode/DerivedData/FactoryFloor-*
     ;;
   *)
     echo "Usage: ./dev.sh [command] [directory]"

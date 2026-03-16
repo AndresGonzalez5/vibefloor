@@ -4,17 +4,17 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("ff2.languageOverride") private var languageOverride: String = ""
-    @AppStorage("ff2.tmuxMode") private var tmuxMode: Bool = false
-    @AppStorage("ff2.bypassPermissions") private var bypassPermissions: Bool = false
-    @AppStorage("ff2.agentTeams") private var agentTeams: Bool = false
-    @AppStorage("ff2.autoRenameBranch") private var autoRenameBranch: Bool = false
-    @AppStorage("ff2.defaultTerminal") private var defaultTerminal: String = ""
-    @AppStorage("ff2.defaultBrowser") private var defaultBrowser: String = ""
-    @AppStorage("ff2.branchPrefix") private var branchPrefix: String = "ff2"
-    @AppStorage("ff2.appearance") private var appearance: String = "system"
-    @AppStorage("ff2.symlinkEnv") private var symlinkEnv: Bool = true
-    @AppStorage("ff2.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
+    @AppStorage("factoryfloor.languageOverride") private var languageOverride: String = ""
+    @AppStorage("factoryfloor.tmuxMode") private var tmuxMode: Bool = false
+    @AppStorage("factoryfloor.bypassPermissions") private var bypassPermissions: Bool = false
+    @AppStorage("factoryfloor.agentTeams") private var agentTeams: Bool = false
+    @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
+    @AppStorage("factoryfloor.defaultTerminal") private var defaultTerminal: String = ""
+    @AppStorage("factoryfloor.defaultBrowser") private var defaultBrowser: String = ""
+    @AppStorage("factoryfloor.branchPrefix") private var branchPrefix: String = "ff"
+    @AppStorage("factoryfloor.appearance") private var appearance: String = "system"
+    @AppStorage("factoryfloor.symlinkEnv") private var symlinkEnv: Bool = true
+    @AppStorage("factoryfloor.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
 
     @EnvironmentObject private var appEnv: AppEnvironment
     @State private var showingClearConfirm = false
@@ -98,7 +98,7 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 150)
                 }
-                Text("e.g. \(branchPrefix.isEmpty ? "ff2" : branchPrefix)/deploy-ludicrous-speed")
+                Text("e.g. \(branchPrefix.isEmpty ? "ff" : branchPrefix)/deploy-ludicrous-speed")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.tertiary)
 

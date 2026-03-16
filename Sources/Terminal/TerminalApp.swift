@@ -4,7 +4,7 @@
 import Cocoa
 import os
 
-private let logger = Logger(subsystem: "ff2", category: "terminal-app")
+private let logger = Logger(subsystem: "factoryfloor", category: "terminal-app")
 
 final class TerminalApp {
     static let shared = TerminalApp()

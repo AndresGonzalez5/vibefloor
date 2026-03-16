@@ -4,20 +4,20 @@
 import SwiftUI
 
 extension Notification.Name {
-    static let openDirectory = Notification.Name("ff2.openDirectory")
-    static let openSettings = Notification.Name("ff2.openSettings")
-    static let openHelp = Notification.Name("ff2.openHelp")
-    static let retryBrowser = Notification.Name("ff2.retryBrowser")
-    static let switchToProject = Notification.Name("ff2.switchToProject")
-    static let toggleSidebar = Notification.Name("ff2.toggleSidebar")
-    static let switchByNumber = Notification.Name("ff2.switchByNumber") // object: Int (1-9)
+    static let openDirectory = Notification.Name("factoryfloor.openDirectory")
+    static let openSettings = Notification.Name("factoryfloor.openSettings")
+    static let openHelp = Notification.Name("factoryfloor.openHelp")
+    static let retryBrowser = Notification.Name("factoryfloor.retryBrowser")
+    static let switchToProject = Notification.Name("factoryfloor.switchToProject")
+    static let toggleSidebar = Notification.Name("factoryfloor.toggleSidebar")
+    static let switchByNumber = Notification.Name("factoryfloor.switchByNumber") // object: Int (1-9)
     // switchToInfo, switchToAgent, switchToTerminal replaced by switchByNumber
-    static let dismissOverlay = Notification.Name("ff2.dismissOverlay")
-    static let openExternalBrowser = Notification.Name("ff2.openExternalBrowser")
-    static let clearProjects = Notification.Name("ff2.clearProjects")
-    static let openExternalTerminal = Notification.Name("ff2.openExternalTerminal")
-    static let nextTab = Notification.Name("ff2.nextTab")
-    static let prevTab = Notification.Name("ff2.prevTab")
+    static let dismissOverlay = Notification.Name("factoryfloor.dismissOverlay")
+    static let openExternalBrowser = Notification.Name("factoryfloor.openExternalBrowser")
+    static let clearProjects = Notification.Name("factoryfloor.clearProjects")
+    static let openExternalTerminal = Notification.Name("factoryfloor.openExternalTerminal")
+    static let nextTab = Notification.Name("factoryfloor.nextTab")
+    static let prevTab = Notification.Name("factoryfloor.prevTab")
 }
 
 @main
@@ -45,7 +45,7 @@ struct FF2App: App {
     }
 
     var body: some Scene {
-        Window("ff2", id: "main") {
+        Window(AppConstants.appName, id: "main") {
             ContentView()
                 .onAppear {
                     if let dir = Self.launchDirectory {
@@ -55,7 +55,7 @@ struct FF2App: App {
                     }
                 }
                 .onOpenURL { url in
-                    guard url.scheme == "ff2" else { return }
+                    guard url.scheme == AppConstants.appID else { return }
                     let path = url.path
                     guard !path.isEmpty else { return }
                     var isDir: ObjCBool = false

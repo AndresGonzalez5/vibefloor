@@ -12,7 +12,7 @@ struct HelpView: View {
                     Image(systemName: "terminal.fill")
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
-                    Text(AppConstants.appID)
+                    Text(AppConstants.appName)
                         .font(.system(size: 28, weight: .bold))
                     Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")")
                         .font(.caption)

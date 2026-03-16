@@ -10,7 +10,7 @@ struct ProjectOverviewView: View {
     let onProjectChanged: () -> Void
 
     @EnvironmentObject var appEnv: AppEnvironment
-    @AppStorage("ff2.workstreamSortOrder") private var workstreamSortOrder: ProjectSortOrder = .recent
+    @AppStorage("factoryfloor.workstreamSortOrder") private var workstreamSortOrder: ProjectSortOrder = .recent
     @State private var worktrees: [WorktreeInfo] = []
     @State private var showingPruneConfirm = false
     @State private var isPruning = false

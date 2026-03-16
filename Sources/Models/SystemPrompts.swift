@@ -1,5 +1,5 @@
 // ABOUTME: System prompts injected into claude sessions based on settings.
-// ABOUTME: Written to ~/.ff2/prompts/ and referenced via --system-prompt-file.
+// ABOUTME: Written to ~/.ff/prompts/ and referenced via --system-prompt-file.
 
 import Foundation
 
@@ -12,7 +12,7 @@ enum SystemPrompts {
         4) Use kebab-case and keep the descriptive part under 6 words. \
         5) After renaming, continue with the task normally. \
         If the branch already has a meaningful descriptive name (not a random generated name), do nothing. \
-        Example: if the branch is `ff2/scan-deep-thr` and the user asks to "fix the login timeout bug", \
-        rename it to `ff2/fix-login-timeout-bug`.
+        Example: if the branch is `ff/scan-deep-thr` and the user asks to "fix the login timeout bug", \
+        rename it to `ff/fix-login-timeout-bug`.
         """
 }

@@ -1,5 +1,5 @@
 // ABOUTME: Loads setup/run/teardown script configuration from project config files.
-// ABOUTME: Resolves from .ff2.json, falling back to emdash, conductor, and superset formats.
+// ABOUTME: Resolves from .factoryfloor.json, falling back to emdash, conductor, and superset formats.
 
 import Foundation
 
@@ -14,8 +14,8 @@ struct ScriptConfig {
     /// Load script config for a project directory, checking multiple config file formats.
     static func load(from directory: String) -> ScriptConfig {
         let resolvers: [(String, (String) -> ScriptConfig?)] = [
-            (".ff2.json", loadFF2),
-            (".ff2/config.json", loadFF2),
+            (".factoryfloor.json", loadFF2),
+            (".factoryfloor/config.json", loadFF2),
             (".emdash.json", loadEmdash),
             ("conductor.json", loadConductor),
             (".superset/config.json", loadSuperset),
@@ -52,7 +52,7 @@ struct ScriptConfig {
 
     // MARK: - Loaders
 
-    /// .ff2.json / .ff2/config.json format:
+    /// .factoryfloor.json / .factoryfloor/config.json format:
     /// { "setup": "cmd", "run": "cmd", "teardown": "cmd" }
     private static func loadFF2(_ path: String) -> ScriptConfig? {
         guard let dict = loadJSON(path) else { return nil }

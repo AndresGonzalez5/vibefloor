@@ -2,7 +2,7 @@
 // ABOUTME: Validates creation, identity, equality, serialization, and workstream management.
 
 import XCTest
-@testable import ff2
+@testable import FactoryFloor
 
 final class ProjectTests: XCTestCase {
     func testCreation() {

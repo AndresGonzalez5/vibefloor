@@ -4,7 +4,7 @@
 import SwiftUI
 
 extension Notification.Name {
-    static let terminalSurfaceClosed = Notification.Name("ff2.terminalSurfaceClosed")
+    static let terminalSurfaceClosed = Notification.Name("factoryfloor.terminalSurfaceClosed")
 }
 
 /// Deterministic UUID derived from a base UUID and a salt string.
@@ -44,10 +44,10 @@ struct TerminalContainerView: View {
 
     @EnvironmentObject var surfaceCache: TerminalSurfaceCache
     @EnvironmentObject var appEnv: AppEnvironment
-    @AppStorage("ff2.defaultBrowser") private var defaultBrowser: String = ""
-    @AppStorage("ff2.tmuxMode") private var tmuxMode: Bool = false
-    @AppStorage("ff2.agentTeams") private var agentTeams: Bool = false
-    @AppStorage("ff2.autoRenameBranch") private var autoRenameBranch: Bool = false
+    @AppStorage("factoryfloor.defaultBrowser") private var defaultBrowser: String = ""
+    @AppStorage("factoryfloor.tmuxMode") private var tmuxMode: Bool = false
+    @AppStorage("factoryfloor.agentTeams") private var agentTeams: Bool = false
+    @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
     @State private var activeTab: WorkstreamTab = .info
     @State private var scriptConfig: ScriptConfig = .empty
 

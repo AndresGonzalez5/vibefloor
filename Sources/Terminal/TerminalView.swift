@@ -4,7 +4,7 @@
 import Cocoa
 import os
 
-private let logger = Logger(subsystem: "ff2", category: "terminal-view")
+private let logger = Logger(subsystem: "factoryfloor", category: "terminal-view")
 
 extension Notification.Name {
     static let terminalActivity = Notification.Name("ff2.terminalActivity")
