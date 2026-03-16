@@ -63,6 +63,9 @@ struct FF2App: App {
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
+            // Remove the default Help menu so Cmd+Shift+/ doesn't open it
+            CommandGroup(replacing: .help) {}
+
             CommandGroup(replacing: .newItem) {
                 // Cmd+N: context-sensitive (add project if none selected, else add workstream)
                 Button("New") {

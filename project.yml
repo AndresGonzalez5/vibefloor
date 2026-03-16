@@ -9,7 +9,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    SWIFT_OBJC_BRIDGING_HEADER: ff2-Bridging-Header.h
+    SWIFT_OBJC_BRIDGING_HEADER: Resources/FactoryFloor-Bridging-Header.h
     HEADER_SEARCH_PATHS:
       - $(PROJECT_DIR)/ghostty/include
     MACOSX_DEPLOYMENT_TARGET: "14.0"

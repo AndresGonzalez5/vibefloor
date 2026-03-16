@@ -172,32 +172,16 @@ struct ProjectSidebar: View {
                 .padding(.vertical, 6)
 
                 HStack {
-                    Button(action: { showingAddProjectChoice = true }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16))
+                    SidebarBottomButton(icon: "plus") {
+                        showingAddProjectChoice = true
                     }
-                    .buttonStyle(.plain)
-                    .padding(8)
-
                     Spacer()
-
-                    Button(action: {
+                    SidebarBottomButton(icon: "questionmark.circle") {
                         NotificationCenter.default.post(name: .openHelp, object: nil)
-                    }) {
-                        Image(systemName: "questionmark.circle")
-                            .font(.system(size: 16))
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 4)
-
-                    Button(action: {
+                    SidebarBottomButton(icon: "gear") {
                         NotificationCenter.default.post(name: .openSettings, object: nil)
-                    }) {
-                        Image(systemName: "gear")
-                            .font(.system(size: 16))
                     }
-                    .buttonStyle(.plain)
-                    .padding(8)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -633,6 +617,26 @@ private struct SidebarIconButton: View {
                 .frame(width: 22, height: 22)
                 .background(isHovering ? Color.primary.opacity(0.1) : .clear)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+}
+
+private struct SidebarBottomButton: View {
+    let icon: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(isHovering ? .primary : .secondary)
+                .frame(width: 32, height: 32)
+                .background(isHovering ? Color.primary.opacity(0.08) : .clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }

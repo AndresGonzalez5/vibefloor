@@ -21,7 +21,8 @@ struct HelpView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.top, 32)
+                .padding(.top, 24)
+                .padding(.bottom, -4)
 
                 VStack(spacing: 4) {
                     HStack(spacing: 0) {
@@ -43,6 +44,7 @@ struct HelpView: View {
 
                 PoblenouSkylineView()
                     .padding(.horizontal, 40)
+                    .padding(.vertical, -4)
 
                 Text("Shortcuts")
                     .font(.system(size: 16, weight: .semibold))
