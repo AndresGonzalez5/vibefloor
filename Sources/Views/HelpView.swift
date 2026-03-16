@@ -26,7 +26,10 @@ struct HelpView: View {
                 PoblenouSkylineView()
                     .padding(.horizontal, 40)
 
-                // Shortcuts
+                Text("Shortcuts")
+                    .font(.system(size: 16, weight: .semibold))
+                    .padding(.top, 8)
+
                 Form {
                     Section {
                         ShortcutRow(keys: ",", description: "Settings")
@@ -38,11 +41,16 @@ struct HelpView: View {
                     }
 
                     Section {
-                        ShortcutRow(keys: "0", description: "Back to project view")
                         ShortcutRow(keys: "Return", description: "Focus Coding Agent")
-                        ShortcutRow(keys: "I", description: "Toggle Info panel")
-                        ShortcutRow(keys: "T", description: "Toggle Terminal split")
-                        ShortcutRow(keys: "B", description: "Toggle Browser")
+                        ShortcutRow(keys: "I", description: "Info panel")
+                        ShortcutRow(keys: "T", description: "New Terminal")
+                        ShortcutRow(keys: "B", description: "New Browser")
+                        ShortcutRow(keys: "W", description: "Close tab")
+                        ShortcutRow(keys: "L", description: "Address bar")
+                        ShortcutRow(keys: "0", description: "Back to project")
+                        ShortcutRow(keys: "1-9", description: "Switch tab")
+                        ShortcutRow(keys: "[", shift: true, description: "Previous tab")
+                        ShortcutRow(keys: "]", shift: true, description: "Next tab")
                     } header: {
                         ShortcutSectionHeader(title: "Workstream", description: "When a workstream is active")
                     }
