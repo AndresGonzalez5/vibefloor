@@ -9,6 +9,7 @@ extension Notification.Name {
     static let toggleTerminal = Notification.Name("factoryfloor.toggleTerminal")
     static let toggleBrowser = Notification.Name("factoryfloor.toggleBrowser")
     static let focusAgent = Notification.Name("factoryfloor.focusAgent")
+    static let closeTerminal = Notification.Name("factoryfloor.closeTerminal")
 }
 
 /// Deterministic UUID derived from a base UUID and a salt string.
@@ -43,13 +44,12 @@ struct TerminalContainerView: View {
     @AppStorage("factoryfloor.agentTeams") private var agentTeams: Bool = false
     @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
     @State private var showingInfo = true
-    @State private var showingTerminal = false
     @State private var showingBrowser = false
+    @State private var terminalIDs: [UUID] = []
     @State private var scriptConfig: ScriptConfig = .empty
     @State private var branchPR: GitHubPR?
 
     private var claudeID: UUID { workstreamID }
-    private var terminalID: UUID { derivedUUID(from: workstreamID, salt: "terminal") }
 
     private var useTmux: Bool {
         tmuxMode && appEnv.toolStatus.tmux.isInstalled
@@ -101,26 +101,26 @@ struct TerminalContainerView: View {
 
             // Content: agent is always rendered, info/browser overlay on top
             ZStack {
-                // Coding Agent (always present, always running)
+                // Coding Agent (always present, always running) + terminal splits
                 VStack(spacing: 0) {
                     SingleTerminalView(
                         surfaceID: claudeID,
                         workingDirectory: workingDirectory,
                         command: claudeCommand,
-                        isFocused: !showingInfo && !showingBrowser,
+                        isFocused: !showingInfo && !showingBrowser && terminalIDs.isEmpty,
                         environmentVars: envVars
                     )
 
-                    // Terminal split panel
-                    if showingTerminal {
+                    // Terminal split panels
+                    ForEach(terminalIDs, id: \.self) { id in
                         Divider()
                         SingleTerminalView(
-                            surfaceID: terminalID,
+                            surfaceID: id,
                             workingDirectory: workingDirectory,
-                            isFocused: false,
+                            isFocused: id == terminalIDs.last && !showingInfo && !showingBrowser,
                             environmentVars: envVars
                         )
-                        .frame(minHeight: 120)
+                        .frame(minHeight: 100)
                     }
                 }
 
@@ -159,7 +159,12 @@ struct TerminalContainerView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in
             withAnimation(.easeInOut(duration: 0.15)) {
-                showingTerminal.toggle()
+                addTerminal()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeTerminal)) { _ in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                closeLastTerminal()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
@@ -185,7 +190,7 @@ struct TerminalContainerView: View {
                     showingInfo = false
                     showingBrowser = false
                 case 3:
-                    showingTerminal.toggle()
+                    addTerminal()
                 case 4:
                     showingBrowser.toggle()
                     if showingBrowser { showingInfo = false }
@@ -229,10 +234,10 @@ struct TerminalContainerView: View {
             }
             .help("Toggle Info (\u{2318}1)")
 
-            ToolbarIconButton(icon: "terminal", isActive: showingTerminal, shortcut: "T") {
+            ToolbarIconButton(icon: "terminal", isActive: !terminalIDs.isEmpty, shortcut: "T", badge: terminalIDs.isEmpty ? nil : "\(terminalIDs.count)") {
                 NotificationCenter.default.post(name: .toggleTerminal, object: nil)
             }
-            .help("Toggle Terminal (\u{2318}3)")
+            .help("New Terminal (\u{2318}T)")
 
             ToolbarIconButton(icon: "globe", isActive: showingBrowser, shortcut: "B") {
                 NotificationCenter.default.post(name: .toggleBrowser, object: nil)
@@ -264,6 +269,16 @@ struct TerminalContainerView: View {
     }
 
     // MARK: - Actions
+
+    private func addTerminal() {
+        let id = derivedUUID(from: workstreamID, salt: "terminal-\(terminalIDs.count)")
+        terminalIDs.append(id)
+    }
+
+    private func closeLastTerminal() {
+        guard let last = terminalIDs.popLast() else { return }
+        surfaceCache.removeSurface(for: last)
+    }
 
     /// Only prewarm the Coding Agent. Everything else is on demand.
     private func prewarmAgent() {
@@ -322,18 +337,31 @@ private struct ToolbarIconButton: View {
     let icon: String
     var isActive: Bool = false
     var shortcut: String? = nil
+    var badge: String? = nil
     let action: () -> Void
 
     @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .frame(width: 28, height: 24)
-                .background(isActive ? Color.accentColor.opacity(0.15) : (isHovering ? Color.primary.opacity(0.05) : .clear))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-                .foregroundStyle(isActive ? .primary : .secondary)
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .frame(width: 28, height: 24)
+                    .background(isActive ? Color.accentColor.opacity(0.15) : (isHovering ? Color.primary.opacity(0.05) : .clear))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .foregroundStyle(isActive ? .primary : .secondary)
+                if let badge {
+                    Text(badge)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(Color.accentColor)
+                        .clipShape(Capsule())
+                        .offset(x: 4, y: -4)
+                }
+            }
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
@@ -435,7 +463,10 @@ final class TerminalSurfaceCache: ObservableObject {
     /// Remove all surfaces for a workstream.
     func removeWorkstreamSurfaces(for workstreamID: UUID) {
         removeSurface(for: workstreamID)
-        removeSurface(for: derivedUUID(from: workstreamID, salt: "terminal"))
+        // Clean up any terminal splits (up to a reasonable number)
+        for i in 0..<20 {
+            removeSurface(for: derivedUUID(from: workstreamID, salt: "terminal-\(i)"))
+        }
     }
 
     private func handleSurfaceClosed(_ closedView: TerminalView) {
