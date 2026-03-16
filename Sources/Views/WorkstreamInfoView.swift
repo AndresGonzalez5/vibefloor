@@ -194,46 +194,12 @@ struct DirectoryRow: View {
     }
 
     private func openInTerminal() {
-        let escaped = path.replacingOccurrences(of: "\"", with: "\\\"")
-
-        if !defaultTerminal.isEmpty {
-            // Use AppleScript to tell the configured terminal to cd
-            let appName: String
-            switch defaultTerminal {
-            case "com.mitchellh.ghostty": appName = "Ghostty"
-            case "com.googlecode.iterm2": appName = "iTerm"
-            case "dev.warp.Warp-Stable": appName = "Warp"
-            case "org.alacritty": appName = "Alacritty"
-            case "net.kovidgoyal.kitty": appName = "kitty"
-            default: appName = "Terminal"
-            }
-
-            if appName == "iTerm" {
-                let script = """
-                tell application "iTerm"
-                    activate
-                    create window with default profile command "/bin/zsh"
-                    tell current session of current window
-                        write text "cd \(escaped) && clear"
-                    end tell
-                end tell
-                """
-                if let appleScript = NSAppleScript(source: script) {
-                    appleScript.executeAndReturnError(nil)
-                }
-            } else {
-                // Generic: open the app then use Terminal-style AppleScript
-                let script = "tell application \"\(appName)\" to activate"
-                if let appleScript = NSAppleScript(source: script) {
-                    appleScript.executeAndReturnError(nil)
-                }
-                // Use open command with the directory
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-                process.arguments = ["-b", defaultTerminal, path]
-                try? process.run()
-            }
+        if !defaultTerminal.isEmpty,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: defaultTerminal) {
+            let config = NSWorkspace.OpenConfiguration()
+            NSWorkspace.shared.open([URL(fileURLWithPath: path)], withApplicationAt: appURL, configuration: config)
         } else {
+            let escaped = path.replacingOccurrences(of: "\"", with: "\\\"")
             let script = "tell application \"Terminal\" to do script \"cd \(escaped) && clear\""
             if let appleScript = NSAppleScript(source: script) {
                 appleScript.executeAndReturnError(nil)
@@ -261,11 +227,11 @@ private struct DirectoryActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 9))
+                .font(.system(size: 12))
                 .foregroundStyle(color ?? (isHovering ? Color.primary : Color.secondary))
-                .frame(width: 16, height: 16)
+                .frame(width: 22, height: 22)
                 .background(isHovering ? Color.primary.opacity(0.1) : .clear)
-                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }

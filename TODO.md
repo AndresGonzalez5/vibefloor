@@ -7,7 +7,6 @@
 - [ ] Occlude non-visible terminal surfaces to save GPU (reverted, needs careful timing)
 
 ## Future
-- [ ] Split panes within a workstream
 - [ ] External Chrome integration: launch with --remote-debugging-port for WebMCP/CDP
 - [ ] PR management: create and manage PRs from workstreams (currently view-only)
 - [ ] Auto-update mechanism (Sparkle or similar)
