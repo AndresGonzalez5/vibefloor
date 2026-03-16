@@ -109,6 +109,9 @@ struct BrowserView: View {
         .onAppear {
             urlText = defaultURL
             navigateTo(defaultURL)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                urlFieldFocused = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .retryBrowser)) { _ in
             retry()

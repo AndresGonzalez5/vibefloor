@@ -18,17 +18,21 @@ struct ProjectOverviewView: View {
     @AppStorage("factoryfloor.defaultTerminal") private var defaultTerminal: String = ""
 
     var body: some View {
-        Form {
-            // MARK: - Project header
-            Section {
-                TextField("Name", text: $project.name)
-                    .font(.system(size: 18, weight: .semibold))
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (outside Form to avoid row styling)
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("", text: $project.name)
+                    .font(.system(size: 22, weight: .bold))
                     .textFieldStyle(.plain)
                     .onChange(of: project.name) { _, _ in onProjectChanged() }
 
                 DirectoryRow(path: project.directory, defaultTerminal: defaultTerminal)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
 
+        Form {
             // MARK: - Repository
             if let info = appEnv.repoInfo(for: project.directory) {
                 Section("Repository") {
@@ -193,6 +197,7 @@ struct ProjectOverviewView: View {
             }
         }
         .formStyle(.grouped)
+        } // VStack
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             appEnv.refreshRepoInfo(for: project.directory)

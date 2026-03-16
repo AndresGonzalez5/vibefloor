@@ -31,28 +31,31 @@ struct WorkstreamInfoView: View {
             // Top pane: metadata (tapping it collapses docs)
             ScrollView {
                 VStack(spacing: 0) {
-                    // Workstream metadata
-                    Form {
-                        Section {
-                            Text(workstreamName)
-                                .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    // Workstream header
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(workstreamName)
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
 
-                            if let branch = branchName {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "arrow.triangle.branch")
-                                        .font(.caption)
-                                    Text(branch)
-                                }
-                                .foregroundStyle(.secondary)
+                        if let branch = branchName {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.branch")
+                                    .font(.caption)
+                                Text(branch)
                             }
-
-                            DirectoryRow(path: workingDirectory, defaultTerminal: defaultTerminal)
-
-                            LabeledContent("Project") {
-                                Text(projectName)
-                                    .foregroundStyle(.secondary)
-                            }
+                            .foregroundStyle(.secondary)
                         }
+
+                        DirectoryRow(path: workingDirectory, defaultTerminal: defaultTerminal)
+
+                        Text(projectName)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 4)
+
+                    Form {
 
                         // GitHub PR
                         if appEnv.ghAvailable, let branch = branchName,
