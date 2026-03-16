@@ -12,6 +12,15 @@
 {{ if $css }}
 <link href="{{ $css.RelPermalink }}?v={{ $css.Content | md5 }}" rel="stylesheet">
 {{ end }}
+{{- with .Site.Params.analyticsSrc }}
+<link rel="dns-prefetch" href="{{ . }}">
+{{- end }}
+{{- with .Site.Params.analyticsID }}
+<script
+  defer
+  src="{{ $.Site.Params.analyticsSrc }}"
+  data-website-id="{{ . }}"></script>
+{{- end }}
 <script>
 (function(){
   var t = localStorage.getItem('ff-theme');
