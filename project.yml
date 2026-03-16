@@ -27,6 +27,8 @@ targets:
     platform: macOS
     sources:
       - Sources
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
       - path: Localization/en.lproj/Localizable.strings
         buildPhase: resources
       - path: Localization/ca.lproj/Localizable.strings
