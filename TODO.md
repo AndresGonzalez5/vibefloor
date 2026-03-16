@@ -5,7 +5,6 @@
 - [ ] Code signing and notarization for distribution
 - [ ] All Tuner Labs logo image in help view (needs asset)
 - [ ] Occlude non-visible terminal surfaces to save GPU (reverted, needs careful timing)
-- [ ] Sidebar visual polish (custom styling beyond default SwiftUI)
 
 ## Future
 - [ ] Split panes within a workstream
@@ -90,6 +89,7 @@
 - [x] Install CLI (ff) from Settings
 - [x] Sponsor page with contribution options
 - [x] Website: Hugo i18n (en/ca/es/sv), language switcher, open source section
+- [x] Sidebar visual polish (hover effects, branch names, credit line)
 
 ## Probably not needed
 - [ ] Claude Agent SDK integration (TypeScript): CLI + tmux + session-id covers our needs

@@ -23,6 +23,24 @@ struct HelpView: View {
                 }
                 .padding(.top, 32)
 
+                VStack(spacing: 4) {
+                    HStack(spacing: 0) {
+                        Text("by ")
+                            .foregroundStyle(.tertiary)
+                        Link("David Poblador i Garcia.", destination: URL(string: "https://davidpoblador.com/")!)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 0) {
+                        Text("Help ")
+                            .foregroundStyle(.tertiary)
+                        Link("supporting", destination: URL(string: "https://factory-floor.com/sponsor")!)
+                            .foregroundStyle(.secondary)
+                        Text(" the development.")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .font(.system(size: 11))
+
                 PoblenouSkylineView()
                     .padding(.horizontal, 40)
 
