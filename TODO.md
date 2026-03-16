@@ -24,13 +24,11 @@
 ## Features
 - [ ] Sidebar visual polish (custom styling beyond default SwiftUI)
 - [ ] Split panes within a workstream
-- [ ] Reorder projects via drag-and-drop in sidebar
 - [ ] External Chrome integration: launch with --remote-debugging-port for WebMCP/CDP
 - [ ] PR management: create and manage PRs from workstreams (currently view-only)
 - [ ] Extract env var injection logic to a shared module
 
 ## Terminal
-- [ ] Sidebar toggle animation still causes minor flicker at the end
 - [ ] Occlude non-visible terminal surfaces to save GPU (reverted, needs careful timing)
 
 ## Infrastructure
@@ -83,6 +81,9 @@
 - [x] Archive warning: warn if worktree has uncommitted changes before archiving
 - [x] Workstream sorting in project view (by name or recent use toggle)
 - [x] Sidebar shows branch name per workstream (refreshed periodically)
+- [x] Sidebar toggle animation flicker fix
+- [x] Git worktree list and prune in project overview
+- [x] Fix auto-rename branch (--append-system-prompt instead of --system-prompt-file)
 
 ## Probably not needed
 - [ ] Claude Agent SDK integration (TypeScript): CLI + tmux + session-id covers our needs
