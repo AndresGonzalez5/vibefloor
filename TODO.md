@@ -5,6 +5,7 @@
 - [ ] CI: automate build, sign, notarize, DMG, and release upload via GitHub Actions
 - [ ] Occlude non-visible terminal surfaces to save GPU (needs careful timing)
 - [ ] Swift 6 migration (strict concurrency)
+- [ ] Debug builds: different icon and bundle ID so debug/release can run in parallel
 - [ ] System notifications when agent needs attention (bell/urgency from Ghostty)
 - [ ] Confirm before quit (Cmd+Q) when workstreams are active
 - [ ] Browser tab: show page title in tab label

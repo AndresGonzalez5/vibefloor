@@ -126,16 +126,25 @@ Requires: Xcode, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew instal
 cd ghostty && zig build -Demit-xcframework=true -Dxcframework-target=universal -Doptimize=ReleaseFast && cd ..
 
 # Build
-./dev.sh build
+./scripts/dev.sh build
 
 # Build and run
-./dev.sh br
+./scripts/dev.sh br
 
-# Run tests
-./dev.sh test
+# Kill and relaunch
+./scripts/dev.sh run
 
 # Run with a specific directory
-./dev.sh run ~/repos/myproject
+./scripts/dev.sh run ~/repos/myproject
+
+# Run tests
+./scripts/dev.sh test
+
+# Clean
+./scripts/dev.sh clean
+
+# Release (sign, notarize, DMG)
+./scripts/release.sh 0.1.0
 ```
 
 See [CLAUDE.md](CLAUDE.md) for development workflow, architecture, and conventions.

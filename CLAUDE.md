@@ -4,18 +4,19 @@
 
 ### Build, Test, Run
 ```bash
-xcodegen generate                                                              # regenerate Xcode project
-xcodebuild -project FactoryFloor.xcodeproj -scheme FactoryFloor -configuration Debug build   # debug build
-xcodebuild -project FactoryFloor.xcodeproj -scheme FactoryFloorTests -configuration Debug test  # run tests
-open "factoryfloor:///path/to/dir"                                             # launch with a directory
+./scripts/dev.sh build              # debug build (xcodegen + xcodebuild)
+./scripts/dev.sh br                 # build and run
+./scripts/dev.sh run [dir]          # kill and relaunch (optionally with a directory)
+./scripts/dev.sh test               # run XCTest suite
+./scripts/dev.sh clean              # clean build artifacts
+./scripts/release.sh [version]      # release build: sign, notarize, create DMG
 ```
 
 ### After code changes
 1. If you added/removed files or changed `project.yml`: run `xcodegen generate` first
-2. Build: `xcodebuild -project FactoryFloor.xcodeproj -scheme FactoryFloor -configuration Debug build`
-3. Kill and relaunch: `pkill -f "Factory Floor.app/Contents/MacOS"; sleep 1; open "factoryfloor:///path"`
-4. If tmux mode was on: `tmux -L factoryfloor kill-server`
-5. If you changed the tmux config: `rm -f ~/.factoryfloor/tmux.conf`
+2. Build and run: `./scripts/dev.sh br`
+3. If tmux mode was on: `tmux -L factoryfloor kill-server`
+4. If you changed the tmux config: `rm -f ~/.factoryfloor/tmux.conf`
 
 ### When to regenerate the Xcode project
 Run `xcodegen generate` when:
