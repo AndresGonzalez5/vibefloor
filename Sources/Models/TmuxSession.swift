@@ -11,7 +11,7 @@ enum TmuxSession {
 
     /// Path to the minimal tmux config that makes tmux invisible.
     private static var configPath: String {
-        let path = AppConstants.appSupportDirectory.appendingPathComponent("tmux.conf")
+        let path = AppConstants.dataDirectory.appendingPathComponent("tmux.conf")
         let config = """
         # Managed by \(AppConstants.appID). Do not edit.
         # Makes tmux act as a transparent session persistence wrapper.
@@ -32,7 +32,7 @@ enum TmuxSession {
         """
         // Write config if missing or outdated
         let fm = FileManager.default
-        try? fm.createDirectory(at: AppConstants.appSupportDirectory, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: AppConstants.dataDirectory, withIntermediateDirectories: true)
         if let existing = try? String(contentsOfFile: path.path, encoding: .utf8), existing == config {
             return path.path
         }

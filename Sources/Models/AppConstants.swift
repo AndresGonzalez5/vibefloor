@@ -6,8 +6,8 @@ import Foundation
 enum AppConstants {
     static let appID = "factoryfloor"
     static let appName = "Factory Floor"
-
-    static var appSupportDirectory: URL {
+    /// Config directory: ~/.config/factoryfloor/ (respects XDG_CONFIG_HOME)
+    static var configDirectory: URL {
         let configBase: URL
         if let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"], !xdg.isEmpty {
             configBase = URL(fileURLWithPath: xdg)
@@ -17,7 +17,12 @@ enum AppConstants {
         return configBase.appendingPathComponent(appID)
     }
 
+    /// Data directory: ~/.factoryfloor/ (worktrees, tmux config, prompts)
+    static var dataDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(appID)")
+    }
+
     static var worktreesDirectory: URL {
-        appSupportDirectory.appendingPathComponent("worktrees")
+        dataDirectory.appendingPathComponent("worktrees")
     }
 }

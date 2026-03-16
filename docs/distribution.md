@@ -5,14 +5,14 @@
 ### Setting up the tap
 
 1. Create a public repo `alltuner/homebrew-tap` (the `homebrew-` prefix is required)
-2. Add a cask formula at `Casks/factory-floor.rb`:
+2. Add a cask formula at `Casks/factoryfloor.rb`:
 
 ```ruby
-cask "factory-floor" do
+cask "factoryfloor" do
   version "0.1.0"
   sha256 "SHA256_OF_DMG_OR_ZIP"
 
-  url "https://github.com/alltuner/factory-floor/releases/download/v#{version}/FactoryFloor-#{version}.dmg"
+  url "https://github.com/alltuner/factoryfloor/releases/download/v#{version}/FactoryFloor-#{version}.dmg"
   name "Factory Floor"
   desc "AI-powered development workspace for macOS"
   homepage "https://factory-floor.com"
@@ -26,7 +26,7 @@ cask "factory-floor" do
 end
 ```
 
-3. Users install with: `brew install alltuner/tap/factory-floor`
+3. Users install with: `brew install alltuner/tap/factoryfloor`
 
 ### Automating cask updates
 

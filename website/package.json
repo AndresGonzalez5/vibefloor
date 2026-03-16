@@ -1,5 +1,5 @@
 {
-  "name": "factory-floor-website",
+  "name": "factoryfloor-website",
   "private": true,
   "scripts": {
     "css:build": "bunx @tailwindcss/cli -i css/input.css -o assets/css/style.css --minify",

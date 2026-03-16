@@ -79,7 +79,7 @@
 - [x] CLI launcher script (ff --install)
 - [x] Distribution guide (Homebrew, notarization, Sparkle)
 - [x] Umami analytics integration
-- [x] GitHub repo at alltuner/factory-floor
+- [x] GitHub repo at alltuner/factoryfloor
 
 ## Probably not needed
 - [ ] Claude Agent SDK integration (TypeScript): CLI + tmux + session-id covers our needs
