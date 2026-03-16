@@ -1,14 +1,14 @@
 # TODO
 
 ## Pre-release
-- [ ] Homebrew tap (alltuner/homebrew-tap) and cask formula
+- [x] Homebrew tap (alltuner/homebrew-tap) and cask formula
 - [ ] CI: automate build, sign, notarize, DMG, and release upload via GitHub Actions
 - [x] Confirm before quit (Cmd+Q) when workstreams are active
 - [x] Browser tab: show page title in tab label
-- [ ] Change workstream navigation shortcuts from Cmd+1-9 to Cmd+Shift+1-9 (Cmd+1-9 collides with terminal tab switching); make it work from within any workspace tab
+- [x] Change workstream navigation shortcuts from Cmd+1-9 to Cmd+Shift+1-9 (Cmd+1-9 collides with terminal tab switching); make it work from within any workspace tab
 - [x] Website: legal/privacy policy page
-- [ ] CONTRIBUTING.md guide
-- [ ] CODE_OF_CONDUCT.md
+- [x] CONTRIBUTING.md guide
+- [x] CODE_OF_CONDUCT.md
 - [x] Funding: add Buy Me a Coffee and GitHub Sponsors options (website + FUNDING.yml)
 
 ## Future
