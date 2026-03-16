@@ -1,17 +1,6 @@
 # TODO
 
 ## Priority (next session)
-- [ ] Setup scripts: run commands when a worktree is created (e.g., npm install, pip install)
-  - Decide: per-project config file (e.g., `.ff2/setup.sh`) vs UI-based script list in settings?
-  - Decide: run automatically or prompt user before running?
-  - Decide: show output in a terminal tab or as a progress indicator?
-- [ ] Run scripts: configurable ways to start dev servers (multiple per project)
-  - Decide: where to store run configs (per-project file, UserDefaults, or both)?
-  - Decide: UI for managing multiple run configs per project (add/edit/remove)
-  - Decide: run in the workspace terminal tab or spawn separate terminals?
-- [ ] Teardown scripts: cleanup commands when archiving a workstream
-  - Decide: same storage as setup scripts?
-  - Decide: run before or after worktree removal? Block archive until done?
 
 ## Pre-release
 - [ ] Choose final app name (currently "ff2" is a working name)
@@ -87,6 +76,12 @@
 - [x] Extract env var injection logic to WorkstreamEnvironment module
 - [x] Tmux mode limited to Coding Agent only (Terminal tab uses plain shell)
 - [x] Tmux aggressive-resize and window-size latest to prevent size revert
+- [x] Script config: .ff2.json with fallback to emdash/conductor/superset formats
+- [x] Setup tab (Cmd+5): auto-runs setup script on workstream creation
+- [x] Run tab (Cmd+6): on-demand dev server via run script
+- [x] Teardown script runs before worktree removal on archive
+- [x] .env symlink guarded by setting (default on)
+- [x] Script info displayed in workstream Info tab
 
 ## Probably not needed
 - [ ] Claude Agent SDK integration (TypeScript): CLI + tmux + session-id covers our needs

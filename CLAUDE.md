@@ -60,10 +60,21 @@ Tests are in `Tests/`. The test target links against the app target.
 - **Tool detection** runs at startup in `AppEnvironment.refresh()`
 
 ### Workstream lifecycle
-1. Creating a workstream: generates name, runs `git worktree add`, stores worktree path
+1. Creating a workstream: generates name, runs `git worktree add`, symlinks .env (if enabled), stores worktree path
 2. Terminal tabs: Coding Agent runs claude (with session-id for resume), Terminal runs shell
-3. Tmux mode: wraps commands in `tmux new-session -A` on a dedicated socket (`-L ff2`)
-4. Archiving: runs `git worktree remove` + `tmux kill-session` in background
+3. Setup tab (Cmd+5): auto-runs setup script on creation (if configured)
+4. Run tab (Cmd+6): starts dev server on demand (if configured)
+5. Tmux mode: wraps Coding Agent and script commands in `tmux new-session -A` on a dedicated socket (`-L ff2`)
+6. Archiving: runs teardown script, then `git worktree remove` + `tmux kill-session` in background
+
+### Script configuration
+Scripts are loaded from the project directory in priority order:
+1. `.ff2.json` or `.ff2/config.json` - `{ "setup": "cmd", "run": "cmd", "teardown": "cmd" }`
+2. `.emdash.json` - `{ "scripts": { "setup": "cmd", "run": "cmd", "teardown": "cmd" } }`
+3. `conductor.json` - `{ "scripts": { "setup": "cmd", "run": "cmd", "archive": "cmd" } }`
+4. `.superset/config.json` - `{ "setup": ["cmd1", "cmd2"], "teardown": ["cmd1"] }`
+
+The config model is in `Sources/Models/ScriptConfig.swift`.
 
 ## Localization
 
@@ -96,8 +107,7 @@ grep -rn 'Label("' Sources/ | grep -v '//'
 
 ## Task Tracking
 - **TODO.md**: Track bugs, features, and future work. Add items when you discover issues or defer work.
-- **next.md**: Parked feature requests to tackle in the next session.
-- When you notice something that should be done later, add it to the appropriate file immediately.
+- When you notice something that should be done later, add it to TODO.md immediately.
 
 ## Keyboard Shortcuts
 When adding, removing, or changing keyboard shortcuts:
@@ -108,7 +118,7 @@ When adding, removing, or changing keyboard shortcuts:
 
 Current shortcuts are context-sensitive via `switchByNumber`:
 - **Cmd+0**: project view (from workstream)
-- **Cmd+1-9**: in project view = jump to Nth workstream; in workstream view = switch tabs (1=info, 2=agent, 3=terminal, 4=browser)
+- **Cmd+1-9**: in project view = jump to Nth workstream; in workstream view = switch tabs (1=info, 2=agent, 3=terminal, 4=browser, 5=setup, 6=run)
 - **Cmd+Shift+[/]**: cycle tabs
 - **Cmd+Shift+O**: external browser
 - **Cmd+Shift+E**: external terminal
