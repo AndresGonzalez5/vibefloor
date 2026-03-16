@@ -135,16 +135,38 @@ struct SettingsView: View {
                 }
 
                 Picker("External Terminal", selection: $defaultTerminal) {
-                    Text("None").tag("")
                     ForEach(appEnv.installedTerminals) { app in
-                        Text(app.name).tag(app.bundleID)
+                        Label {
+                            Text(app.name)
+                        } icon: {
+                            if let icon = app.icon {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .frame(width: 16, height: 16)
+                            }
+                        }
+                        .tag(app.bundleID)
+                    }
+                }
+                .onAppear {
+                    if defaultTerminal.isEmpty, let first = appEnv.installedTerminals.first {
+                        defaultTerminal = first.bundleID
                     }
                 }
 
                 Picker("External Browser", selection: $defaultBrowser) {
                     Text("System Default").tag("")
                     ForEach(appEnv.installedBrowsers) { app in
-                        Text(app.name).tag(app.bundleID)
+                        Label {
+                            Text(app.name)
+                        } icon: {
+                            if let icon = app.icon {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .frame(width: 16, height: 16)
+                            }
+                        }
+                        .tag(app.bundleID)
                     }
                 }
             }
@@ -470,6 +492,11 @@ struct AppInfo: Identifiable {
     let name: String
     let bundleID: String
     var id: String { bundleID }
+
+    var icon: NSImage? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
 
     private static func isAppInstalled(_ bundleID: String) -> Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
