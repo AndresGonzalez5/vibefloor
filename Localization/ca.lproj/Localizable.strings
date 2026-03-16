@@ -45,7 +45,7 @@
 "Settings" = "Configuració";
 "Session" = "Sessió";
 "Tmux Mode" = "Mode Tmux";
-"Makes sessions persist across app restarts. Sessions are lost on system restart." = "Les sessions es mantenen entre reinicis de l'aplicació. Es perden en reiniciar el sistema.";
+"Coding Agent sessions persist across app restarts. The Terminal tab is not affected. Sessions are lost on system restart." = "Les sessions de l'agent de codi es mantenen entre reinicis de l'aplicació. La pestanya Terminal no es veu afectada. Es perden en reiniciar el sistema.";
 "Language" = "Idioma";
 "System Default" = "Per defecte del sistema";
 "Restart the app for the language change to take effect." = "Reinicia l'aplicació perquè el canvi d'idioma tingui efecte.";

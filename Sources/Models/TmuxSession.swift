@@ -25,6 +25,8 @@ enum TmuxSession {
         set -g escape-time 0
         set -g allow-passthrough on
         set -g default-terminal "xterm-256color"
+        set -g aggressive-resize on
+        set -g window-size latest
         set -g remain-on-exit on
         set-hook -g pane-died 'respawn-pane'
         """
@@ -67,12 +69,10 @@ enum TmuxSession {
         process.waitUntilExit()
     }
 
-    /// Kill both agent and terminal sessions for a workstream.
+    /// Kill the agent tmux session for a workstream.
     static func killWorkstreamSessions(tmuxPath: String, project: String, workstream: String) {
         let agentSession = sessionName(project: project, workstream: workstream, role: "agent")
-        let terminalSession = sessionName(project: project, workstream: workstream, role: "terminal")
         killSession(tmuxPath: tmuxPath, sessionName: agentSession)
-        killSession(tmuxPath: tmuxPath, sessionName: terminalSession)
     }
 
     private static func sanitize(_ name: String) -> String {

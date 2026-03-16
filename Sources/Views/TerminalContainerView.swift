@@ -93,9 +93,7 @@ struct TerminalContainerView: View {
     }
 
     private var workspaceCommand: String? {
-        guard useTmux, let tmuxPath = appEnv.toolStatus.tmux.path else { return nil }
-        let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: "terminal")
-        return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: nil)
+        nil
     }
 
     var body: some View {

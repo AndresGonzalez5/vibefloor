@@ -45,7 +45,7 @@
 "Settings" = "Inställningar";
 "Session" = "Session";
 "Tmux Mode" = "Tmux-läge";
-"Makes sessions persist across app restarts. Sessions are lost on system restart." = "Sessioner bevaras mellan omstarter av appen. De försvinner vid omstart av systemet.";
+"Coding Agent sessions persist across app restarts. The Terminal tab is not affected. Sessions are lost on system restart." = "Kodningsagentens sessioner bevaras mellan omstarter av appen. Terminalfliken påverkas inte. De försvinner vid omstart av systemet.";
 "Language" = "Språk";
 "System Default" = "Systemstandard";
 "Restart the app for the language change to take effect." = "Starta om appen för att språkändringen ska träda i kraft.";

@@ -106,7 +106,7 @@ struct SettingsView: View {
             Section("Terminal & Browser") {
                 Toggle("Tmux Mode", isOn: $tmuxMode)
                     .disabled(!appEnv.toolStatus.tmux.isInstalled)
-                Text("Makes sessions persist across app restarts. Sessions are lost on system restart.")
+                Text("Coding Agent sessions persist across app restarts. The Terminal tab is not affected. Sessions are lost on system restart.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

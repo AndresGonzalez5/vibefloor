@@ -84,6 +84,8 @@
 - [x] Git worktree list and prune in project overview
 - [x] Fix auto-rename branch (--append-system-prompt instead of --system-prompt-file)
 - [x] Extract env var injection logic to WorkstreamEnvironment module
+- [x] Tmux mode limited to Coding Agent only (Terminal tab uses plain shell)
+- [x] Tmux aggressive-resize and window-size latest to prevent size revert
 
 ## Probably not needed
 - [ ] Claude Agent SDK integration (TypeScript): CLI + tmux + session-id covers our needs
