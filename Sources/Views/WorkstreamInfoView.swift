@@ -14,6 +14,8 @@ struct WorkstreamInfoView: View {
     @State private var branchName: String?
     @State private var docFiles: [DocFile] = []
     @State private var selectedDoc: String?
+    @State private var docHeight: CGFloat = 300
+    @State private var docExpanded = false
 
     struct DocFile: Identifiable {
         let name: String
@@ -152,9 +154,9 @@ struct WorkstreamInfoView: View {
                 }
             }
 
-            // Document tabs
+            // Document viewer
             if !docFiles.isEmpty {
-                Divider()
+                // Drag handle
                 HStack(spacing: 0) {
                     ForEach(docFiles) { doc in
                         DocTabButton(
@@ -164,16 +166,42 @@ struct WorkstreamInfoView: View {
                         )
                     }
                     Spacer()
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) { docExpanded.toggle() }
+                    }) {
+                        Image(systemName: docExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .help(docExpanded ? "Collapse" : "Expand")
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 6)
+                .padding(.vertical, 4)
+                .background(.bar)
 
-                Divider()
+                // Resize handle
+                Rectangle()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(height: 4)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                docHeight = max(100, docHeight - value.translation.height)
+                            }
+                    )
 
                 if let selected = selectedDoc,
                    let doc = docFiles.first(where: { $0.name == selected }) {
                     MarkdownContentView(markdown: doc.content)
                         .id(selected)
+                        .frame(height: docExpanded ? nil : docHeight)
+                        .frame(maxHeight: docExpanded ? .infinity : docHeight)
                 } else {
                     Spacer()
                 }

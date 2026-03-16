@@ -1,5 +1,5 @@
-// ABOUTME: Agent-centric workspace view for a workstream.
-// ABOUTME: Coding Agent is always the main view; Info, Terminal, Browser open on demand.
+// ABOUTME: Workspace view with dynamic tabs for agent, terminals, and browsers.
+// ABOUTME: Info and Agent are always present; terminals and browsers are added on demand.
 
 import SwiftUI
 
@@ -29,6 +29,21 @@ func derivedUUID(from base: UUID, salt: String) -> UUID {
     return UUID(uuid: bytes)
 }
 
+/// A tab in the workspace. Info and Agent are permanent; terminals and browsers are closeable.
+enum WorkspaceTab: Hashable {
+    case info
+    case agent
+    case terminal(UUID)
+    case browser(UUID)
+
+    var isCloseable: Bool {
+        switch self {
+        case .info, .agent: return false
+        case .terminal, .browser: return true
+        }
+    }
+}
+
 struct TerminalContainerView: View {
     let workstreamID: UUID
     let workingDirectory: String
@@ -43,9 +58,10 @@ struct TerminalContainerView: View {
     @AppStorage("factoryfloor.tmuxMode") private var tmuxMode: Bool = false
     @AppStorage("factoryfloor.agentTeams") private var agentTeams: Bool = false
     @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
-    @State private var showingInfo = true
-    @State private var showingBrowser = false
-    @State private var terminalIDs: [UUID] = []
+    @State private var activeTab: WorkspaceTab = .info
+    @State private var tabs: [WorkspaceTab] = [.info, .agent]
+    @State private var terminalCount = 0
+    @State private var browserCount = 0
     @State private var scriptConfig: ScriptConfig = .empty
     @State private var branchPR: GitHubPR?
 
@@ -95,12 +111,68 @@ struct TerminalContainerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Toolbar
-            toolbar
+            // Tab bar
+            HStack(spacing: 0) {
+                ForEach(tabs, id: \.self) { tab in
+                    WorkspaceTabButton(
+                        tab: tab,
+                        label: tabLabel(tab),
+                        icon: tabIcon(tab),
+                        isActive: activeTab == tab,
+                        onSelect: { activeTab = tab },
+                        onClose: tab.isCloseable ? { closeTab(tab) } : nil
+                    )
+                }
+
+                Spacer()
+
+                // Add buttons
+                Button(action: addTerminal) {
+                    Image(systemName: "plus.rectangle.on.rectangle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("New Terminal (\u{2318}T)")
+
+                Button(action: addBrowser) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("New Browser (\u{2318}B)")
+
+                // PR badge
+                if let pr = branchPR, let url = URL(string: pr.url) {
+                    Button(action: { NSWorkspace.shared.open(url) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.pull")
+                                .font(.system(size: 11))
+                            Text("#\(pr.number)")
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .foregroundStyle(.green)
+                    }
+                    .buttonStyle(.plain)
+                    .help(pr.title)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.bar)
+
             Divider()
 
-            // Content: show one view at a time
-            if showingInfo {
+            // Content
+            switch activeTab {
+            case .info:
                 WorkstreamInfoView(
                     workstreamName: workstreamName,
                     workingDirectory: workingDirectory,
@@ -108,29 +180,24 @@ struct TerminalContainerView: View {
                     projectDirectory: projectDirectory,
                     scriptConfig: scriptConfig
                 )
-            } else if showingBrowser {
+            case .agent:
+                SingleTerminalView(
+                    surfaceID: claudeID,
+                    workingDirectory: workingDirectory,
+                    command: claudeCommand,
+                    isFocused: true,
+                    environmentVars: envVars
+                )
+            case .terminal(let id):
+                SingleTerminalView(
+                    surfaceID: id,
+                    workingDirectory: workingDirectory,
+                    isFocused: true,
+                    environmentVars: envVars
+                )
+            case .browser(let id):
                 BrowserView(defaultURL: "http://localhost:\(workstreamPort)")
-            } else {
-                VStack(spacing: 0) {
-                    SingleTerminalView(
-                        surfaceID: claudeID,
-                        workingDirectory: workingDirectory,
-                        command: claudeCommand,
-                        isFocused: terminalIDs.isEmpty,
-                        environmentVars: envVars
-                    )
-
-                    ForEach(terminalIDs, id: \.self) { id in
-                        Divider()
-                        SingleTerminalView(
-                            surfaceID: id,
-                            workingDirectory: workingDirectory,
-                            isFocused: id == terminalIDs.last,
-                            environmentVars: envVars
-                        )
-                        .frame(minHeight: 100)
-                    }
-                }
+                    .id(id)
             }
         }
         .onAppear {
@@ -143,51 +210,25 @@ struct TerminalContainerView: View {
             refreshBranchPR()
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                showingInfo.toggle()
-                if showingInfo { showingBrowser = false }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                addTerminal()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .closeTerminal)) { _ in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                closeLastTerminal()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                showingBrowser.toggle()
-                if showingBrowser { showingInfo = false }
-            }
+            activeTab = .info
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusAgent)) { _ in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                showingInfo = false
-                showingBrowser = false
+            activeTab = .agent
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in
+            addTerminal()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
+            addBrowser()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeTerminal)) { _ in
+            if activeTab.isCloseable {
+                closeTab(activeTab)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchByNumber)) { notification in
-            guard let n = notification.object as? Int else { return }
-            withAnimation(.easeInOut(duration: 0.15)) {
-                switch n {
-                case 1:
-                    showingInfo.toggle()
-                    if showingInfo { showingBrowser = false }
-                case 2:
-                    showingInfo = false
-                    showingBrowser = false
-                case 3:
-                    addTerminal()
-                case 4:
-                    showingBrowser.toggle()
-                    if showingBrowser { showingInfo = false }
-                default: break
-                }
-            }
+            guard let n = notification.object as? Int, n >= 1, n <= tabs.count else { return }
+            activeTab = tabs[n - 1]
         }
         .onReceive(NotificationCenter.default.publisher(for: .openExternalBrowser)) { _ in
             guard let url = URL(string: "http://localhost:\(workstreamPort)") else { return }
@@ -201,77 +242,58 @@ struct TerminalContainerView: View {
         }
     }
 
-    // MARK: - Toolbar
+    // MARK: - Tab management
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            // Branch name
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.triangle.branch")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                Text(appEnv.branchName(for: workingDirectory) ?? workstreamName)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            // View toggles
-            ToolbarButton(label: "Agent", icon: "sparkle", shortcut: "\u{2318}\u{21A9}", isActive: !showingInfo && !showingBrowser) {
-                NotificationCenter.default.post(name: .focusAgent, object: nil)
-            }
-
-            ToolbarButton(label: "Info", icon: "info.circle", shortcut: "\u{2318}I", isActive: showingInfo) {
-                NotificationCenter.default.post(name: .toggleInfo, object: nil)
-            }
-
-            ToolbarButton(label: "Terminal", icon: "terminal", shortcut: "\u{2318}T", isActive: !terminalIDs.isEmpty, badge: terminalIDs.isEmpty ? nil : "\(terminalIDs.count)") {
-                NotificationCenter.default.post(name: .toggleTerminal, object: nil)
-            }
-
-            ToolbarButton(label: "Browser", icon: "globe", shortcut: "\u{2318}B", isActive: showingBrowser) {
-                NotificationCenter.default.post(name: .toggleBrowser, object: nil)
-            }
-
-            // PR badge
-            if let pr = branchPR, let url = URL(string: pr.url) {
-                Button(action: { NSWorkspace.shared.open(url) }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.pull")
-                            .font(.system(size: 11))
-                        Text("#\(pr.number)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                    .foregroundStyle(.green)
-                }
-                .buttonStyle(.plain)
-                .help(pr.title)
-            }
+    private func tabLabel(_ tab: WorkspaceTab) -> String {
+        switch tab {
+        case .info: return "Info"
+        case .agent: return "Agent"
+        case .terminal: return "Terminal"
+        case .browser: return "Browser"
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.bar)
     }
 
-    // MARK: - Actions
+    private func tabIcon(_ tab: WorkspaceTab) -> String {
+        switch tab {
+        case .info: return "info.circle"
+        case .agent: return "sparkle"
+        case .terminal: return "terminal"
+        case .browser: return "globe"
+        }
+    }
 
     private func addTerminal() {
-        let id = derivedUUID(from: workstreamID, salt: "terminal-\(terminalIDs.count)")
-        terminalIDs.append(id)
+        terminalCount += 1
+        let id = derivedUUID(from: workstreamID, salt: "terminal-\(terminalCount)")
+        let tab = WorkspaceTab.terminal(id)
+        tabs.append(tab)
+        activeTab = tab
     }
 
-    private func closeLastTerminal() {
-        guard let last = terminalIDs.popLast() else { return }
-        surfaceCache.removeSurface(for: last)
+    private func addBrowser() {
+        browserCount += 1
+        let id = derivedUUID(from: workstreamID, salt: "browser-\(browserCount)")
+        let tab = WorkspaceTab.browser(id)
+        tabs.append(tab)
+        activeTab = tab
     }
 
-    /// Only prewarm the Coding Agent. Everything else is on demand.
+    private func closeTab(_ tab: WorkspaceTab) {
+        guard let index = tabs.firstIndex(of: tab) else { return }
+        tabs.remove(at: index)
+        // Clean up terminal surface
+        if case .terminal(let id) = tab {
+            surfaceCache.removeSurface(for: id)
+        }
+        // Switch to previous tab or agent
+        if activeTab == tab {
+            let newIndex = min(index, tabs.count - 1)
+            activeTab = tabs[newIndex]
+        }
+    }
+
+    // MARK: - Lifecycle
+
     private func prewarmAgent() {
         guard let app = TerminalApp.shared.app else { return }
         _ = surfaceCache.surface(
@@ -280,7 +302,6 @@ struct TerminalContainerView: View {
         )
     }
 
-    /// Run setup script in the background if configured.
     private func runSetupIfNeeded() {
         guard let setup = scriptConfig.setup else { return }
         let dir = workingDirectory
@@ -322,40 +343,39 @@ struct TerminalContainerView: View {
     }
 }
 
-// MARK: - Toolbar icon button
+// MARK: - Tab button
 
-private struct ToolbarButton: View {
+private struct WorkspaceTabButton: View {
+    let tab: WorkspaceTab
     let label: String
     let icon: String
-    let shortcut: String
-    var isActive: Bool = false
-    var badge: String? = nil
-    let action: () -> Void
+    let isActive: Bool
+    let onSelect: () -> Void
+    var onClose: (() -> Void)?
 
     @State private var isHovering = false
 
     var body: some View {
-        Button(action: action) {
+        Button(action: onSelect) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 11))
                 Text(label)
-                    .font(.system(size: 11, weight: isActive ? .semibold : .regular))
-                if let badge {
-                    Text(badge)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.accentColor)
-                        .clipShape(Capsule())
+                    .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                if let onClose, isHovering || isActive {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 14, height: 14)
+                            .background(Color.primary.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                Text(shortcut)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(isActive ? Color.accentColor.opacity(0.15) : (isHovering ? Color.primary.opacity(0.05) : .clear))
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .foregroundStyle(isActive ? .primary : .secondary)
@@ -367,7 +387,6 @@ private struct ToolbarButton: View {
 
 // MARK: - SingleTerminalView
 
-/// NSViewRepresentable for a single terminal surface.
 struct SingleTerminalView: NSViewRepresentable {
     let surfaceID: UUID
     let workingDirectory: String
@@ -417,7 +436,6 @@ struct SingleTerminalView: NSViewRepresentable {
 
 // MARK: - Surface cache
 
-/// Caches terminal surfaces so switching workstreams doesn't destroy/recreate them.
 final class TerminalSurfaceCache: ObservableObject {
     private var surfaces: [UUID: TerminalView] = [:]
     private var surfaceParams: [UUID: SurfaceParams] = [:]
@@ -457,12 +475,11 @@ final class TerminalSurfaceCache: ObservableObject {
         surfaceParams.removeValue(forKey: id)
     }
 
-    /// Remove all surfaces for a workstream.
     func removeWorkstreamSurfaces(for workstreamID: UUID) {
         removeSurface(for: workstreamID)
-        // Clean up any terminal splits (up to a reasonable number)
         for i in 0..<20 {
             removeSurface(for: derivedUUID(from: workstreamID, salt: "terminal-\(i)"))
+            removeSurface(for: derivedUUID(from: workstreamID, salt: "browser-\(i)"))
         }
     }
 
