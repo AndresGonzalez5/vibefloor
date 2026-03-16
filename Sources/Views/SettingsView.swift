@@ -19,6 +19,7 @@ struct SettingsView: View {
 
     @EnvironmentObject private var appEnv: AppEnvironment
     @State private var showingClearConfirm = false
+    @State private var cliInstalled = FileManager.default.fileExists(atPath: "/usr/local/bin/ff")
 
     var body: some View {
         Form {
@@ -183,6 +184,19 @@ struct SettingsView: View {
                 }
             }
 
+            // MARK: - CLI
+            Section("Command Line") {
+                LabeledContent("Install 'ff' command") {
+                    Button(cliInstalled ? "Installed" : "Install...", action: installCLI)
+                        .disabled(cliInstalled)
+                }
+                Text(cliInstalled
+                    ? "The 'ff' command is available at /usr/local/bin/ff."
+                    : "Installs the 'ff' command to /usr/local/bin so you can open directories with 'ff .' from any terminal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // MARK: - Danger
             Section("Danger Zone") {
                 Toggle("Bleeding edge", isOn: $bleedingEdge)
@@ -210,6 +224,42 @@ struct SettingsView: View {
         } message: {
             Text("This will remove all projects and workstreams from the sidebar. No files on disk will be deleted. This cannot be undone.")
         }
+    }
+
+    private func installCLI() {
+        // Path to the ff script bundled in the app
+        guard let scriptPath = Bundle.main.path(forResource: "ff", ofType: nil, inDirectory: "Scripts") else {
+            // Fallback: create the script inline
+            let script = """
+            #!/bin/bash
+            DIR="${1:-.}"
+            RESOLVED=$(cd "$DIR" 2>/dev/null && pwd)
+            [ -z "$RESOLVED" ] && echo "Error: directory '$DIR' not found" >&2 && exit 1
+            open "factoryfloor://$RESOLVED"
+            """
+            let tempPath = NSTemporaryDirectory() + "ff"
+            try? script.write(toFile: tempPath, atomically: true, encoding: .utf8)
+            chmod(tempPath, 0o755)
+            installWithPrivileges(source: tempPath)
+            return
+        }
+        installWithPrivileges(source: scriptPath)
+    }
+
+    private func installWithPrivileges(source: String) {
+        let destination = "/usr/local/bin/ff"
+        let script = "do shell script \"install -m 755 \(source.replacingOccurrences(of: "\"", with: "\\\"")) \(destination)\" with administrator privileges"
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            if error == nil {
+                cliInstalled = true
+            }
+        }
+    }
+
+    private func chmod(_ path: String, _ mode: mode_t) {
+        Darwin.chmod(path, mode)
     }
 
     private func applyAppearance(_ mode: String) {

@@ -282,17 +282,13 @@ private struct DocTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: "doc.text")
-                    .font(.system(size: 10))
-                Text(name)
-                    .font(.system(size: 12, weight: isActive ? .semibold : .regular, design: .monospaced))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(isActive ? Color.accentColor.opacity(0.15) : (isHovering ? Color.primary.opacity(0.05) : .clear))
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .foregroundStyle(isActive ? .primary : .secondary)
+            Text(name)
+                .font(.system(size: 10, weight: isActive ? .medium : .regular, design: .monospaced))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(isActive ? Color.primary.opacity(0.08) : (isHovering ? Color.primary.opacity(0.04) : .clear))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .foregroundStyle(isActive ? .primary : .tertiary)
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
