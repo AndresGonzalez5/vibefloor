@@ -53,7 +53,7 @@
 "Not found" = "No encontrado";
 "Authenticated" = "Autenticado";
 "Not authenticated" = "No autenticado";
-"Default Terminal" = "Terminal predeterminado";
+"Default Terminal" = "Terminal predeterminada";
 "Terminal" = "Terminal";
 "No supported terminals found" = "No se encontraron terminales compatibles";
 "None" = "Ninguno";
@@ -64,7 +64,7 @@
 "Bypass permission prompts" = "Omitir solicitudes de permisos";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "Cuando está activado, el agente de código no pedirá confirmación antes de hacer cambios. Úsalo con precaución: el agente podrá editar archivos, ejecutar comandos y hacer commits sin preguntar.";
 "Default External Browser" = "Navegador externo predeterminado";
-"External Terminal" = "Terminal externo";
+"External Terminal" = "Terminal externa";
 "Requires tmux to be installed." = "Requiere tmux instalado.";
 "URL" = "URL";
 "Done" = "Hecho";

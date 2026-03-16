@@ -265,7 +265,9 @@ struct TerminalContainerView: View {
         case .info: return "Info"
         case .agent: return "Agent"
         case .terminal: return nil
-        case .browser(let id): return browserTitles[id]
+        case .browser(let id):
+            guard let title = browserTitles[id], !title.isEmpty else { return nil }
+            return title.count > 20 ? String(title.prefix(20)) + "..." : title
         }
     }
 

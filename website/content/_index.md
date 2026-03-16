@@ -36,11 +36,11 @@ translationKey: home
     </p>
 
     <div class="flex gap-4 flex-wrap animate-fade-up-3">
-      <a href="https://github.com/anthropics/ff2/releases" class="inline-flex items-center gap-2 bg-wine text-[#F7F4F3] px-6 py-3 rounded-lg font-mono text-sm font-medium border border-wine-light no-underline transition-all hover:bg-wine-light hover:-translate-y-0.5 hover:shadow-[0_8px_30px_var(--color-wine-glow)]">
+      <a href="https://github.com/alltuner/factoryfloor/releases" class="inline-flex items-center gap-2 bg-wine text-[#F7F4F3] px-6 py-3 rounded-lg font-mono text-sm font-medium border border-wine-light no-underline transition-all hover:bg-wine-light hover:-translate-y-0.5 hover:shadow-[0_8px_30px_var(--color-wine-glow)]">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download
       </a>
-      <a href="https://github.com/anthropics/ff2" class="inline-flex items-center gap-2 bg-transparent text-fg-dim px-6 py-3 rounded-lg font-mono text-sm border border-fg-faint no-underline transition-all hover:-translate-y-0.5 hover:bg-fg-faint">
+      <a href="https://github.com/alltuner/factoryfloor" class="inline-flex items-center gap-2 bg-transparent text-fg-dim px-6 py-3 rounded-lg font-mono text-sm border border-fg-faint no-underline transition-all hover:-translate-y-0.5 hover:bg-fg-faint">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
         View source
       </a>
@@ -139,7 +139,7 @@ translationKey: home
       <div class="text-center relative">
         <div class="w-12 h-12 flex items-center justify-center mx-auto mb-6 rounded-full border-2 border-wine bg-bg font-mono font-bold text-wine-light relative z-10">1</div>
         <h3 class="font-mono text-sm font-semibold mb-2">Add a project</h3>
-        <p class="text-sm text-fg-muted leading-relaxed">Drop a directory on the sidebar, or create a new one. ff2 detects git repos, installed tools, and GitHub connections automatically.</p>
+        <p class="text-sm text-fg-muted leading-relaxed">Drop a directory on the sidebar, or create a new one. Factory Floor detects git repos, installed tools, and GitHub connections automatically.</p>
       </div>
       <div class="text-center relative">
         <div class="w-12 h-12 flex items-center justify-center mx-auto mb-6 rounded-full border-2 border-wine bg-bg font-mono font-bold text-wine-light relative z-10">2</div>
@@ -189,7 +189,7 @@ translationKey: home
       </div>
 
       <div>
-        <p class="text-sm text-fg-muted leading-relaxed mb-6">No config file? ff2 looks for these formats in order:</p>
+        <p class="text-sm text-fg-muted leading-relaxed mb-6">No config file? Factory Floor looks for these formats in order:</p>
         <div class="flex flex-col gap-3">
           <div class="flex items-center gap-4 p-4 rounded-lg border border-fg-faint bg-bg-surface">
             <span class="font-mono text-[0.7rem] font-semibold text-wine-light w-6 shrink-0">1</span>
@@ -264,7 +264,7 @@ translationKey: home
           <tr class="border-b border-fg-faint">
             <td class="px-6 py-3 text-wine-light text-xs">FF_WORKTREE_DIR</td>
             <td class="px-6 py-3 font-sans text-sm text-fg-dim">Worktree path for this workstream</td>
-            <td class="px-6 py-3 text-xs text-fg-muted hidden md:table-cell">~/.ff2/worktrees/my-app/deploy-auth-fix</td>
+            <td class="px-6 py-3 text-xs text-fg-muted hidden md:table-cell">~/.factoryfloor/worktrees/my-app/deploy-auth-fix</td>
           </tr>
           <tr>
             <td class="px-6 py-3 text-wine-light text-xs">FF_PORT</td>

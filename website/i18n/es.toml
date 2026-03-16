@@ -145,11 +145,11 @@ other = "Contacto"
 
 # Open Source
 [oss_label]
-other = "Codigo abierto"
+other = "Código abierto"
 [oss_title]
-other = "Gratuito y de codigo abierto."
+other = "Gratuito y de código abierto."
 [oss_desc]
-other = "Factory Floor tiene licencia MIT y es gratuito. El codigo fuente esta disponible en GitHub. Las contribuciones, informes de errores y solicitudes de funcionalidades son bienvenidas."
+other = "Factory Floor tiene licencia MIT y es gratuito. El código fuente está disponible en GitHub. Las contribuciones, informes de errores y solicitudes de funcionalidades son bienvenidas."
 [oss_view]
 other = "Ver en GitHub"
 [oss_star]

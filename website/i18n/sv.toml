@@ -6,7 +6,7 @@ other = "Så fungerar det"
 other = "Konfiguration"
 
 [hero_badge]
-other = "Gratis och oppen · macOS-nativt · Ghostty-terminal"
+other = "Gratis och öppen · macOS-nativt · Ghostty-terminal"
 [hero_title_1]
 other = "Din"
 [hero_title_accent]
@@ -144,15 +144,15 @@ other = "Kontakt"
 
 # Open Source
 [oss_label]
-other = "Oppen kallkod"
+other = "Öppen källkod"
 [oss_title]
-other = "Gratis och oppen kallkod."
+other = "Gratis och öppen källkod."
 [oss_desc]
-other = "Factory Floor har MIT-licens och ar gratis att anvanda. Kallkoden finns tillganglig pa GitHub. Bidrag, felrapporter och funktionsforslag ar valkommen."
+other = "Factory Floor har MIT-licens och är gratis att använda. Källkoden finns tillgänglig på GitHub. Bidrag, felrapporter och funktionsförslag är välkomna."
 [oss_view]
-other = "Visa pa GitHub"
+other = "Visa på GitHub"
 [oss_star]
-other = "Ge en stjarna"
+other = "Ge en stjärna"
 
 [footer_poblenou]
 other = "Gjord med ❤️ i Poblenou, Barcelona"

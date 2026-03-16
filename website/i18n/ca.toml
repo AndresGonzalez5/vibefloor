@@ -72,7 +72,7 @@ other = "Un nou git worktree amb una branca nova, una sessió de Claude Code, un
 [step3_title]
 other = "Programa amb IA"
 [step3_desc]
-other = "L'agent de programació renombra la branca per adaptar-la a la tasca. Els scripts de preparació instal·len les dependències. Canvia entre workstreams sense perdre l'estat."
+other = "L'agent de programació reanomena la branca per adaptar-la a la tasca. Els scripts de preparació instal·len les dependències. Canvia entre workstreams sense perdre l'estat."
 
 # Config
 [config_label]
@@ -160,7 +160,7 @@ other = "Factory Floor té llicència MIT i és gratuït. El codi font està dis
 [oss_view]
 other = "Veure a GitHub"
 [oss_star]
-other = "Dona una estrella"
+other = "Posa-hi una estrella"
 
 [footer_poblenou]
 other = "Fet amb ❤️ al Poblenou, Barcelona"

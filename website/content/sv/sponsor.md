@@ -1,5 +1,5 @@
 ---
-title: Support Factory Floor
+title: Stöd Factory Floor
 translationKey: sponsor
 hideInstall: true
 ---

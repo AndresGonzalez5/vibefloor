@@ -32,7 +32,7 @@ Factory Floor no actua com a intermediari per a aquests serveis. Les teves claus
 
 ## Aquest lloc web
 
-El lloc web de Factory Floor (factory-floor.com) utilitza [Umami](https://umami.is/) per a analítiques respectuoses amb la privacitat. Umami no utilitza galetes, no recull dades personals i compleix amb el RGPD, CCPA i PECR. Totes les dades són agregades i anònimes.
+El lloc web de Factory Floor (factory-floor.com) utilitza [Umami](https://umami.is/) per a analítiques respectuoses amb la privacitat. Umami no utilitza galetes, no recull dades personals i compleix el RGPD, CCPA i PECR. Totes les dades són agregades i anònimes.
 
 No s'utilitzen altres scripts de seguiment, xarxes publicitàries ni analítiques de tercers en aquest lloc web.
 
