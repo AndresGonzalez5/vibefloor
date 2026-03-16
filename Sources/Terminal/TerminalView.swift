@@ -127,11 +127,18 @@ final class TerminalView: NSView, NSTextInputClient {
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
         ghostty_surface_set_content_scale(surface, scale, scale)
 
-        let size = bounds.size
-        let scaledWidth = UInt32(size.width * scale)
-        let scaledHeight = UInt32(size.height * scale)
-        if scaledWidth > 0 && scaledHeight > 0 {
-            ghostty_surface_set_size(surface, scaledWidth, scaledHeight)
+        // Defer size reporting to let Auto Layout settle first.
+        // Without this, surfaces added dynamically (e.g., new terminal splits)
+        // report the init frame (800x600) instead of their actual layout size.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let surface = self.surface else { return }
+            let currentScale = self.window?.backingScaleFactor ?? 2.0
+            let size = self.bounds.size
+            let w = UInt32(size.width * currentScale)
+            let h = UInt32(size.height * currentScale)
+            if w > 0 && h > 0 {
+                ghostty_surface_set_size(surface, w, h)
+            }
         }
     }
 
@@ -150,10 +157,11 @@ final class TerminalView: NSView, NSTextInputClient {
         let h = UInt32(newSize.height * scale)
         guard w > 0 && h > 0 else { return }
 
-        // During animations (sidebar toggle), hide the surface to avoid mid-animation
-        // rendering at intermediate sizes, then show it at the final size.
+        // During long animations (sidebar toggle), hide the surface to avoid mid-animation
+        // rendering at intermediate sizes. Short animations (layout adjustments from adding
+        // views) should not trigger occlusion, as that can freeze the surface.
         resizeDebounceWork?.cancel()
-        if NSAnimationContext.current.duration > 0 {
+        if NSAnimationContext.current.duration > 0.1 {
             // Mark occluded so ghostty stops rendering during animation
             ghostty_surface_set_occlusion(surface, true)
 
