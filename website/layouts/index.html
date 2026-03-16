@@ -12,8 +12,7 @@
     </div>
 
     <h1 class="font-mono font-bold leading-[1.05] tracking-tighter mb-6 animate-fade-up-1 text-[clamp(3rem,7vw,5.5rem)]">
-      {{ T "hero_title_1" }} <span class="bg-gradient-to-br from-wine-light to-[#9e4a60] bg-clip-text text-transparent">{{ T "hero_title_accent" }}</span><br>
-      {{ T "hero_title_2" }}
+      {{ T "hero_title_1" }} <span class="bg-gradient-to-br from-wine-light to-[#9e4a60] bg-clip-text text-transparent">{{ T "hero_title_accent" }}</span>{{ with T "hero_title_2" }}<br>{{ . }}{{ end }}
     </h1>
 
     <p class="text-lg text-fg-muted max-w-[540px] leading-relaxed mb-10 animate-fade-up-2">
@@ -73,6 +72,10 @@
 <div class="divider"></div>
 
 {{ partial "shortcuts.html" . }}
+
+<div class="divider"></div>
+
+{{ partial "open-source.html" . }}
 
 {{ partial "footer.html" . }}
 {{ end }}

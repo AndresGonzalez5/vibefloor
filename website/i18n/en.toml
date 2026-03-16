@@ -8,7 +8,7 @@ other = "Config"
 
 # Hero
 [hero_badge]
-other = "macOS native · Ghostty terminal · Claude Code"
+other = "Free & open source · macOS native · Ghostty terminal"
 [hero_title_1]
 other = "Your"
 [hero_title_accent]
@@ -149,3 +149,15 @@ other = "Built by"
 other = "with the support of"
 [footer_contact]
 other = "Contact"
+
+# Open Source
+[oss_label]
+other = "Open Source"
+[oss_title]
+other = "Free and open source."
+[oss_desc]
+other = "Factory Floor is MIT-licensed and free to use. The source code is available on GitHub. Contributions, bug reports, and feature requests are welcome."
+[oss_view]
+other = "View on GitHub"
+[oss_star]
+other = "Star the project"

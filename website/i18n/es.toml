@@ -7,9 +7,9 @@ other = "Cómo funciona"
 other = "Configuración"
 
 [hero_badge]
-other = "Nativo de macOS · Terminal Ghostty · Claude Code"
+other = "Gratuito y abierto · macOS nativo · Terminal Ghostty"
 [hero_title_1]
-other = "Tu entorno"
+other = "Desarrolla"
 [hero_title_accent]
 other = "con IA."
 [hero_title_2]
@@ -142,3 +142,15 @@ other = "Creado por"
 other = "con el apoyo de"
 [footer_contact]
 other = "Contacto"
+
+# Open Source
+[oss_label]
+other = "Codigo abierto"
+[oss_title]
+other = "Gratuito y de codigo abierto."
+[oss_desc]
+other = "Factory Floor tiene licencia MIT y es gratuito. El codigo fuente esta disponible en GitHub. Las contribuciones, informes de errores y solicitudes de funcionalidades son bienvenidas."
+[oss_view]
+other = "Ver en GitHub"
+[oss_star]
+other = "Dale una estrella"
