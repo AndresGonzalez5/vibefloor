@@ -14,7 +14,6 @@ struct WorkstreamInfoView: View {
     @State private var branchName: String?
     @State private var docFiles: [DocFile] = []
     @State private var selectedDoc: String?
-    @State private var docHeight: CGFloat = 300
     @State private var docExpanded = false
 
     struct DocFile: Identifiable {
@@ -26,14 +25,16 @@ struct WorkstreamInfoView: View {
     private static let docFileNames = ["README.md", "CLAUDE.md"]
 
     var body: some View {
+        GeometryReader { geo in
         VStack(spacing: 0) {
+            // Top pane: metadata (tapping it collapses docs)
             ScrollView {
                 VStack(spacing: 0) {
                     // App header
                     VStack(spacing: 8) {
                         Image(nsImage: NSApp.applicationIconImage)
                             .resizable()
-                            .frame(width: 64, height: 64)
+                            .frame(width: 96, height: 96)
                         Text(AppConstants.appName)
                             .font(.system(size: 20, weight: .bold))
                         Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")")
@@ -153,10 +154,13 @@ struct WorkstreamInfoView: View {
                     .scrollDisabled(true)
                 }
             }
+            .frame(height: docExpanded ? geo.size.height * 0.2 : geo.size.height * 0.8)
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) { docExpanded = false }
+            }
 
             // Document viewer
             if !docFiles.isEmpty {
-                // Drag handle
                 HStack(spacing: 0) {
                     ForEach(docFiles) { doc in
                         DocTabButton(
@@ -181,35 +185,21 @@ struct WorkstreamInfoView: View {
                 .padding(.vertical, 4)
                 .background(.bar)
 
-                // Resize handle
-                Rectangle()
-                    .fill(Color.primary.opacity(0.08))
-                    .frame(height: 4)
-                    .contentShape(Rectangle())
-                    .onHover { hovering in
-                        if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                docHeight = max(100, docHeight - value.translation.height)
-                            }
-                    )
+                Divider()
 
                 if let selected = selectedDoc,
                    let doc = docFiles.first(where: { $0.name == selected }) {
                     MarkdownContentView(markdown: doc.content)
                         .id(selected)
-                        .frame(height: docExpanded ? nil : docHeight)
-                        .frame(maxHeight: docExpanded ? .infinity : docHeight)
                 } else {
                     Spacer()
                 }
             }
-        }
+        } // VStack
+        } // GeometryReader
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { loadInfo() }
-    }
+    } // body
 
     private func loadInfo() {
         Task.detached {

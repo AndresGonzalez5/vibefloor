@@ -118,6 +118,7 @@ struct TerminalContainerView: View {
                         tab: tab,
                         label: tabLabel(tab),
                         icon: tabIcon(tab),
+                        shortcut: tabShortcut(tab),
                         isActive: activeTab == tab,
                         onSelect: { activeTab = tab },
                         onClose: tab.isCloseable ? { closeTab(tab) } : nil
@@ -127,23 +128,8 @@ struct TerminalContainerView: View {
                 Spacer()
 
                 // Add buttons
-                Button(action: addTerminal) {
-                    Image(systemName: "plus.rectangle.on.rectangle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .help("New Terminal (\u{2318}T)")
-
-                Button(action: addBrowser) {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .help("New Browser (\u{2318}B)")
+                AddTabButton(label: "Terminal", icon: "terminal", shortcut: "\u{2318}T", action: addTerminal)
+                AddTabButton(label: "Browser", icon: "globe", shortcut: "\u{2318}B", action: addBrowser)
 
                 // PR badge
                 if let pr = branchPR, let url = URL(string: pr.url) {
@@ -244,12 +230,11 @@ struct TerminalContainerView: View {
 
     // MARK: - Tab management
 
-    private func tabLabel(_ tab: WorkspaceTab) -> String {
+    private func tabLabel(_ tab: WorkspaceTab) -> String? {
         switch tab {
         case .info: return "Info"
         case .agent: return "Agent"
-        case .terminal: return "Terminal"
-        case .browser: return "Browser"
+        case .terminal, .browser: return nil
         }
     }
 
@@ -259,6 +244,14 @@ struct TerminalContainerView: View {
         case .agent: return "sparkle"
         case .terminal: return "terminal"
         case .browser: return "globe"
+        }
+    }
+
+    private func tabShortcut(_ tab: WorkspaceTab) -> String? {
+        switch tab {
+        case .agent: return "\u{2318}\u{21A9}"
+        case .info: return "\u{2318}I"
+        case .terminal, .browser: return nil
         }
     }
 
@@ -347,8 +340,9 @@ struct TerminalContainerView: View {
 
 private struct WorkspaceTabButton: View {
     let tab: WorkspaceTab
-    let label: String
+    let label: String?
     let icon: String
+    var shortcut: String? = nil
     let isActive: Bool
     let onSelect: () -> Void
     var onClose: (() -> Void)?
@@ -360,8 +354,15 @@ private struct WorkspaceTabButton: View {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 11))
-                Text(label)
-                    .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                if let label {
+                    Text(label)
+                        .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                }
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
                 if let onClose, isHovering || isActive {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
@@ -379,6 +380,38 @@ private struct WorkspaceTabButton: View {
             .background(isActive ? Color.accentColor.opacity(0.15) : (isHovering ? Color.primary.opacity(0.05) : .clear))
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .foregroundStyle(isActive ? .primary : .secondary)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+}
+
+private struct AddTabButton: View {
+    let label: String
+    let icon: String
+    let shortcut: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 9, weight: .bold))
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(label)
+                    .font(.system(size: 11))
+                Text(shortcut)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isHovering ? Color.primary.opacity(0.05) : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
