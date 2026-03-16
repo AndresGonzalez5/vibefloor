@@ -33,11 +33,6 @@ enum AppConstants {
         return dir
     }
 
-    /// Data directory: ~/.factoryfloor[-debug]/ (tmux config, per-build state)
-    static var dataDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(appID)")
-    }
-
     /// Worktrees are always shared between debug and release builds.
     static var worktreesDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
