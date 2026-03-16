@@ -6,10 +6,12 @@ import WebKit
 
 extension Notification.Name {
     static let focusAddressBar = Notification.Name("factoryfloor.focusAddressBar")
+    static let browserTitleChanged = Notification.Name("factoryfloor.browserTitleChanged")
 }
 
 struct BrowserView: View {
     let defaultURL: String
+    var tabID: UUID?
 
     @State private var urlText: String = ""
     @State private var webView = WKWebView()
@@ -126,6 +128,14 @@ struct BrowserView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusAddressBar)) { _ in
             urlFieldFocused = true
+        }
+        .onChange(of: pageTitle) { _, newTitle in
+            guard let tabID else { return }
+            NotificationCenter.default.post(
+                name: .browserTitleChanged,
+                object: tabID,
+                userInfo: newTitle.map { ["title": $0] }
+            )
         }
     }
 

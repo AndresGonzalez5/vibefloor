@@ -68,6 +68,7 @@ struct TerminalContainerView: View {
     @State private var browserCount = 0
     @State private var scriptConfig: ScriptConfig = .empty
     @State private var branchPR: GitHubPR?
+    @State private var browserTitles: [UUID: String] = [:]
 
     private var claudeID: UUID { workstreamID }
 
@@ -187,7 +188,7 @@ struct TerminalContainerView: View {
                     environmentVars: terminalEnvVars
                 )
             case .browser(let id):
-                BrowserView(defaultURL: "http://localhost:\(workstreamPort)/")
+                BrowserView(defaultURL: "http://localhost:\(workstreamPort)/", tabID: id)
                     .id(id)
             }
         }
@@ -241,6 +242,10 @@ struct TerminalContainerView: View {
                 closeTab(tab)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .browserTitleChanged)) { notification in
+            guard let tabID = notification.object as? UUID else { return }
+            browserTitles[tabID] = notification.userInfo?["title"] as? String
+        }
         .onReceive(NotificationCenter.default.publisher(for: .openExternalBrowser)) { _ in
             guard let url = URL(string: "http://localhost:\(workstreamPort)/") else { return }
             if defaultBrowser.isEmpty {
@@ -259,7 +264,8 @@ struct TerminalContainerView: View {
         switch tab {
         case .info: return "Info"
         case .agent: return "Agent"
-        case .terminal, .browser: return nil
+        case .terminal: return nil
+        case .browser(let id): return browserTitles[id]
         }
     }
 
