@@ -49,96 +49,81 @@ struct WorkstreamInfoView: View {
             .padding(.bottom, 8)
             .background(.bar)
 
-            Divider()
+            // Pinned metadata (PR, scripts)
+            if appEnv.ghAvailable, let branch = branchName,
+               let pr = appEnv.githubPR(for: projectDirectory, branch: branch) {
+                Divider()
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.triangle.pull")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.green)
+                    Text("#\(pr.number)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    Text(pr.title)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(pr.state)
+                        .font(.system(size: 10))
+                        .foregroundStyle(pr.state == "OPEN" ? .green : .secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+            }
 
-            // Scrollable content: metadata + doc tabs + rendered docs
-            ScrollView {
-                VStack(spacing: 0) {
-                    Form {
-                        // GitHub PR
-                        if appEnv.ghAvailable, let branch = branchName,
-                           let pr = appEnv.githubPR(for: projectDirectory, branch: branch) {
-                            Section("Pull Request") {
-                                LabeledContent("#\(pr.number)") {
-                                    Text(pr.title)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-                                LabeledContent("Status") {
-                                    Text(pr.state)
-                                        .foregroundStyle(pr.state == "OPEN" ? .green : .secondary)
-                                }
-                            }
-                        }
-
-                        // Scripts
-                        if scriptConfig.hasAnyScript {
-                            Section {
-                                if let setup = scriptConfig.setup {
-                                    LabeledContent("Setup") {
-                                        Text(setup)
-                                            .font(.system(.caption, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                    }
-                                }
-                                if let run = scriptConfig.run {
-                                    LabeledContent("Run") {
-                                        Text(run)
-                                            .font(.system(.caption, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                    }
-                                }
-                                if let teardown = scriptConfig.teardown {
-                                    LabeledContent("Teardown") {
-                                        Text(teardown)
-                                            .font(.system(.caption, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                    }
-                                }
-                            } header: {
-                                HStack {
-                                    Text("Scripts")
-                                    Spacer()
-                                    if let source = scriptConfig.source {
-                                        Text(source)
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
-                        }
+            if scriptConfig.hasAnyScript {
+                Divider()
+                HStack(spacing: 12) {
+                    if let setup = scriptConfig.setup {
+                        Label(setup, systemImage: "hammer")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .formStyle(.grouped)
-                    .scrollDisabled(true)
-
-                    // Doc tabs + content
-                    if !docFiles.isEmpty {
-                        HStack(spacing: 0) {
-                            ForEach(docFiles) { doc in
-                                DocTabButton(
-                                    name: doc.name,
-                                    isActive: selectedDoc == doc.name,
-                                    action: { selectedDoc = doc.name }
-                                )
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-
-                        Divider()
-                            .padding(.horizontal, 16)
-
-                        if let selected = selectedDoc,
-                           let doc = docFiles.first(where: { $0.name == selected }) {
-                            MarkdownContentView(markdown: doc.content)
-                                .id(selected)
-                        }
+                    if let run = scriptConfig.run {
+                        Label(run, systemImage: "play")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    if let source = scriptConfig.source {
+                        Text(source)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.quaternary)
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+            }
+
+            // Pinned doc tabs
+            if !docFiles.isEmpty {
+                Divider()
+                HStack(spacing: 0) {
+                    ForEach(docFiles) { doc in
+                        DocTabButton(
+                            name: doc.name,
+                            isActive: selectedDoc == doc.name,
+                            action: { selectedDoc = doc.name }
+                        )
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+            }
+
+            Divider()
+
+            // Scrollable: only the markdown content
+            if let selected = selectedDoc,
+               let doc = docFiles.first(where: { $0.name == selected }) {
+                MarkdownContentView(markdown: doc.content)
+                    .id(selected)
+            } else if docFiles.isEmpty {
+                Spacer()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
