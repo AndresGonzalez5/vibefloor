@@ -98,17 +98,23 @@ jobs:
 
           echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
 
-      - name: Notarize
+      - name: Store notarization credentials
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          VERSION: ${{ needs.release-please.outputs.version }}
         run: |
-          xcrun notarytool submit "build/release/$DMG_NAME" \
+          xcrun notarytool store-credentials "notarize-profile" \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
+            --keychain "$RUNNER_TEMP/signing.keychain-db"
+
+      - name: Notarize
+        run: |
+          xcrun notarytool submit "build/release/$DMG_NAME" \
+            --keychain-profile "notarize-profile" \
+            --keychain "$RUNNER_TEMP/signing.keychain-db" \
             --wait
 
           xcrun stapler staple "build/release/$DMG_NAME"
