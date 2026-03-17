@@ -33,7 +33,7 @@ Factory Floor is a native macOS app built on [Ghostty](https://ghostty.org)'s GP
 - **Git Worktrees** &mdash; Each workstream gets its own branch and worktree. Switch between tasks without stashing.
 - **Claude Code** &mdash; Integrated AI agent with session persistence. Resume conversations across app restarts.
 - **Tmux Persistence** &mdash; Agent sessions survive app restarts via tmux on a dedicated socket.
-- **Setup & Run Scripts** &mdash; Configure setup, run, and teardown scripts per project. Compatible with [emdash](https://emdash.sh), [conductor](https://conductor.build), and [superset](https://superset.sh) configs.
+- **Setup & Run Scripts** &mdash; Configure setup, run, and teardown scripts per project via `.factoryfloor.json`.
 - **Embedded Browser** &mdash; WKWebView tab with deterministic port allocation per workstream.
 - **GitHub Integration** &mdash; Repo info, open PRs, and branch PR status via the `gh` CLI.
 - **Dynamic Tabs** &mdash; Open as many terminals and browsers as you need. Close with Cmd+W or Ctrl+D.
@@ -51,7 +51,7 @@ Add a `.factoryfloor.json` to your project root:
 }
 ```
 
-Or use your existing config from emdash (`.emdash.json`), conductor (`conductor.json`), or superset (`.superset/config.json`).
+Or place it at `.factoryfloor/config.json` in your project root.
 
 ### Environment Variables
 
