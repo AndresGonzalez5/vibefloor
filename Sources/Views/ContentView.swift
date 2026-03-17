@@ -1,7 +1,10 @@
 // ABOUTME: Main application view composing the sidebar and terminal content area.
 // ABOUTME: Uses NavigationSplitView for the sidebar/detail pattern.
 
+import OSLog
 import SwiftUI
+
+private let logger = Logger(subsystem: "factoryfloor", category: "content-view")
 
 struct ContentView: View {
     @State private var projects: [Project] = ProjectStore.load()
@@ -362,6 +365,10 @@ enum ProjectStore {
 
     static func save(_ projects: [Project]) {
         guard let data = try? JSONEncoder().encode(projects) else { return }
-        FilePersistence.writeAtomically(data, to: fileURL)
+        do {
+            try FilePersistence.writeAtomically(data, to: fileURL)
+        } catch {
+            logger.warning("Failed to save projects: \(error.localizedDescription)")
+        }
     }
 }

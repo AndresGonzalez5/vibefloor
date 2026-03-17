@@ -2,6 +2,9 @@
 // ABOUTME: Can be either a project or a workstream, enabling single-selection across both.
 
 import Foundation
+import OSLog
+
+private let logger = Logger(subsystem: "factoryfloor", category: "sidebar-selection")
 
 enum SidebarSelection: Hashable, Codable {
     case project(UUID)
@@ -44,7 +47,11 @@ enum SidebarSelection: Hashable, Codable {
 
     func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
-        FilePersistence.writeAtomically(data, to: Self.fileURL)
+        do {
+            try FilePersistence.writeAtomically(data, to: Self.fileURL)
+        } catch {
+            logger.warning("Failed to save sidebar selection: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -73,6 +80,10 @@ enum SidebarState {
 
     static func saveExpanded(_ ids: Set<UUID>) {
         guard let data = try? JSONEncoder().encode(ids) else { return }
-        FilePersistence.writeAtomically(data, to: fileURL)
+        do {
+            try FilePersistence.writeAtomically(data, to: fileURL)
+        } catch {
+            logger.warning("Failed to save sidebar state: \(error.localizedDescription)")
+        }
     }
 }
