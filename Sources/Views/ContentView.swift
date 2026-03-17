@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var saveWork: DispatchWorkItem?
     @State private var workstreamToArchive: UUID?
     @State private var archiveWarningDirty = false
+    @State private var removedProjectNames: [String] = []
 
     private static func initialSelection() -> SidebarSelection? {
         let projects = ProjectStore.load()
@@ -149,6 +150,18 @@ struct ContentView: View {
                     Text("The worktree and its branch will be removed.")
                 }
             }
+            .alert(
+                "Projects Removed",
+                isPresented: Binding(
+                    get: { !removedProjectNames.isEmpty },
+                    set: { if !$0 { removedProjectNames = [] } }
+                )
+            ) {
+                Button("OK") { removedProjectNames = [] }
+            } message: {
+                Text("The following projects were removed because their directories no longer exist on disk:")
+                + Text("\n\n" + removedProjectNames.joined(separator: "\n"))
+            }
     }
 
     private var navigationView: some View {
@@ -213,6 +226,7 @@ struct ContentView: View {
         }
         .onChange(of: appEnvironment.missingProjectIDs) { _, missing in
             guard !missing.isEmpty else { return }
+            let names = projects.filter { missing.contains($0.id) }.map(\.name)
             for id in missing {
                 if let project = projects.first(where: { $0.id == id }) {
                     for ws in project.workstreams {
@@ -228,6 +242,7 @@ struct ContentView: View {
                 selection = nil
             }
             ProjectStore.save(projects)
+            removedProjectNames = names
         }
         .onChange(of: selection) { oldValue, newValue in
             if newValue == .settings || newValue == .help {
@@ -329,23 +344,7 @@ struct ContentView: View {
     private func performArchive() {
         guard let wsID = workstreamToArchive,
               let projectIndex = projects.firstIndex(where: { $0.workstreams.contains(where: { $0.id == wsID }) }) else { return }
-        let project = projects[projectIndex]
-        if let ws = project.workstreams.first(where: { $0.id == wsID }) {
-            let projectDir = project.directory
-            let worktreeDir = ws.worktreePath ?? projectDir
-            let wsName = ws.name
-            let projName = project.name
-            let tmuxPath = appEnvironment.toolStatus.tmux.path
-            Task.detached {
-                ScriptConfig.runTeardown(in: worktreeDir, projectDirectory: projectDir)
-                GitOperations.removeWorktree(projectPath: projectDir, workstreamName: wsName, projectName: projName)
-                if let tmuxPath {
-                    TmuxSession.killWorkstreamSessions(tmuxPath: tmuxPath, project: projName, workstream: wsName)
-                }
-            }
-        }
-        surfaceCache.removeWorkstreamSurfaces(for: wsID)
-        projects[projectIndex].workstreams.removeAll { $0.id == wsID }
+        WorkstreamArchiver.archive(wsID, in: &projects[projectIndex], surfaceCache: surfaceCache, tmuxPath: appEnvironment.toolStatus.tmux.path)
         ProjectStore.save(projects)
         workstreamToArchive = nil
     }
