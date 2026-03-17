@@ -217,8 +217,13 @@ enum GitOperations {
     // MARK: - Private
 
     private static func sanitize(_ name: String) -> String {
-        name.replacingOccurrences(of: "/", with: "-")
+        var result = name.replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: " ", with: "-")
+        // Prevent names from being interpreted as git flags
+        while result.hasPrefix("-") {
+            result = String(result.dropFirst())
+        }
+        return result.isEmpty ? "unnamed" : result
     }
 
     private static func run(_ command: String, args: [String], in directory: String) -> String? {

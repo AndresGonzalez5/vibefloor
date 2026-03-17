@@ -5,7 +5,7 @@
 - [ ] Pin third-party CI actions to commit SHAs instead of mutable tags (supply chain risk)
 - [ ] CI notarization: use keychain profile instead of passing Apple password as CLI arg
 - [ ] Scope CI permissions per job (release-please needs write, build only needs contents:write)
-- [ ] GitOperations.sanitize: block names starting with `-` (interpreted as git flags)
+- [x] GitOperations.sanitize: strip leading `-` to prevent git flag injection
 - [ ] .env symlink: validate source is a regular file, not itself a symlink to sensitive data
 - [ ] Remove website/node_modules from repo, add to .gitignore, install via bun in CI
 
