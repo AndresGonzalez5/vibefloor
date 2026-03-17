@@ -37,6 +37,8 @@
 "Worktree Creation Failed" = "Kunde inte skapa arbetsträd";
 "Could not create a git worktree. This can happen if the branch already exists or if there is an ongoing merge or rebase." = "Kunde inte skapa ett git-arbetsträd. Detta kan hända om grenen redan finns eller om det pågår en sammanslagning eller rebase.";
 "OK" = "OK";
+"Not a Git Repository" = "Inte ett Git-repository";
+"Workstreams require a git repository. Initialize one with git init or select a different directory." = "Arbetsflöden kräver ett git-repository. Initiera ett med git init eller välj en annan katalog.";
 
 /* Sheets */
 "Add Project" = "Lägg till projekt";

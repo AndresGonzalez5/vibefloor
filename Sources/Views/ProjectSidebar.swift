@@ -25,6 +25,7 @@ struct ProjectSidebar: View {
     @State private var expandedProjects: Set<UUID> = SidebarState.loadExpanded()
     @State private var cachedSortedIDs: [UUID] = []
     @State private var showWorktreeError = false
+    @State private var showNotGitRepoError = false
     @AppStorage("factoryfloor.sortOrder") private var sortOrder: ProjectSortOrder = .recent
 
     /// Index from UUID to project array index for O(1) lookups.
@@ -287,6 +288,14 @@ struct ProjectSidebar: View {
         } message: {
             Text("Could not create a git worktree. This can happen if the branch already exists or if there is an ongoing merge or rebase.")
         }
+        .alert(
+            "Not a Git Repository",
+            isPresented: $showNotGitRepoError
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Workstreams require a git repository. Initialize one with git init or select a different directory.")
+        }
     }
 
     // MARK: - Workstream management
@@ -298,7 +307,10 @@ struct ProjectSidebar: View {
         guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
         let project = projects[index]
 
-        guard GitOperations.isGitRepo(at: project.directory) else { return }
+        guard GitOperations.isGitRepo(at: project.directory) else {
+            showNotGitRepoError = true
+            return
+        }
 
         let existingNames = Set(project.workstreams.map(\.name))
         let name = NameGenerator.generate(avoiding: existingNames)
