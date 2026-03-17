@@ -1,8 +1,47 @@
 # TODO
 
-## Pre-release
+## Security
 
-- [x] Website: favicon, OG image, SEO meta tags
+- [ ] Pin third-party CI actions to commit SHAs instead of mutable tags (supply chain risk)
+- [ ] CI notarization: use keychain profile instead of passing Apple password as CLI arg
+- [ ] Scope CI permissions per job (release-please needs write, build only needs contents:write)
+- [ ] GitOperations.sanitize: block names starting with `-` (interpreted as git flags)
+- [ ] .env symlink: validate source is a regular file, not itself a symlink to sensitive data
+- [ ] Remove website/node_modules from repo, add to .gitignore, install via bun in CI
+
+## Bugs
+
+- [ ] BrowserView: "Press Cmd+Shift+B to retry" hint is wrong (Cmd+Shift+B doesn't retry, retryBrowser notification is never posted)
+- [ ] Settings/Help persisted as selection: app reopens to Settings if quit while in Settings (should restore last project/workstream)
+- [ ] Detached HEAD inconsistency: project overview shows "HEAD", worktree list shows "detached"
+- [ ] Path collision: worktree names differing only by `/` vs `-` produce same filesystem path (sanitize converts `/` to `-`)
+- [ ] Surface cleanup in removeWorkstreamSurfaces hard-capped at 20 tabs (orphans surfaces beyond that)
+
+## UX
+
+- [ ] Show error feedback when worktree creation fails (currently adds broken workstream silently)
+- [ ] Show banner or message when claude CLI is not installed (agent tab just opens plain shell)
+- [ ] Setup script: log output or show status instead of routing to /dev/null and ignoring exit code
+- [ ] Notify user when a project directory is removed from disk (currently silently removes from sidebar)
+- [ ] Onboarding: explain prerequisites (claude, gh), what a workstream is, Cmd+N contextual behavior
+- [ ] Execute the `run` script from .factoryfloor.json (currently loaded and displayed but never run)
+
+## Accessibility
+
+- [ ] Add accessibilityLabel/accessibilityHint to all interactive elements
+- [ ] Make hover-only actions (archive, delete, add) reachable via keyboard
+- [ ] Restore focus rings on .buttonStyle(.plain) buttons for keyboard navigation
+
+## Code Quality
+
+- [ ] Extract duplicated abbreviatePath into a shared String extension (appears in 5 files)
+- [ ] Remove duplicated performArchive logic between ContentView and ProjectSidebar
+- [ ] Remove dead bleedingEdge setting (toggle exists but nothing reads it)
+- [ ] Remove dead retryBrowser notification (declared and observed but never posted)
+- [ ] ToolStatus.detect: remove misleading async signature (contains no await)
+- [ ] Localization: add missing strings for Settings sections, HelpView, BrowserView error UI, ProjectOverviewView
+- [ ] Remove stale unused keys from Localizable.strings files
+- [ ] surfaceRegistry thread safety: confirm ghostty callback threading contract
 
 ## Future
 
@@ -92,3 +131,4 @@
 - [x] Funding: Buy Me a Coffee, GitHub Sponsors (website + FUNDING.yml + CLI message)
 - [x] Website: legal/privacy policy page (4 languages)
 - [x] Workstream navigation shortcuts (Ctrl+1-9, Cmd+Shift+[/] cycling)
+- [x] Security: disable JS in markdown WKWebView, restrict browser to http/https, fix AppleScript injection, fix PortAllocator hash stability, fix CI checkout version, fix CLI install path quoting
