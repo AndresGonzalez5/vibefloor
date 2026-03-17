@@ -44,7 +44,16 @@ struct FF2App: App {
         // ghostty_init must happen before any ghostty API calls, but it's fast.
         // TerminalApp.shared is lazy and deferred to first access (when a terminal is needed).
         guard ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) == GHOSTTY_SUCCESS else {
-            fatalError("ghostty_init failed")
+            let alert = NSAlert()
+            alert.messageText = NSLocalizedString("Factory Floor cannot start", comment: "")
+            alert.informativeText = NSLocalizedString(
+                "The terminal engine (Ghostty) failed to initialize. This may indicate a system compatibility issue.",
+                comment: ""
+            )
+            alert.alertStyle = .critical
+            alert.addButton(withTitle: NSLocalizedString("Quit", comment: ""))
+            alert.runModal()
+            exit(1)
         }
     }
 

@@ -9,13 +9,10 @@
 /* Project Overview */
 "No workstreams yet" = "Aún no hay flujos de trabajo";
 "Workstreams" = "Flujos de trabajo";
-"Click to open" = "Haz clic para abrir";
 "Press " = "Pulsa ";
 "to create one." = "para crear uno.";
 
 /* Sidebar */
-"Drop a directory here" = "Arrastra un directorio aquí";
-"to add a project" = "para añadir un proyecto";
 "Recent" = "Recientes";
 "A-Z" = "A-Z";
 
@@ -26,6 +23,8 @@
 "Archive Anyway" = "Archivar de todos modos";
 "This workstream has uncommitted changes that will be lost." = "Este flujo de trabajo tiene cambios sin confirmar que se perderán.";
 "The worktree and its branch will be removed." = "El árbol de trabajo y su rama se eliminarán.";
+"Projects Removed" = "Proyectos eliminados";
+"The following projects were removed because their directories no longer exist on disk:" = "Los siguientes proyectos se eliminaron porque sus directorios ya no existen en el disco:";
 "Cancel" = "Cancelar";
 "Remove" = "Eliminar";
 "Worktree Creation Failed" = "Error al crear el árbol de trabajo";
@@ -37,9 +36,6 @@
 "Directory" = "Directorio";
 "Project Name" = "Nombre del proyecto";
 "Add" = "Añadir";
-"Add Workstream" = "Añadir flujo de trabajo";
-"Workstream Name" = "Nombre del flujo de trabajo";
-
 /* File Picker */
 "Choose a project directory" = "Elige un directorio de proyecto";
 "Select" = "Seleccionar";
@@ -52,25 +48,18 @@
 "Language" = "Idioma";
 "System Default" = "Predeterminado del sistema";
 "Restart the app for the language change to take effect." = "Reinicia la aplicación para que el cambio de idioma surta efecto.";
-"Installed Tools" = "Herramientas instaladas";
 "Not found" = "No encontrado";
 "Authenticated" = "Autenticado";
 "Not authenticated" = "No autenticado";
-"Default Terminal" = "Terminal predeterminada";
 "Terminal" = "Terminal";
-"No supported terminals found" = "No se encontraron terminales compatibles";
 "None" = "Ninguno";
-"Default Browser" = "Navegador predeterminado";
 "Browser" = "Navegador";
-"No supported browsers found" = "No se encontraron navegadores compatibles";
 "Coding Agent" = "Agente de código";
 "Bypass permission prompts" = "Omitir solicitudes de permisos";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "Cuando está activado, el agente de código no pedirá confirmación antes de hacer cambios. Úsalo con precaución: el agente podrá editar archivos, ejecutar comandos y hacer commits sin preguntar.";
-"Default External Browser" = "Navegador externo predeterminado";
 "External Terminal" = "Terminal externa";
 "Requires tmux to be installed." = "Requiere tmux instalado.";
 "URL" = "URL";
-"Done" = "Hecho";
 
 /* Worktrees */
 "Git Worktrees" = "Árboles de trabajo Git";
@@ -179,3 +168,7 @@
 "Open PRs" = "PRs abiertas";
 "Not a git repository" = "No es un repositorio git";
 "Description" = "Descripción";
+
+/* Initialization errors */
+"Factory Floor cannot start" = "Factory Floor no puede iniciarse";
+"The terminal engine (Ghostty) failed to initialize. This may indicate a system compatibility issue." = "El motor de terminal (Ghostty) no se pudo inicializar. Esto puede indicar un problema de compatibilidad del sistema.";

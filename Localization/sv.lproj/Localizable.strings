@@ -9,13 +9,10 @@
 /* Project Overview */
 "No workstreams yet" = "Inga arbetsflöden ännu";
 "Workstreams" = "Arbetsflöden";
-"Click to open" = "Klicka för att öppna";
 "Press " = "Tryck ";
 "to create one." = "för att skapa ett.";
 
 /* Sidebar */
-"Drop a directory here" = "Släpp en katalog här";
-"to add a project" = "för att lägga till ett projekt";
 "Recent" = "Senaste";
 "A-Z" = "A-Ö";
 
@@ -26,6 +23,8 @@
 "Archive Anyway" = "Arkivera ändå";
 "This workstream has uncommitted changes that will be lost." = "Detta arbetsflöde har osparade ändringar som kommer att gå förlorade.";
 "The worktree and its branch will be removed." = "Arbetsträdet och dess gren kommer att tas bort.";
+"Projects Removed" = "Projekt borttagna";
+"The following projects were removed because their directories no longer exist on disk:" = "Följande projekt togs bort eftersom deras kataloger inte längre finns på disken:";
 "Cancel" = "Avbryt";
 "Remove" = "Ta bort";
 "Worktree Creation Failed" = "Kunde inte skapa arbetsträd";
@@ -37,9 +36,6 @@
 "Directory" = "Katalog";
 "Project Name" = "Projektnamn";
 "Add" = "Lägg till";
-"Add Workstream" = "Lägg till arbetsflöde";
-"Workstream Name" = "Namn på arbetsflöde";
-
 /* File Picker */
 "Choose a project directory" = "Välj en projektkatalog";
 "Select" = "Välj";
@@ -52,17 +48,12 @@
 "Language" = "Språk";
 "System Default" = "Systemstandard";
 "Restart the app for the language change to take effect." = "Starta om appen för att språkändringen ska träda i kraft.";
-"Installed Tools" = "Installerade verktyg";
 "Not found" = "Hittades inte";
 "Authenticated" = "Autentiserad";
 "Not authenticated" = "Inte autentiserad";
-"Default Terminal" = "Standardterminal";
 "Terminal" = "Terminal";
-"No supported terminals found" = "Inga terminaler som stöds hittades";
 "None" = "Ingen";
-"Default Browser" = "Standardwebbläsare";
 "Browser" = "Webbläsare";
-"No supported browsers found" = "Inga webbläsare som stöds hittades";
 "Coding Agent" = "Kodningsagent";
 "Bypass permission prompts" = "Hoppa över behörighetsförfrågningar";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "När aktiverad kommer kodningsagenten inte att be om bekräftelse innan ändringar görs. Använd med försiktighet: agenten kan redigera filer, köra kommandon och göra commits utan att fråga.";
@@ -179,3 +170,7 @@
 "Open PRs" = "Öppna PRs";
 "Not a git repository" = "Inte ett git-repository";
 "Description" = "Beskrivning";
+
+/* Initialization errors */
+"Factory Floor cannot start" = "Factory Floor kan inte starta";
+"The terminal engine (Ghostty) failed to initialize. This may indicate a system compatibility issue." = "Terminalmotorn (Ghostty) kunde inte initialiseras. Detta kan tyda på ett systemkompatibilitetsproblem.";

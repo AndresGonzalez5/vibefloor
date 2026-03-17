@@ -9,13 +9,10 @@
 /* Project Overview */
 "No workstreams yet" = "No workstreams yet";
 "Workstreams" = "Workstreams";
-"Click to open" = "Click to open";
 "Press " = "Press ";
 "to create one." = "to create one.";
 
 /* Sidebar */
-"Drop a directory here" = "Drop a directory here";
-"to add a project" = "to add a project";
 "Recent" = "Recent";
 "A-Z" = "A-Z";
 
@@ -26,6 +23,8 @@
 "Archive Anyway" = "Archive Anyway";
 "This workstream has uncommitted changes that will be lost." = "This workstream has uncommitted changes that will be lost.";
 "The worktree and its branch will be removed." = "The worktree and its branch will be removed.";
+"Projects Removed" = "Projects Removed";
+"The following projects were removed because their directories no longer exist on disk:" = "The following projects were removed because their directories no longer exist on disk:";
 "Cancel" = "Cancel";
 "Remove" = "Remove";
 "Worktree Creation Failed" = "Worktree Creation Failed";
@@ -37,9 +36,6 @@
 "Directory" = "Directory";
 "Project Name" = "Project Name";
 "Add" = "Add";
-"Add Workstream" = "Add Workstream";
-"Workstream Name" = "Workstream Name";
-
 /* File Picker */
 "Choose a project directory" = "Choose a project directory";
 "Select" = "Select";
@@ -52,25 +48,18 @@
 "Language" = "Language";
 "System Default" = "System Default";
 "Restart the app for the language change to take effect." = "Restart the app for the language change to take effect.";
-"Installed Tools" = "Installed Tools";
 "Not found" = "Not found";
 "Authenticated" = "Authenticated";
 "Not authenticated" = "Not authenticated";
-"Default Terminal" = "Default Terminal";
 "Terminal" = "Terminal";
-"No supported terminals found" = "No supported terminals found";
 "None" = "None";
-"Default Browser" = "Default Browser";
 "Browser" = "Browser";
-"No supported browsers found" = "No supported browsers found";
 "Coding Agent" = "Coding Agent";
 "Bypass permission prompts" = "Bypass permission prompts";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking.";
-"Default External Browser" = "Default External Browser";
 "External Terminal" = "External Terminal";
 "Requires tmux to be installed." = "Requires tmux to be installed.";
 "URL" = "URL";
-"Done" = "Done";
 
 /* Worktrees */
 "Git Worktrees" = "Git Worktrees";
@@ -179,3 +168,7 @@
 "Open PRs" = "Open PRs";
 "Not a git repository" = "Not a git repository";
 "Description" = "Description";
+
+/* Initialization errors */
+"Factory Floor cannot start" = "Factory Floor cannot start";
+"The terminal engine (Ghostty) failed to initialize. This may indicate a system compatibility issue." = "The terminal engine (Ghostty) failed to initialize. This may indicate a system compatibility issue.";

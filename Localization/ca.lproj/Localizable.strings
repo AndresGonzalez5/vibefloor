@@ -9,13 +9,10 @@
 /* Project Overview */
 "No workstreams yet" = "Encara no hi ha fluxos de treball";
 "Workstreams" = "Fluxos de treball";
-"Click to open" = "Fes clic per obrir";
 "Press " = "Prem ";
 "to create one." = "per crear-ne un.";
 
 /* Sidebar */
-"Drop a directory here" = "Deixa anar un directori aquí";
-"to add a project" = "per afegir un projecte";
 "Recent" = "Recents";
 "A-Z" = "A-Z";
 
@@ -26,6 +23,8 @@
 "Archive Anyway" = "Arxiva igualment";
 "This workstream has uncommitted changes that will be lost." = "Aquest flux de treball té canvis sense confirmar que es perdran.";
 "The worktree and its branch will be removed." = "L'arbre de treball i la seva branca s'eliminaran.";
+"Projects Removed" = "Projectes eliminats";
+"The following projects were removed because their directories no longer exist on disk:" = "Els projectes següents s'han eliminat perquè els seus directoris ja no existeixen al disc:";
 "Cancel" = "Cancel·la";
 "Remove" = "Elimina";
 "Worktree Creation Failed" = "Error en crear l'arbre de treball";
@@ -37,9 +36,6 @@
 "Directory" = "Directori";
 "Project Name" = "Nom del projecte";
 "Add" = "Afegeix";
-"Add Workstream" = "Afegeix flux de treball";
-"Workstream Name" = "Nom del flux de treball";
-
 /* File Picker */
 "Choose a project directory" = "Tria un directori de projecte";
 "Select" = "Selecciona";
@@ -52,25 +48,18 @@
 "Language" = "Idioma";
 "System Default" = "Per defecte del sistema";
 "Restart the app for the language change to take effect." = "Reinicia l'aplicació perquè el canvi d'idioma tingui efecte.";
-"Installed Tools" = "Eines instal·lades";
 "Not found" = "No trobat";
 "Authenticated" = "Autenticat";
 "Not authenticated" = "No autenticat";
-"Default Terminal" = "Terminal per defecte";
 "Terminal" = "Terminal";
-"No supported terminals found" = "No s'han trobat terminals compatibles";
 "None" = "Cap";
-"Default Browser" = "Navegador per defecte";
 "Browser" = "Navegador";
-"No supported browsers found" = "No s'han trobat navegadors compatibles";
 "Coding Agent" = "Agent de codi";
 "Bypass permission prompts" = "Ometre les sol·licituds de permisos";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "Quan està activat, l'agent de codi no demanarà confirmació abans de fer canvis. Utilitza amb precaució: l'agent podrà editar fitxers, executar ordres i fer commits sense preguntar.";
-"Default External Browser" = "Navegador extern per defecte";
 "External Terminal" = "Terminal extern";
 "Requires tmux to be installed." = "Requereix tmux instal·lat.";
 "URL" = "URL";
-"Done" = "Fet";
 
 /* Worktrees */
 "Git Worktrees" = "Arbres de treball Git";
@@ -179,3 +168,7 @@
 "Open PRs" = "PRs obertes";
 "Not a git repository" = "No és un repositori git";
 "Description" = "Descripció";
+
+/* Initialization errors */
+"Factory Floor cannot start" = "Factory Floor no pot iniciar-se";
+"The terminal engine (Ghostty) failed to initialize. This may indicate a system compatibility issue." = "El motor de terminal (Ghostty) no s'ha pogut inicialitzar. Això pot indicar un problema de compatibilitat del sistema.";
