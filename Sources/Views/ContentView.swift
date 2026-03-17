@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var workstreamToArchive: UUID?
     @State private var archiveWarningDirty = false
     @State private var removedProjectNames: [String] = []
+    @State private var keyMonitorInstalled = false
 
     private static func initialSelection() -> SidebarSelection? {
         let projects = ProjectStore.load()
@@ -247,6 +248,8 @@ struct ContentView: View {
         }
         .onAppear {
             // Intercept Cmd+W at the app level to close tabs instead of the window
+            guard !keyMonitorInstalled else { return }
+            keyMonitorInstalled = true
             NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
                     NotificationCenter.default.post(name: .closeTerminal, object: nil)
