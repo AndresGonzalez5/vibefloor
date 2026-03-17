@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var selectionBeforeSettings: SidebarSelection?
     @StateObject private var surfaceCache = TerminalSurfaceCache()
     @StateObject private var appEnvironment = AppEnvironment()
+    @StateObject private var updateChecker = UpdateChecker()
     @State private var saveWork: DispatchWorkItem?
     @State private var workstreamToArchive: UUID?
     @State private var archiveWarningDirty = false
@@ -165,10 +166,12 @@ struct ContentView: View {
         }
         .environmentObject(surfaceCache)
         .environmentObject(appEnvironment)
+        .environmentObject(updateChecker)
         .onAppear {
             appEnvironment.refresh()
             appEnvironment.refreshAllRepoInfo(projects: projects)
             appEnvironment.refreshPathValidity(projects: projects)
+            updateChecker.check()
             // Apply saved appearance
             switch UserDefaults.standard.string(forKey: "factoryfloor.appearance") ?? "system" {
             case "light": NSApp.appearance = NSAppearance(named: .aqua)
@@ -211,6 +214,9 @@ struct ContentView: View {
             appEnvironment.refreshPathValidity(projects: projects)
             appEnvironment.refreshAllBranchPRs(projects: projects)
             syncWorkstreamNamesFromBranches()
+        }
+        .onReceive(Timer.publish(every: 6 * 60 * 60, on: .main, in: .common).autoconnect()) { _ in
+            updateChecker.check()
         }
         .onChange(of: appEnvironment.missingProjectIDs) { _, missing in
             guard !missing.isEmpty else { return }
