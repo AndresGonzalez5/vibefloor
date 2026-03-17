@@ -8,10 +8,9 @@
 
 - [ ] Auto-update mechanism (Sparkle): in-app update for direct DMG users
 - [ ] Swift 6 migration (strict concurrency), scoped in docs/swift6-migration.md
-- [ ] Restore full app state on launch (active tab within workstream. if user was on a custom browser or spawned terminal since those are not preserved, return to the info pane)
+- [ ] Restore full app state on launch (active tab within workstream; if on a spawned terminal/browser, return to info)
 - [ ] Right-click context menu on sidebar: workstream (copy branch name, copy worktree path), project (copy project path)
 - [ ] Port detection: auto-detect when run script opens a listening port, point browser to it (scoped in docs/port-detection.md)
-
 - [ ] Crash reporting
 
 ## Future
@@ -21,9 +20,6 @@
 - [ ] Horizontal terminal splits within a tab (ghostty C API supports splits)
 - [ ] Drag-and-drop to reorder tabs
 - [ ] System notifications when agent needs attention (bell/urgency from Ghostty)
-- [ ] Restore full app state on launch (active tab within workstream. if user was on a custom browser or spawned terminal since those are not preserved, return to the info pane)
-- [ ] Right-click context menu on sidebar: workstream (copy branch name, copy worktree path), project (copy project path)
-- [ ] Port detection: auto-detect when run script opens a listening port, point browser to it (scoped in docs/port-detection.md)
 
 ## Done
 
@@ -47,7 +43,7 @@
 - [x] Info tab with README.md, CLAUDE.md, AGENTS.md (cmark-gfm WKWebView, skip files < 20 bytes)
 - [x] Doc tabs in project overview (shared DocFile/DocTabButton)
 - [x] GitHub integration: repo info, open PRs, branch PR status (via gh CLI)
-- [x] Keyboard shortcuts: all documented in HelpView, README, CLAUDE.md, and website
+- [x] Keyboard shortcuts: all documented in HelpView, README, AGENTS.md, and website
 - [x] Help view with app icon, skyline, shortcuts, credits, sponsor/bug/feature links
 - [x] Settings: environment, CLI install (auto-hidden when installed), tmux, bypass, teams, auto-rename, appearance, language, base dir, branch prefix, external apps, bleeding edge, danger zone
 - [x] Project overview with editable name, git info, GitHub info, worktree list with prune, doc tabs
@@ -65,7 +61,8 @@
 - [x] Workstream sorting in project view (recent / A-Z)
 - [x] Localization: en, ca, es, sv (all strings translated)
 - [x] Script config: .factoryfloor.json
-- [x] Environment tab: setup (auto) / run (on-demand) with Rebuild (⌃⇧R) and Start/Rerun (⌃⇧S) shortcuts
+- [x] Environment tab: setup (auto) / run (on-demand) with Rebuild (⌃⇧R) and Start/Rerun (⌃⇧S)
+- [x] Tmux session restore for run scripts on app relaunch
 - [x] Preload agent and setup terminals in background
 - [x] Occlude non-visible terminal surfaces (ghostty_surface_set_occlusion)
 - [x] Update notification: versions.json check + sidebar badge + /get page
@@ -75,9 +72,11 @@
 - [x] Code signing, notarization, release-please, CI pipeline (security hardened)
 - [x] Homebrew tap (alltuner/homebrew-tap) with cask and CLI binary
 - [x] Website: Hugo + Tailwind, i18n (4 langs), sponsor page, privacy, SEO, OG image, /get page
-- [x] Distribution docs: distribution.md (release routine), distribution-strategy.md, port-detection.md
+- [x] Distribution docs: distribution.md, distribution-strategy.md, port-detection.md, swift6-migration.md
 - [x] Onboarding view with prerequisites, getting started, key concepts
-- [x] Security: WKWebView JS disabled, shell-escape tmux, deinit race fix, git flag injection, .env symlink validation, CI hardening
+- [x] Security: WKWebView JS disabled, shell-escape tmux, surface destroy on restart, git flag injection, .env symlink validation, CI hardening
 - [x] Accessibility: labels, focus rings, keyboard-reachable hover actions
 - [x] Code quality: dedup, parallelized git, cached state, consolidated timers, error propagation
 - [x] Error feedback: worktree creation, non-git dir, ghostty init, project removal, Claude not found
+- [x] Fix: embedded terminal mouse selection coordinates (Y axis inversion)
+- [x] Fix: env script terminal lifecycle (initialInput for non-tmux, command for tmux, explicit surface destroy)
