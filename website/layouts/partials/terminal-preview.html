@@ -1,28 +1,39 @@
-<div class="mt-16 rounded-xl overflow-hidden border border-fg-faint bg-bg-surface shadow-[0_25px_80px_var(--color-shadow)] animate-fade-up-4">
-  <div class="flex items-center gap-1.5 px-4 py-3 bg-bg-elevated border-b border-fg-faint">
-    <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
-    <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
-    <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
-    <span class="flex-1 text-center font-mono text-[0.7rem] text-fg-muted mr-12">Factory Floor &mdash; my-project &mdash; deploy-auth-fix</span>
-  </div>
-  <div class="flex gap-0 px-3 bg-bg-surface/60 border-b border-fg-faint">
-    <span class="px-3.5 py-2 font-mono text-[0.7rem] text-fg-muted border-b-2 border-transparent">Info</span>
-    <span class="px-3.5 py-2 font-mono text-[0.7rem] text-fg border-b-2 border-wine-light bg-fg-faint/30">Coding Agent</span>
-    <span class="px-3.5 py-2 font-mono text-[0.7rem] text-fg-muted border-b-2 border-transparent">Terminal</span>
-    <span class="px-3.5 py-2 font-mono text-[0.7rem] text-fg-muted border-b-2 border-transparent">Browser</span>
-    <span class="px-3.5 py-2 font-mono text-[0.7rem] text-fg-muted border-b-2 border-transparent">Setup</span>
-    <span class="px-3.5 py-2 font-mono text-[0.7rem] text-fg-muted border-b-2 border-transparent">Run</span>
-  </div>
-  <div class="p-5 font-mono text-[0.8rem] leading-loose min-h-[180px]">
-    <div><span class="text-wine-light">$</span> <span>claude</span> <span class="text-fg-muted">--resume</span> <span class="text-code-key">a1b2c3d4</span> <span class="text-fg-muted">--name</span> <span class="text-code-key">deploy-auth-fix</span></div>
-    <div class="text-fg-muted">Resuming session...</div>
-    <div>&nbsp;</div>
-    <div><span class="text-code-str">claude</span> <span class="text-fg-muted">Fix the authentication timeout bug in the login handler.</span></div>
-    <div class="text-fg-muted">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The JWT expiry check is using seconds instead of milliseconds.</div>
-    <div>&nbsp;</div>
-    <div><span class="text-code-str">&#10003;</span> <span class="text-fg-muted">Reading src/auth/handler.ts</span></div>
-    <div><span class="text-code-str">&#10003;</span> <span class="text-fg-muted">Editing token validation logic</span></div>
-    <div><span class="text-code-str">&#10003;</span> <span class="text-fg-muted">Running tests... 47 passed</span></div>
-    <div><span class="text-wine-light">$</span> <span class="inline-block w-2 h-4 bg-fg align-text-bottom animate-cursor"></span></div>
+<div class="mt-16 animate-fade-up-4">
+  <div class="relative">
+    <!-- Screenshot tabs -->
+    <div class="flex justify-center gap-2 mb-4">
+      <button onclick="showScreenshot('agent')" class="ss-tab ss-tab-active font-mono text-xs px-3 py-1.5 rounded-md border border-fg-faint transition-all" data-tab="agent">Agent</button>
+      <button onclick="showScreenshot('environment')" class="ss-tab font-mono text-xs px-3 py-1.5 rounded-md border border-fg-faint transition-all" data-tab="environment">Environment</button>
+      <button onclick="showScreenshot('info')" class="ss-tab font-mono text-xs px-3 py-1.5 rounded-md border border-fg-faint transition-all" data-tab="info">Info</button>
+      <button onclick="showScreenshot('terminal')" class="ss-tab font-mono text-xs px-3 py-1.5 rounded-md border border-fg-faint transition-all" data-tab="terminal">Terminal</button>
+      <button onclick="showScreenshot('browser')" class="ss-tab font-mono text-xs px-3 py-1.5 rounded-md border border-fg-faint transition-all" data-tab="browser">Browser</button>
+      <button onclick="showScreenshot('project')" class="ss-tab font-mono text-xs px-3 py-1.5 rounded-md border border-fg-faint transition-all" data-tab="project">Project</button>
+    </div>
+
+    <!-- Screenshots -->
+    <div class="rounded-xl overflow-hidden shadow-[0_25px_80px_var(--color-shadow)] border border-fg-faint">
+      <img id="ss-agent" class="ss-img w-full" src="/img/screenshots/agent.png" alt="Claude Code agent running in Factory Floor">
+      <img id="ss-environment" class="ss-img w-full hidden" src="/img/screenshots/environment.png" alt="Environment tab with setup and run scripts">
+      <img id="ss-info" class="ss-img w-full hidden" src="/img/screenshots/info.png" alt="Workstream info with documentation">
+      <img id="ss-terminal" class="ss-img w-full hidden" src="/img/screenshots/terminal.png" alt="Ghostty terminal with custom shell">
+      <img id="ss-browser" class="ss-img w-full hidden" src="/img/screenshots/browser.png" alt="Embedded browser with auto-port detection">
+      <img id="ss-project" class="ss-img w-full hidden" src="/img/screenshots/project.png" alt="Project overview with git info and docs">
+    </div>
   </div>
 </div>
+
+<script>
+function showScreenshot(name) {
+  document.querySelectorAll('.ss-img').forEach(function(img) { img.classList.add('hidden'); });
+  document.querySelectorAll('.ss-tab').forEach(function(tab) {
+    tab.classList.remove('ss-tab-active', 'bg-wine', 'text-[#F7F4F3]', 'border-wine');
+    tab.classList.add('text-fg-muted', 'bg-transparent');
+  });
+  document.getElementById('ss-' + name).classList.remove('hidden');
+  var activeTab = document.querySelector('[data-tab="' + name + '"]');
+  activeTab.classList.add('ss-tab-active', 'bg-wine', 'text-[#F7F4F3]', 'border-wine');
+  activeTab.classList.remove('text-fg-muted', 'bg-transparent');
+}
+// Initialize first tab
+document.addEventListener('DOMContentLoaded', function() { showScreenshot('agent'); });
+</script>

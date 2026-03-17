@@ -2,7 +2,7 @@
 
 ## Pre-release
 
-- [ ] Take app screenshots for the website
+- [x] App screenshots on website (agent, environment, info, terminal, browser, project)
 
 ## Post-release
 
