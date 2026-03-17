@@ -167,7 +167,7 @@ struct DirectoryRow: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(abbreviatePath(path))
+            Text(path.abbreviatedPath)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -204,13 +204,6 @@ struct DirectoryRow: View {
         }
     }
 
-    private func abbreviatePath(_ p: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if p.hasPrefix(home) {
-            return "~" + p.dropFirst(home.count)
-        }
-        return p
-    }
 }
 
 private struct DirectoryActionButton: View {

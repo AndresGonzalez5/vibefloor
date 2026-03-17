@@ -82,7 +82,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Base directory")
                     Spacer()
-                    Text(abbreviatePath(baseDirectory))
+                    Text(baseDirectory.abbreviatedPath)
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -294,14 +294,6 @@ struct SettingsView: View {
         case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
         default: NSApp.appearance = nil
         }
-    }
-
-    private func abbreviatePath(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
     }
 
     private var availableLanguages: [(code: String, name: String)] {

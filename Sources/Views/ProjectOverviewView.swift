@@ -142,8 +142,7 @@ struct ProjectOverviewView: View {
                             workstream: workstream,
                             shortcutNumber: index < 9 ? index + 1 : nil,
                             onSelect: { onSelectWorkstream(workstream.id) },
-                            onArchive: { onArchiveWorkstream(workstream.id) },
-                            abbreviatePath: abbreviatePath
+                            onArchive: { onArchiveWorkstream(workstream.id) }
                         )
                     }
                 }
@@ -170,7 +169,7 @@ struct ProjectOverviewView: View {
             if !worktrees.isEmpty {
                 Section {
                     ForEach(worktrees) { wt in
-                        WorktreeInfoRow(worktree: wt, abbreviatePath: abbreviatePath)
+                        WorktreeInfoRow(worktree: wt)
                     }
 
                     if prunableCount > 0 {
@@ -256,18 +255,10 @@ struct ProjectOverviewView: View {
         }
     }
 
-    private func abbreviatePath(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
-    }
 }
 
 private struct WorktreeInfoRow: View {
     let worktree: WorktreeInfo
-    let abbreviatePath: (String) -> String
 
     var body: some View {
         HStack {
@@ -277,7 +268,7 @@ private struct WorktreeInfoRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(worktree.branch ?? "detached")
                     .font(.system(.body, design: .monospaced))
-                Text(abbreviatePath(worktree.path))
+                Text(worktree.path.abbreviatedPath)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -309,7 +300,6 @@ private struct WorkstreamRow: View {
     var shortcutNumber: Int?
     let onSelect: () -> Void
     let onArchive: () -> Void
-    let abbreviatePath: (String) -> String
 
     @State private var isHovering = false
 
@@ -323,7 +313,7 @@ private struct WorkstreamRow: View {
                     Text(workstream.name)
                         .font(.system(.body, design: .monospaced))
                     if let path = workstream.worktreePath {
-                        Text(abbreviatePath(path))
+                        Text(path.abbreviatedPath)
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }

@@ -508,7 +508,7 @@ private struct ProjectHeaderRow: View {
                     }
                 }
 
-                Text(abbreviatePath(project.directory))
+                Text(project.directory.abbreviatedPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -537,13 +537,6 @@ private struct ProjectHeaderRow: View {
         .onHover { isHovering = $0 }
     }
 
-    private func abbreviatePath(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
-    }
 }
 
 private struct WorkstreamRow: View {
@@ -719,7 +712,7 @@ private struct NewProjectSheet: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 4) {
-                    Text(abbreviatePath(baseDirectory))
+                    Text(baseDirectory.abbreviatedPath)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.tertiary)
                     Text("(change in Settings)")
@@ -752,13 +745,6 @@ private struct NewProjectSheet: View {
         .frame(width: 380)
     }
 
-    private func abbreviatePath(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
-    }
 }
 
 
