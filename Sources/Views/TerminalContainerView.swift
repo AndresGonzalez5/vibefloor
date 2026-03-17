@@ -244,7 +244,6 @@ struct TerminalContainerView: View {
         .onChange(of: bypassPermissions) { _ in cachedClaudeCommand = buildClaudeCommand() }
         .onChange(of: autoRenameBranch) { _ in cachedClaudeCommand = buildClaudeCommand() }
         .onChange(of: workstreamName) { _ in cachedClaudeCommand = buildClaudeCommand() }
-        .onReceive(appEnv.objectWillChange) { _ in cachedClaudeCommand = buildClaudeCommand() }
         .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in activeTab = .info }
         .onReceive(NotificationCenter.default.publisher(for: .focusAgent)) { _ in activeTab = .agent }
         .onReceive(NotificationCenter.default.publisher(for: .toggleEnvironment)) { _ in
