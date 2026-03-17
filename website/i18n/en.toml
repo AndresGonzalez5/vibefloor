@@ -185,7 +185,7 @@ other = "Buy Me a Coffee"
 [sponsor_coffee_desc]
 other = "Quick one-time contribution."
 [sponsor_star]
-other = "Star the project"
+other = "Star the project on GitHub"
 [sponsor_star_desc]
 other = "Stars help others discover Factory Floor."
 [sponsor_issues]

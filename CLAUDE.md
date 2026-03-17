@@ -103,9 +103,10 @@ Breaking changes: add `!` after the type or include `BREAKING CHANGE:` in the fo
 5. Archiving: runs teardown script, then `git worktree remove` + `tmux kill-session`
 
 ### Script configuration
-Scripts are loaded from the project directory, checking in order:
-1. `.factoryfloor.json` - `{ "setup": "cmd", "run": "cmd", "teardown": "cmd" }`
-2. `.factoryfloor/config.json` - same format as above
+Scripts are loaded from `.factoryfloor.json` in the project directory:
+```json
+{ "setup": "cmd", "run": "cmd", "teardown": "cmd" }
+```
 
 ### Paths
 - Config: `~/.config/factoryfloor/` (respects `XDG_CONFIG_HOME`)

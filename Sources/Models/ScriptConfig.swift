@@ -13,17 +13,9 @@ struct ScriptConfig {
 
     /// Load script config for a project directory.
     static func load(from directory: String) -> ScriptConfig {
-        let filenames = [".factoryfloor.json", ".factoryfloor/config.json"]
-
-        for filename in filenames {
-            let path = URL(fileURLWithPath: directory).appendingPathComponent(filename).path
-            guard FileManager.default.fileExists(atPath: path) else { continue }
-            if let config = loadFF2(path) {
-                return config
-            }
-        }
-
-        return .empty
+        let path = URL(fileURLWithPath: directory).appendingPathComponent(".factoryfloor.json").path
+        guard FileManager.default.fileExists(atPath: path) else { return .empty }
+        return loadFF2(path) ?? .empty
     }
 
     var hasAnyScript: Bool {
