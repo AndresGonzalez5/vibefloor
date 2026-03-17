@@ -401,11 +401,12 @@ struct TerminalContainerView: View {
     }
 
     private func buildEnvironmentCommand(script: String, role: String) -> String {
+        let kept = "\(script); exec $SHELL"
         if useTmux, let tmuxPath = appEnv.toolStatus.tmux.path {
             let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: role)
-            return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: script)
+            return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: kept)
         }
-        return script
+        return kept
     }
 
     /// Env vars for plain terminal tabs. Clears tmux vars to prevent inheritance.

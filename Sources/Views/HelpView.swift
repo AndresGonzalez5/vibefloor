@@ -4,6 +4,12 @@
 import SwiftUI
 
 struct HelpView: View {
+    private var sponsorURL: URL {
+        let lang = Locale.current.language.languageCode?.identifier ?? "en"
+        let path = lang == "en" ? "/sponsor" : "/\(lang)/sponsor"
+        return URL(string: "https://factory-floor.com\(path)")!
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -45,6 +51,19 @@ struct HelpView: View {
                 PoblenouSkylineView()
                     .padding(.horizontal, 40)
                     .padding(.vertical, -4)
+
+                HStack(spacing: 16) {
+                    Link(destination: sponsorURL) {
+                        Label("Sponsor", systemImage: "heart")
+                    }
+                    Link(destination: URL(string: "https://github.com/alltuner/factoryfloor/issues/new?template=bug_report.md")!) {
+                        Label("Report a Bug", systemImage: "ladybug")
+                    }
+                    Link(destination: URL(string: "https://github.com/alltuner/factoryfloor/issues/new?template=feature_request.md")!) {
+                        Label("Request a Feature", systemImage: "lightbulb")
+                    }
+                }
+                .font(.system(size: 11))
 
                 Text("Shortcuts")
                     .font(.system(size: 16, weight: .semibold))

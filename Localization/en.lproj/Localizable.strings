@@ -223,3 +223,9 @@
 "by " = "by ";
 "Help " = "Help ";
 " the development." = " the development.";
+
+
+/* Help */
+"Sponsor" = "Sponsor";
+"Report a Bug" = "Report a Bug";
+"Request a Feature" = "Request a Feature";

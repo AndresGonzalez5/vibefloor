@@ -223,3 +223,9 @@
 "by " = "av ";
 "Help " = "Hjälp till att ";
 " the development." = "stödja utvecklingen.";
+
+
+/* Help */
+"Sponsor" = "Sponsra";
+"Report a Bug" = "Rapportera en bugg";
+"Request a Feature" = "Föreslå en funktion";

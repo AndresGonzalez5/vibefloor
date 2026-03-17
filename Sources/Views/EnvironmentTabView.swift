@@ -190,19 +190,18 @@ struct EnvironmentTabView: View {
                 .background(Color.primary.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .foregroundStyle(.secondary)
-            Text("Also supports .factoryfloor/config.json.")
-                .font(.system(size: 10))
-                .foregroundStyle(.quaternary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func buildCommand(script: String, role: String) -> String {
+        // Keep the shell alive after the script exits so the terminal doesn't close and respawn
+        let kept = "\(script); exec $SHELL"
         if useTmux, let tmuxPath = appEnv.toolStatus.tmux.path {
             let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: role)
-            return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: script)
+            return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: kept)
         }
-        return script
+        return kept
     }
 
     private func restartSetup() {

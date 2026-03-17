@@ -223,3 +223,9 @@
 "by " = "per ";
 "Help " = "Ajuda a ";
 " the development." = "el desenvolupament.";
+
+
+/* Help */
+"Sponsor" = "Patrocina";
+"Report a Bug" = "Reporta un error";
+"Request a Feature" = "Suggereix una funcionalitat";
