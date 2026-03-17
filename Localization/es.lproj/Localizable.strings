@@ -58,6 +58,7 @@
 "Not found" = "No encontrado";
 "Authenticated" = "Autenticado";
 "Not authenticated" = "No autenticado";
+"Run gh auth login" = "Ejecuta gh auth login";
 "Terminal" = "Terminal";
 "None" = "Ninguno";
 "Browser" = "Navegador";

@@ -185,6 +185,11 @@ private struct PrerequisiteRow: View {
                         Text(detail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if !isAuth {
+                            Text("Run gh auth login")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
             } else if let installURL, !optional {
