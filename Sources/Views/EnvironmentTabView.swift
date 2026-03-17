@@ -93,7 +93,7 @@ struct EnvironmentTabView: View {
                 SingleTerminalView(
                     surfaceID: surfaceID,
                     workingDirectory: workingDirectory,
-                    command: buildCommand(script: script, role: tmuxRole),
+                    initialInput: buildCommand(script: script, role: tmuxRole) + "\n",
                     isFocused: false,
                     environmentVars: environmentVars
                 )
@@ -165,7 +165,7 @@ struct EnvironmentTabView: View {
                     SingleTerminalView(
                         surfaceID: runID,
                         workingDirectory: workingDirectory,
-                        command: buildCommand(script: script, role: "run"),
+                        initialInput: buildCommand(script: script, role: "run") + "\n",
                         isFocused: false,
                         environmentVars: environmentVars
                     )
