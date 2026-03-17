@@ -140,6 +140,7 @@ struct EnvironmentTabView: View {
 
                 if scriptConfig.run != nil {
                     if runStarted {
+                        EnvActionButton(label: NSLocalizedString("Stop", comment: ""), icon: "stop.fill", shortcut: "", action: stopRun)
                         EnvActionButton(label: NSLocalizedString("Rerun", comment: ""), icon: "arrow.counterclockwise", shortcut: shortcut, action: restartRun)
                     } else {
                         EnvActionButton(label: NSLocalizedString("Start", comment: ""), icon: "play.fill", shortcut: shortcut) { runStarted = true }
@@ -245,6 +246,13 @@ struct EnvironmentTabView: View {
             setupGeneration += 1
             setupRestarting = false
         }
+    }
+
+    private func stopRun() {
+        killTmuxSession(role: "run")
+        surfaceCache.removeSurface(for: runID)
+        runStarted = false
+        runGeneration += 1
     }
 
     private func restartRun() {

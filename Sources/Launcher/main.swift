@@ -170,16 +170,16 @@ private final class PortScanner: @unchecked Sendable {
     }
 
     private func childPIDs(of pid: Int32) -> [Int32] {
-        let byteCount = proc_listchildpids(pid, nil, 0)
-        guard byteCount > 0 else { return [] }
+        // proc_listchildpids returns the number of PIDs (not bytes)
+        let estimatedCount = proc_listchildpids(pid, nil, 0)
+        guard estimatedCount > 0 else { return [] }
 
-        let count = Int(byteCount) / MemoryLayout<Int32>.stride
-        var children = [Int32](repeating: 0, count: count)
-        let filledBytes = children.withUnsafeMutableBytes { buffer in
-            proc_listchildpids(pid, buffer.baseAddress, Int32(buffer.count))
+        var children = [Int32](repeating: 0, count: Int(estimatedCount))
+        let filledCount = children.withUnsafeMutableBufferPointer { buffer in
+            proc_listchildpids(pid, buffer.baseAddress, Int32(buffer.count * MemoryLayout<Int32>.stride))
         }
-        guard filledBytes > 0 else { return [] }
-        return Array(children.prefix(Int(filledBytes) / MemoryLayout<Int32>.stride))
+        guard filledCount > 0 else { return [] }
+        return Array(children.prefix(Int(filledCount)))
     }
 
     private func listeningPorts(in pids: Set<Int32>) -> Set<Int> {
