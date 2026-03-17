@@ -451,14 +451,14 @@ final class TerminalView: NSView, NSTextInputClient {
 
     override func mouseMoved(with event: NSEvent) {
         guard let surface else { return }
-        let point = convert(event.locationInWindow, from: nil)
+        let point = Self.ghosttyMousePoint(from: event.locationInWindow, in: self)
         let mods = Self.eventMods(event)
         ghostty_surface_mouse_pos(surface, point.x, point.y, mods)
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard let surface else { return }
-        let point = convert(event.locationInWindow, from: nil)
+        let point = Self.ghosttyMousePoint(from: event.locationInWindow, in: self)
         let mods = Self.eventMods(event)
         ghostty_surface_mouse_pos(surface, point.x, point.y, mods)
     }
@@ -480,6 +480,11 @@ final class TerminalView: NSView, NSTextInputClient {
 
     private static func eventMods(_ event: NSEvent) -> ghostty_input_mods_e {
         flagsToGhosttyMods(event.modifierFlags)
+    }
+
+    static func ghosttyMousePoint(from windowPoint: NSPoint, in view: NSView) -> NSPoint {
+        let point = view.convert(windowPoint, from: nil)
+        return NSPoint(x: point.x, y: view.frame.height - point.y)
     }
 
     private static func flagsToGhosttyMods(_ flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
