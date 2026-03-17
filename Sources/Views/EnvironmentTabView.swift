@@ -31,6 +31,7 @@ struct EnvironmentTabView: View {
             scriptPane(
                 title: NSLocalizedString("Setup", comment: ""),
                 icon: "hammer",
+                restartLabel: NSLocalizedString("Rebuild", comment: ""),
                 script: scriptConfig.setup,
                 surfaceID: setupID,
                 tmuxRole: "setup",
@@ -42,7 +43,7 @@ struct EnvironmentTabView: View {
     }
 
     @ViewBuilder
-    private func scriptPane(title: String, icon: String, script: String?, surfaceID: UUID, tmuxRole: String, onRestart: @escaping () -> Void) -> some View {
+    private func scriptPane(title: String, icon: String, restartLabel: String, script: String?, surfaceID: UUID, tmuxRole: String, onRestart: @escaping () -> Void) -> some View {
         VStack(spacing: 0) {
             // Header bar
             HStack {
@@ -64,12 +65,15 @@ struct EnvironmentTabView: View {
 
                 if script != nil {
                     Button(action: onRestart) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 11))
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 10))
+                            Text(restartLabel)
+                                .font(.system(size: 11))
+                        }
                     }
                     .buttonStyle(.borderless)
-                    .help(String(format: NSLocalizedString("Restart %@ script", comment: ""), title.lowercased()))
-                    .accessibilityLabel(String(format: NSLocalizedString("Restart %@ script", comment: ""), title.lowercased()))
+                    .accessibilityLabel(restartLabel)
                 }
             }
             .padding(.horizontal, 10)
@@ -119,16 +123,23 @@ struct EnvironmentTabView: View {
                 if scriptConfig.run != nil {
                     if runStarted {
                         Button(action: restartRun) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 11))
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 10))
+                                Text(NSLocalizedString("Rerun", comment: ""))
+                                    .font(.system(size: 11))
+                            }
                         }
                         .buttonStyle(.borderless)
-                        .help(String(format: NSLocalizedString("Restart %@ script", comment: ""), title.lowercased()))
-                        .accessibilityLabel(String(format: NSLocalizedString("Restart %@ script", comment: ""), title.lowercased()))
+                        .accessibilityLabel(NSLocalizedString("Rerun", comment: ""))
                     } else {
                         Button(action: { runStarted = true }) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 11))
+                            HStack(spacing: 4) {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 10))
+                                Text(NSLocalizedString("Start", comment: ""))
+                                    .font(.system(size: 11))
+                            }
                         }
                         .buttonStyle(.borderless)
                         .help(String(format: NSLocalizedString("Start %@ script", comment: ""), title.lowercased()))
@@ -195,8 +206,8 @@ struct EnvironmentTabView: View {
     }
 
     private func buildCommand(script: String, role: String) -> String {
-        // Keep the shell alive after the script exits so the terminal doesn't close and respawn
-        let kept = "\(script); exec $SHELL"
+        // Keep the terminal open after the script exits so output remains visible
+        let kept = "\(script); cat"
         if useTmux, let tmuxPath = appEnv.toolStatus.tmux.path {
             let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: role)
             return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: kept)
