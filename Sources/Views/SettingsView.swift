@@ -272,7 +272,9 @@ struct SettingsView: View {
 
     private func installWithPrivileges(source: String) {
         let destination = "/usr/local/bin/\(Self.cliName)"
-        let script = "do shell script \"install -m 755 \(source.replacingOccurrences(of: "\"", with: "\\\"")) \(destination)\" with administrator privileges"
+        let quotedSource = source.replacingOccurrences(of: "'", with: "'\\''")
+        let quotedDest = destination.replacingOccurrences(of: "'", with: "'\\''")
+        let script = "do shell script \"install -m 755 '\(quotedSource)' '\(quotedDest)'\" with administrator privileges"
         if let appleScript = NSAppleScript(source: script) {
             var error: NSDictionary?
             appleScript.executeAndReturnError(&error)

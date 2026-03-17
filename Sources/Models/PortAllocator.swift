@@ -8,11 +8,13 @@ enum PortAllocator {
     static let rangeEnd = 49999
 
     /// Derive a deterministic port from the working directory path.
+    /// Uses DJB2 hash (stable across processes, unlike Swift's Hasher).
     static func port(for path: String) -> Int {
-        var hasher = Hasher()
-        hasher.combine(path)
-        let hash = abs(hasher.finalize())
+        var hash: UInt64 = 5381
+        for byte in path.utf8 {
+            hash = hash &* 33 &+ UInt64(byte)
+        }
         let range = rangeEnd - rangeStart + 1
-        return rangeStart + (hash % range)
+        return rangeStart + Int(hash % UInt64(range))
     }
 }

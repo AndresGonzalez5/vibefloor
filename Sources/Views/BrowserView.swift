@@ -145,7 +145,9 @@ struct BrowserView: View {
         if !resolved.contains("://") {
             resolved = "http://\(resolved)"
         }
-        guard let url = URL(string: resolved) else { return }
+        guard let url = URL(string: resolved),
+              let scheme = url.scheme,
+              ["http", "https"].contains(scheme) else { return }
         webView.load(URLRequest(url: url))
     }
 
