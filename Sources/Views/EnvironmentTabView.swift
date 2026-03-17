@@ -95,8 +95,7 @@ struct EnvironmentTabView: View {
                     workingDirectory: workingDirectory,
                     command: buildCommand(script: script, role: tmuxRole),
                     isFocused: false,
-                    environmentVars: environmentVars,
-                    waitAfterCommand: false
+                    environmentVars: environmentVars
                 )
                 .id(surfaceID)
             } else {
@@ -168,8 +167,7 @@ struct EnvironmentTabView: View {
                         workingDirectory: workingDirectory,
                         command: buildCommand(script: script, role: "run"),
                         isFocused: false,
-                        environmentVars: environmentVars,
-                        waitAfterCommand: false
+                        environmentVars: environmentVars
                     )
                     .id(runID)
                 } else {

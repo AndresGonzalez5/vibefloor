@@ -25,7 +25,7 @@ final class TerminalView: NSView, NSTextInputClient {
     private var keyTextAccumulator: [String]?
     private var activityDebounceWork: DispatchWorkItem?
 
-    init(app: ghostty_app_t, workingDirectory: String? = nil, command: String? = nil, initialInput: String? = nil, environmentVars: [String: String] = [:], waitAfterCommand: Bool = true) {
+    init(app: ghostty_app_t, workingDirectory: String? = nil, command: String? = nil, initialInput: String? = nil, environmentVars: [String: String] = [:]) {
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
         wantsLayer = true
@@ -42,7 +42,6 @@ final class TerminalView: NSView, NSTextInputClient {
         config.scale_factor = Double(NSScreen.main?.backingScaleFactor ?? 2.0)
         config.font_size = 0 // inherit from ghostty config
         config.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
-        config.wait_after_command = waitAfterCommand
 
         // Build C env vars array. Keep the strings alive until surface is created.
         var envKeys = environmentVars.map { $0.key.utf8CString }
