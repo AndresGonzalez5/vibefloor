@@ -18,11 +18,14 @@
 - [ ] Move retroactive String/UUID Identifiable conformances from ProjectSidebar to extensions file
 - [ ] FilePersistence: drop redundant .atomic on temp write (outer replaceItemAt provides atomicity)
 
-## Future
+## Pre-release
 
 - [ ] Ensure docs/distribution.md is up to date with current CI, signing, Homebrew, and release workflow
 - [ ] Document version release routine: step-by-step process for cutting a release, what release-please does, manual steps needed, how to verify
 - [ ] Plan distribution and auto-update strategy: compare Mac App Store vs Homebrew vs direct DMG vs Sparkle; document tradeoffs (Homebrew is a must regardless)
+
+## Future
+
 - [ ] Swift 6 migration (strict concurrency)
 - [ ] External Chrome integration: launch with --remote-debugging-port for WebMCP/CDP
 - [ ] PR management: create and manage PRs from workstreams (currently view-only)
