@@ -51,8 +51,6 @@ Add a `.factoryfloor.json` to your project root:
 }
 ```
 
-Or place it at `.factoryfloor/config.json` in your project root.
-
 ### Environment Variables
 
 Every workstream terminal has access to:
@@ -103,19 +101,27 @@ English, Catalan, Spanish, Swedish.
 ## Install
 
 ```bash
-brew install alltuner/tap/factoryfloor
+brew install --cask alltuner/tap/factoryfloor
 ```
 
 Or download from [GitHub Releases](https://github.com/alltuner/factoryfloor/releases).
 
+### Upgrade
+
+```bash
+brew upgrade --cask factoryfloor
+```
+
 ### CLI
 
-Install the `ff` command from Settings > Environment, or manually:
+Homebrew automatically installs the `ff` command:
 
 ```bash
 ff                  # open current directory
 ff ~/repos/myapp    # open a specific directory
 ```
+
+If you installed via DMG, you can install the CLI from Settings > Environment.
 
 ---
 

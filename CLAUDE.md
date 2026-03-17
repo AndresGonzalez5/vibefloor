@@ -88,12 +88,12 @@ Breaking changes: add `!` after the type or include `BREAKING CHANGE:` in the fo
 - `docs/` - Distribution guide and reference docs
 
 ### Data flow
-- **Projects/workstreams** stored in UserDefaults as JSON, accessed via `ProjectStore`
+- **Projects/workstreams** stored as JSON files in `~/.config/factoryfloor/`, accessed via `ProjectStore`
 - **Settings** use `@AppStorage` (UserDefaults), keyed as `factoryfloor.*`
 - **Terminal surfaces** cached in `TerminalSurfaceCache` (keyed by UUID)
 - **Git repo info** cached in `AppEnvironment`, refreshed async every 15s
 - **Tool detection** runs at startup in `AppEnvironment.refresh()`
-- **Sidebar state** (selection, expanded sections) persisted via `SidebarSelection` / `SidebarState`
+- **Sidebar state** (selection, expanded sections) persisted as JSON via `SidebarSelection` / `SidebarState`
 
 ### Workstream lifecycle
 1. Creating a workstream: generates name, runs `git worktree add`, symlinks .env (if enabled)
