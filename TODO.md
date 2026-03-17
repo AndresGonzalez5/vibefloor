@@ -4,7 +4,7 @@
 
 - [x] Pin third-party CI actions to commit SHAs (supply chain protection)
 - [x] CI notarization: use keychain profile instead of passing Apple password as CLI arg
-- [ ] Scope CI permissions per job (release-please needs write, build only needs contents:write)
+- [x] Scope CI permissions per job (release-please: contents+PRs, build: contents only)
 - [x] GitOperations.sanitize: strip leading `-` to prevent git flag injection
 - [x] .env symlink: validate source is a regular file, not itself a symlink to sensitive data
 - [x] Remove website/node_modules from repo, add to .gitignore, install via bun in CI
@@ -23,7 +23,7 @@
 - [x] Show install prompt when Claude CLI is not found (instead of plain shell)
 - [ ] Setup script: log output or show status instead of routing to /dev/null and ignoring exit code
 - [x] Notify user when a project directory is removed from disk (alert with project names)
-- [ ] Onboarding: explain prerequisites (claude, gh), what a workstream is, Cmd+N contextual behavior
+- [x] Onboarding: prerequisites with live status, getting started steps, key concepts
 - [ ] Execute the `run` script from .factoryfloor.json (currently loaded and displayed but never run)
 - [x] Show error dialog when ghostty_init fails (NSAlert instead of fatalError)
 - [x] ToolRow: text already shown alongside color dot (no change needed)
@@ -57,7 +57,7 @@
 - [ ] PR management: create and manage PRs from workstreams (currently view-only)
 - [ ] Auto-update mechanism (Sparkle or similar)
 - [ ] Crash reporting
-- [ ] Move persistence from UserDefaults to a proper file (for larger state)
+- [x] Move persistence from UserDefaults to JSON files (~/.config/factoryfloor/) with auto-migration
 - [ ] Horizontal terminal splits within a tab (ghostty C API supports splits via action_cb, but surface lifecycle needs investigation)
 - [ ] Preload Coding Agent terminal in background so it's ready when the user switches from Info tab
 - [ ] Drag-and-drop to reorder tabs
