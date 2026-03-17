@@ -11,6 +11,9 @@ DerivedData/
 ghostty/zig-out/
 ghostty/.zig-cache/
 
+# Node dependencies (installed via bun in CI)
+node_modules/
+
 # macOS
 .DS_Store
 *.swp
