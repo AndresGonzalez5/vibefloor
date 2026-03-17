@@ -21,6 +21,9 @@ packages:
   swift-cmark:
     url: https://github.com/swiftlang/swift-cmark
     from: "0.6.0"
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: "9.7.0"
 
 targets:
   FactoryFloor:
@@ -82,6 +85,8 @@ targets:
         product: cmark-gfm
       - package: swift-cmark
         product: cmark-gfm-extensions
+      - package: Sentry
+        product: Sentry
 
   FactoryFloorTests:
     type: bundle.unit-test

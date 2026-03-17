@@ -6,25 +6,44 @@ translationKey: privacy
 
 ## La versión corta
 
-Factory Floor no recoge, almacena ni transmite ningún dato personal. Tu código se queda en tu ordenador.
+Factory Floor no recoge datos personales. Tu código se queda en tu ordenador. Recogemos informes de error anónimos para mejorar la estabilidad.
 
 ## La aplicación
 
 Factory Floor es una aplicación nativa de macOS que se ejecuta completamente en tu ordenador. No:
 
-- Recoge telemetría ni analíticas de uso
-- Envía datos a ningún servidor remoto
+- Envía tu código, contenido de proyectos ni salida de terminal a ningún servidor
 - Requiere ninguna cuenta ni registro
 - Rastrea tu comportamiento ni actividad
 - Accede a archivos fuera de tus directorios de proyecto
 
-Todos los datos de proyecto (nombres, directorios, configuraciones de flujos de trabajo) se almacenan localmente en macOS UserDefaults en tu ordenador. Las sesiones de terminal, las operaciones de git y las interacciones con el agente de código se realizan directamente entre tu ordenador y los servicios respectivos (GitHub, Anthropic) sin pasar por ninguna infraestructura de Factory Floor.
+Todos los datos de proyecto (nombres, directorios, configuraciones de flujos de trabajo) se almacenan localmente en tu ordenador en `~/.config/factoryfloor/`.
+
+## Informes de error
+
+Factory Floor utiliza [Sentry](https://sentry.io/) para recoger informes de error anónimos. Esto nos ayuda a identificar y corregir problemas de estabilidad, especialmente en el motor de terminal integrado.
+
+**Qué se recoge:**
+
+- Trazas de pila de errores y mensajes de error
+- Versión de la aplicación y tipo de compilación (producción o desarrollo)
+- Versión de macOS y arquitectura de hardware
+- Detección de bloqueos de la aplicación (hilo principal bloqueado >5 segundos)
+
+**Qué NO se recoge:**
+
+- Capturas de pantalla ni contenido del terminal
+- Rutas de archivos, nombres de proyectos ni código
+- Información personal (nombres, correos electrónicos, direcciones IP)
+- Pulsaciones de teclas, contenido del portapapeles ni actividad de navegación
+
+Los datos de error se procesan por Sentry en la UE (Frankfurt). Puedes consultar la [política de privacidad de Sentry](https://sentry.io/privacy/).
 
 ## Servicios de terceros
 
 Factory Floor se integra con herramientas que tú instalas y configuras:
 
-- **Claude Code** (Anthropic) - al usar el agente de código, tu código y el contexto de la conversación se envían a la API de Anthropic para su procesamiento. Es una conexión directa entre tu ordenador y Anthropic, sujeta a la [política de privacidad de Anthropic](https://www.anthropic.com/privacy). Factory Floor no intercepta, almacena ni retransmite estos datos.
+- **Claude Code** (Anthropic) - al usar el agente de código, tu código y el contexto de la conversación se envían a la API de Anthropic. Es una conexión directa entre tu ordenador y Anthropic, sujeta a la [política de privacidad de Anthropic](https://www.anthropic.com/privacy). Factory Floor no intercepta, almacena ni retransmite estos datos.
 - **GitHub CLI** - sujeto a la [política de privacidad de GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
 - **Ghostty** - el motor de terminal integrado se ejecuta localmente sin actividad de red
 

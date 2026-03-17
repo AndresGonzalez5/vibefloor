@@ -2,6 +2,7 @@
 // ABOUTME: Initializes the ghostty terminal engine and presents the main window.
 
 import SwiftUI
+import Sentry
 
 extension Notification.Name {
     static let openDirectory = Notification.Name("factoryfloor.openDirectory")
@@ -42,8 +43,20 @@ struct FF2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
-        // ghostty_init must happen before any ghostty API calls, but it's fast.
-        // TerminalApp.shared is lazy and deferred to first access (when a terminal is needed).
+        SentrySDK.start { options in
+            options.dsn = "https://45310bb703b438b38aee17e84e10d32e@o4511060356956160.ingest.de.sentry.io/4511060370391120"
+            options.enableCrashHandler = true
+            options.enableAppHangTracking = true
+            options.appHangTimeoutInterval = 5
+            options.sendDefaultPii = false
+            options.releaseName = "\(AppConstants.appID)@\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0")"
+            #if DEBUG
+            options.environment = "development"
+            #else
+            options.environment = "production"
+            #endif
+        }
+
         guard ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) == GHOSTTY_SUCCESS else {
             let alert = NSAlert()
             alert.messageText = NSLocalizedString("Factory Floor cannot start", comment: "")

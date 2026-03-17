@@ -6,25 +6,44 @@ translationKey: privacy
 
 ## Kortversionen
 
-Factory Floor samlar inte in, lagrar eller överför någon personlig data. Din kod stannar på din dator.
+Factory Floor samlar inte in personlig data. Din kod stannar på din dator. Vi samlar in anonyma kraschrapporter för att förbättra stabiliteten.
 
 ## Applikationen
 
 Factory Floor är en inbyggd macOS-applikation som körs helt på din dator. Den:
 
-- Samlar inte in telemetri eller användningsanalys
-- Skickar inte data till någon fjärrserver
+- Skickar inte din kod, projektinnehåll eller terminalutdata till någon server
 - Kräver inget konto eller registrering
 - Spårar inte ditt beteende eller din aktivitet
 - Kommer inte åt filer utanför dina projektkataloger
 
-All projektdata (namn, kataloger, arbetsflödeskonfigurationer) lagras lokalt i macOS UserDefaults på din dator. Terminalsessioner, git-operationer och interaktioner med kodningsagenten sker direkt mellan din dator och respektive tjänster (GitHub, Anthropic) utan att passera genom någon Factory Floor-infrastruktur.
+All projektdata (namn, kataloger, arbetsflödeskonfigurationer) lagras lokalt på din dator i `~/.config/factoryfloor/`.
+
+## Kraschrapportering
+
+Factory Floor använder [Sentry](https://sentry.io/) för att samla in anonyma kraschrapporter. Detta hjälper oss att identifiera och åtgärda stabilitetsproblem, särskilt i den inbyggda terminalmotorn.
+
+**Vad som samlas in:**
+
+- Kraschstackspår och felmeddelanden
+- Appversion och byggtyp (produktion eller utveckling)
+- macOS-version och hårdvaruarkitektur
+- Detektering av appfrysningar (huvudtråd blockerad >5 sekunder)
+
+**Vad som INTE samlas in:**
+
+- Skärmdumpar eller terminalinnehåll
+- Filsökvägar, projektnamn eller kod
+- Personlig information (namn, e-postadresser, IP-adresser)
+- Tangenttryckningar, urklippsinnehåll eller surfaktivitet
+
+Kraschdata bearbetas av Sentry inom EU (Frankfurt). Du kan läsa [Sentrys integritetspolicy](https://sentry.io/privacy/).
 
 ## Tredjepartstjänster
 
 Factory Floor integrerar med verktyg som du själv installerar och konfigurerar:
 
-- **Claude Code** (Anthropic) - när du använder kodningsagenten skickas din kod och konversationskontext till Anthropics API för bearbetning. Det är en direkt anslutning mellan din dator och Anthropic, som omfattas av [Anthropics integritetspolicy](https://www.anthropic.com/privacy). Factory Floor fångar inte upp, lagrar eller vidarebefordrar dessa data.
+- **Claude Code** (Anthropic) - när du använder kodningsagenten skickas din kod och konversationskontext till Anthropics API. Det är en direkt anslutning mellan din dator och Anthropic, som omfattas av [Anthropics integritetspolicy](https://www.anthropic.com/privacy). Factory Floor fångar inte upp, lagrar eller vidarebefordrar dessa data.
 - **GitHub CLI** - omfattas av [GitHubs integritetspolicy](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
 - **Ghostty** - den inbyggda terminalmotorn körs lokalt utan nätverksaktivitet
 
