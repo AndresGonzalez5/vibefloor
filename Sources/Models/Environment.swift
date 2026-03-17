@@ -105,30 +105,47 @@ final class AppEnvironment: ObservableObject {
         Task.detached {
             var results: [String: Bool] = [:]
             var missing: Set<UUID> = []
-            var branches: [String: String] = [:]
+
+            // Collect valid worktree paths that need git info
+            var validPaths: [String] = []
 
             for project in projects {
-                // Check project directory
                 var isDir: ObjCBool = false
                 let exists = FileManager.default.fileExists(atPath: project.directory, isDirectory: &isDir) && isDir.boolValue
                 if !exists {
                     missing.insert(project.id)
                 }
 
-                // Check worktree paths and branch names
                 for ws in project.workstreams {
                     guard let path = ws.worktreePath else { continue }
                     var wsIsDir: ObjCBool = false
                     let valid = FileManager.default.fileExists(atPath: path, isDirectory: &wsIsDir) && wsIsDir.boolValue
                     results[path] = valid
                     if valid {
-                        let info = GitOperations.repoInfo(at: path)
-                        if let branch = info.branch {
-                            branches[path] = branch
-                        }
+                        validPaths.append(path)
                     }
                 }
             }
+
+            // Run git info calls in parallel
+            let branches: [String: String] = await withTaskGroup(
+                of: (String, String?).self
+            ) { group in
+                for path in validPaths {
+                    group.addTask {
+                        let info = GitOperations.repoInfo(at: path)
+                        return (path, info.branch)
+                    }
+                }
+                var collected: [String: String] = [:]
+                for await (path, branch) in group {
+                    if let branch {
+                        collected[path] = branch
+                    }
+                }
+                return collected
+            }
+
             await MainActor.run {
                 self.pathValidityCache.merge(results) { _, new in new }
                 self.branchNameCache.merge(branches) { _, new in new }
