@@ -26,9 +26,8 @@ struct WorktreeInfo: Identifiable {
 }
 
 enum GitOperations {
-    private static var gitPath: String? {
-        CommandLineTools.path(for: "git")
-    }
+    // Resolved once at startup; git's location doesn't change during the app's lifetime.
+    private static let gitPath: String? = CommandLineTools.path(for: "git")
 
     /// Check if a directory is a git repository.
     static func isGitRepo(at path: String) -> Bool {
@@ -254,12 +253,14 @@ enum GitOperations {
     // MARK: - Private
 
     private static func sanitize(_ name: String) -> String {
-        var result = name.replacingOccurrences(of: "/", with: "--")
-            .replacingOccurrences(of: " ", with: "-")
-        // Prevent names from being interpreted as git flags
-        while result.hasPrefix("-") {
-            result = String(result.dropFirst())
+        var result = name.reduce(into: "") { acc, c in
+            switch c {
+            case "/": acc += "--"  // double dash matches original behaviour
+            case " ": acc.append("-")
+            default: acc.append(c)
+            }
         }
+        result = String(result.drop(while: { $0 == "-" }))
         return result.isEmpty ? "unnamed" : result
     }
 

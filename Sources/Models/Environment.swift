@@ -154,6 +154,22 @@ final class AppEnvironment: ObservableObject {
                 self.pathValidityCache.merge(results) { _, new in new }
                 self.branchNameCache.merge(branches) { _, new in new }
                 self.missingProjectIDs = missing
+
+                // Remove stale cache entries for paths that no longer exist
+                let invalidPaths = results.filter { !$0.value }.keys
+                for path in invalidPaths {
+                    self.branchNameCache.removeValue(forKey: path)
+                }
+
+                // Remove all cached data for projects whose directories are gone
+                for project in projects where missing.contains(project.id) {
+                    self.repoInfoCache.removeValue(forKey: project.directory)
+                    self.repoInfoTimestamps.removeValue(forKey: project.directory)
+                    self.githubRepoCache.removeValue(forKey: project.directory)
+                    self.githubPRCache.removeValue(forKey: project.directory)
+                    let prefix = "\(project.directory)|"
+                    self.githubBranchPRCache = self.githubBranchPRCache.filter { !$0.key.hasPrefix(prefix) }
+                }
             }
         }
     }

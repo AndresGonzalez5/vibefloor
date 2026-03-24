@@ -52,7 +52,8 @@ enum TmuxSession {
 
     static func wrapCommand(tmuxPath: String, sessionName: String, command: String?, environmentVars: [String: String] = [:], shell: String = CommandBuilder.userShell) -> String {
         let socket = shellEscape(socketName)
-        let conf = shellEscape(configPath)
+        let path = configPath  // Evaluate once — configPath reads/writes a file
+        let conf = shellEscape(path)
         let escaped = shellEscape(sessionName)
 
         let envFlags = environmentVars.map { "-e \"\($0.key)=\(doubleQuoteEscape($0.value))\"" }.joined(separator: " ")
@@ -68,7 +69,7 @@ enum TmuxSession {
         }
 
         // Use login shell for proper PATH, with inner sh for POSIX syntax.
-        let setup = serverSetupCommand(tmuxPath: tmuxPath, configPath: configPath)
+        let setup = serverSetupCommand(tmuxPath: tmuxPath, configPath: path)
         let posixCmd = shellEscape("\(setup); exec \(tmuxCmd)")
         let shCmd = "exec sh -c \(posixCmd)"
         return "\(shell) -lc \(shellEscape(shCmd))"
@@ -107,9 +108,7 @@ enum TmuxSession {
     }
 
     private static func sanitize(_ name: String) -> String {
-        name.replacingOccurrences(of: ":", with: "-")
-            .replacingOccurrences(of: ".", with: "-")
-            .replacingOccurrences(of: " ", with: "-")
+        String(name.map { c in (c == ":" || c == "." || c == " ") ? "-" : c })
     }
 
     private static func shellEscape(_ str: String) -> String {
@@ -118,10 +117,15 @@ enum TmuxSession {
 
     /// Escape a string for safe embedding inside double quotes in a shell command.
     private static func doubleQuoteEscape(_ str: String) -> String {
-        str.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "$", with: "\\$")
-            .replacingOccurrences(of: "`", with: "\\`")
+        str.reduce(into: "") { result, c in
+            switch c {
+            case "\\": result.append(contentsOf: "\\\\")
+            case "\"": result.append(contentsOf: "\\\"")
+            case "$":  result.append(contentsOf: "\\$")
+            case "`":  result.append(contentsOf: "\\`")
+            default:   result.append(c)
+            }
+        }
     }
 
     private static func serverSetupCommand(tmuxPath: String, configPath: String) -> String {

@@ -46,23 +46,37 @@ enum RestorableWorkspaceTab: String, Codable {
 
 enum WorkspaceStateStore {
     private static let userDefaultsKey = "factoryfloor.workspaceTabs"
+    // Accessed exclusively from the main thread (SwiftUI onChange/onAppear).
+    nonisolated(unsafe) private static var cache: [String: RestorableWorkspaceTab]?
 
+    @MainActor
     static func load(for workstreamID: UUID) -> RestorableWorkspaceTab? {
-        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-              let saved = try? JSONDecoder().decode([String: RestorableWorkspaceTab].self, from: data)
-        else { return nil }
-        return saved[workstreamID.uuidString]
+        loadCacheIfNeeded()
+        return cache?[workstreamID.uuidString]
     }
 
+    @MainActor
     static func save(_ tab: RestorableWorkspaceTab, for workstreamID: UUID) {
-        var saved: [String: RestorableWorkspaceTab] = [:]
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let existing = try? JSONDecoder().decode([String: RestorableWorkspaceTab].self, from: data)
-        {
-            saved = existing
+        loadCacheIfNeeded()
+        cache?[workstreamID.uuidString] = tab
+        persist()
+    }
+
+    @MainActor
+    private static func loadCacheIfNeeded() {
+        guard cache == nil else { return }
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+              let saved = try? JSONDecoder().decode([String: RestorableWorkspaceTab].self, from: data)
+        else {
+            cache = [:]
+            return
         }
-        saved[workstreamID.uuidString] = tab
-        guard let data = try? JSONEncoder().encode(saved) else { return }
+        cache = saved
+    }
+
+    @MainActor
+    private static func persist() {
+        guard let data = try? JSONEncoder().encode(cache ?? [:]) else { return }
         UserDefaults.standard.set(data, forKey: userDefaultsKey)
     }
 }
