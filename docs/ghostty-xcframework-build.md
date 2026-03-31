@@ -26,6 +26,8 @@ zig build -Demit-xcframework=true -Dxcframework-target=native -Doptimize=Release
 
 The xcframework is output to `macos/GhosttyKit.xcframework/`.
 
+Then copy `macos/GhosttyKit.xcframework/` to your project's `ghostty/macos/` directory.
+
 ## macOS 26 (Tahoe) Workaround
 
 On macOS 26+, Apple's XProtect content scanning blocks a deliberately malformed JPEG test file (`hippopotamus-bad-comment-length.jpeg`) in the `wuffs` image decoding dependency. This causes Zig's package manager to fail with:
@@ -46,9 +48,9 @@ This is not a file permissions issue. macOS scans file contents at the kernel le
 - Using the official Ghostty source tarball (it still fetches wuffs remotely)
 - Adding the terminal to Developer Tools in Privacy & Security
 
-### Fix: Use a local wuffs dependency with the blocked file replaced
+### Step 1: Patch wuffs and build with Zig
 
-1. **Download the Ghostty source tarball** (contains preprocessed deps, fewer fetch requirements):
+1. **Download the Ghostty source tarball**:
 
    ```bash
    cd /tmp
@@ -95,39 +97,78 @@ This is not a file permissions issue. macOS scans file contents at the kernel le
    },
    ```
 
-5. **Build the xcframework**:
+5. **Build** (the Ghostty.app step will fail — that's expected, we only need the libraries):
 
    ```bash
    rm -rf ~/.cache/zig
    cd /tmp/ghostty-1.3.1
    zig build -Demit-xcframework=true -Dxcframework-target=native -Doptimize=ReleaseFast
+   # Expect "150/153 steps succeeded; 1 failed" — the xcodebuild step fails
+   # but all the .a libraries are built successfully
    ```
 
-6. **Copy the result to the project** (arm64 only; sufficient for Apple Silicon development):
+### Step 2: Repack the library for Apple's linker
+
+Zig's `zig build` produces `libghostty.a` plus ~15 dependency `.a` files in `.zig-cache/`. These need to be combined into a single archive, and the archive must be repacked with Apple's `libtool` because Zig's ar format produces `.o` members that are not 8-byte aligned (which Apple's linker rejects).
+
+1. **Extract all .o files from all built archives, fix permissions, and repack**:
 
    ```bash
-   mkdir -p ~/Desktop/vibefloor/ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64
-   cp /tmp/ghostty-1.3.1/macos/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a \
-      ~/Desktop/vibefloor/ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64/libghostty.a
+   cd /tmp && rm -rf mega-repack && mkdir mega-repack && cd mega-repack
+
+   # Extract .o files from each library into uniquely-prefixed directories
+   for lib in /tmp/ghostty-1.3.1/.zig-cache/o/*/lib*.a; do
+     name=$(basename "$lib" .a)
+     mkdir -p "$name" && cd "$name"
+     ar x "$lib"
+     chmod 644 *.o 2>/dev/null
+     for f in *.o; do [ -f "$f" ] && mv "$f" "${name}_${f}"; done
+     cd /tmp/mega-repack
+   done
+
+   # Combine all .o files into one archive using Apple's libtool
+   find . -name '*.o' > /tmp/all-objects.txt
+   libtool -static -o /tmp/libghostty-final.a -filelist /tmp/all-objects.txt
    ```
 
-## Known Limitations
+2. **Verify the combined library has the required symbols**:
 
-- **arm64 only**: This workaround produces an arm64-only binary placed in the `macos-arm64_x86_64` directory to match the expected path. It works for development on Apple Silicon but is not a true universal binary.
-- **Ghostty version-specific**: The wuffs dependency URL and hash are tied to the Ghostty version. When updating the Ghostty submodule, you may need to repeat this process with the new URL from `pkg/wuffs/build.zig.zon`.
-- **macOS version-specific**: This workaround is only needed on macOS 26 (Tahoe) and later. On macOS 15 (Sequoia) and earlier, the standard build command works without modification.
+   ```bash
+   nm /tmp/libghostty-final.a | grep " T _ghostty_app_new"   # ghostty API
+   nm /tmp/libghostty-final.a | grep " T _FT_Activate_Size"  # FreeType
+   nm /tmp/libghostty-final.a | grep " T _zig_os_log_with_type"  # Zig runtime
+   ```
 
-## Verifying the Build
+### Step 3: Install into the project
 
 ```bash
-ls -la ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64/libghostty.a
-# Should show ~56MB file
+mkdir -p ~/Desktop/vibefloor/ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64
+cp /tmp/libghostty-final.a \
+   ~/Desktop/vibefloor/ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64/libghostty.a
 ```
 
-Then continue with the normal Factory Floor build:
+### Step 4: Build Factory Floor
 
 ```bash
 cd ~/Desktop/vibefloor
 xcodegen generate
 ./scripts/dev.sh build
+```
+
+## Known Limitations
+
+- **arm64 only**: This workaround produces an arm64-only binary. It works for development on Apple Silicon but is not a universal binary.
+- **Ghostty version-specific**: The wuffs dependency URL is tied to the Ghostty version. When updating the Ghostty submodule, repeat this process with the new URL from `pkg/wuffs/build.zig.zon`.
+- **macOS version-specific**: This workaround is only needed on macOS 26 (Tahoe) and later. On macOS 15 (Sequoia) and earlier, the standard build command works without modification.
+- **Zig archive alignment**: Zig's ar format does not 8-byte-align object file members. Apple's `ld` rejects these archives. The repack step (extracting .o files and re-archiving with `libtool`) fixes this.
+- **Build partially fails**: The `zig build` step fails at 150/153 (the xcodebuild step for Ghostty.app). This is expected — we only need the `.a` libraries, not the Ghostty app itself.
+
+## Verifying the Build
+
+```bash
+ls -lh ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64/libghostty.a
+# Should show ~188MB file
+
+nm ghostty/macos/GhosttyKit.xcframework/macos-arm64_x86_64/libghostty.a | grep " T _ghostty_app_new"
+# Should show the symbol
 ```
