@@ -1,8 +1,11 @@
 // ABOUTME: Workspace view with dynamic tabs for agent, terminals, and browsers.
 // ABOUTME: Info and Agent are always present; terminals and browsers are added on demand.
 
+import os
 import SwiftUI
 import WebKit
+
+private let logger = Logger(subsystem: "factoryfloor", category: "surface-cache")
 
 extension Notification.Name {
     static let terminalSurfaceClosed = Notification.Name("factoryfloor.terminalSurfaceClosed")
@@ -787,7 +790,58 @@ private struct AddTabButton: View {
 
 // MARK: - SingleTerminalView
 
-struct SingleTerminalView: NSViewRepresentable {
+struct SingleTerminalView: View {
+    let surfaceID: UUID
+    let workingDirectory: String
+    var command: String?
+    var isFocused: Bool = true
+    var environmentVars: [String: String] = [:]
+
+    @EnvironmentObject var surfaceCache: TerminalSurfaceCache
+
+    var body: some View {
+        if let failedCommand = surfaceCache.failedSurfaces[surfaceID] {
+            SurfaceErrorView(command: failedCommand) {
+                surfaceCache.retrySurface(for: surfaceID)
+            }
+        } else {
+            TerminalSurfaceView(
+                surfaceID: surfaceID,
+                workingDirectory: workingDirectory,
+                command: command,
+                isFocused: isFocused,
+                environmentVars: environmentVars
+            )
+        }
+    }
+}
+
+private struct SurfaceErrorView: View {
+    let command: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 36))
+                .foregroundStyle(.secondary)
+            Text("Terminal failed to start")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            Text(command)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .lineLimit(3)
+                .truncationMode(.middle)
+                .padding(.horizontal, 40)
+            Button("Retry", action: onRetry)
+                .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct TerminalSurfaceView: NSViewRepresentable {
     let surfaceID: UUID
     let workingDirectory: String
     var command: String?
@@ -848,6 +902,14 @@ final class TerminalSurfaceCache: ObservableObject {
     private var webViews: [UUID: WKWebView] = [:]
     /// Surface IDs that should respawn when closed (e.g., the agent).
     var respawnableIDs: Set<UUID> = []
+    /// Guards against concurrent respawns for the same surface ID.
+    private var respawning = Set<UUID>()
+    /// Surface IDs where creation failed, with the command that was attempted.
+    private(set) var failedSurfaces: [UUID: String] = [:]
+    /// Tracks when each surface was created, for detecting immediate process death.
+    private var creationTimes: [UUID: Date] = [:]
+    /// Surfaces that died within this interval after creation are treated as launch failures.
+    private static let healthCheckWindow: TimeInterval = 2.0
 
     struct SurfaceParams {
         let workingDirectory: String
@@ -887,7 +949,35 @@ final class TerminalSurfaceCache: ObservableObject {
         view.workstreamID = id
         surfaces[id] = view
         surfaceParams[id] = SurfaceParams(workingDirectory: workingDirectory, command: command, initialInput: initialInput, environmentVars: environmentVars)
+        if view.surface == nil {
+            logger.error("Surface creation failed for \(id) command=\(command ?? "<shell>")")
+            failedSurfaces[id] = command ?? "(default shell)"
+            objectWillChange.send()
+        } else {
+            creationTimes[id] = Date()
+        }
         return view
+    }
+
+    /// Retry creating a surface that previously failed.
+    func retrySurface(for id: UUID) {
+        guard let params = surfaceParams[id],
+              let app = TerminalApp.shared.app else { return }
+        logger.detailed("Retrying surface creation for \(id)")
+        if let view = surfaces.removeValue(forKey: id) {
+            view.destroy()
+        }
+        failedSurfaces.removeValue(forKey: id)
+        let view = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars)
+        view.workstreamID = id
+        surfaces[id] = view
+        if view.surface == nil {
+            logger.error("Surface retry failed for \(id)")
+            failedSurfaces[id] = params.command ?? "(default shell)"
+        } else {
+            creationTimes[id] = Date()
+        }
+        objectWillChange.send()
     }
 
     func webView(for id: UUID) -> WKWebView {
@@ -906,6 +996,8 @@ final class TerminalSurfaceCache: ObservableObject {
             view.destroy()
         }
         surfaceParams.removeValue(forKey: id)
+        failedSurfaces.removeValue(forKey: id)
+        creationTimes.removeValue(forKey: id)
     }
 
     func removeWorkstreamSurfaces(for workstreamID: UUID) {
@@ -928,17 +1020,54 @@ final class TerminalSurfaceCache: ObservableObject {
     private func handleSurfaceClosed(_ closedView: TerminalView) {
         guard let (id, _) = surfaces.first(where: { $0.value === closedView }) else { return }
 
+        // Check if the surface died immediately after creation (launch failure).
+        let diedImmediately: Bool
+        if let created = creationTimes[id] {
+            let age = Date().timeIntervalSince(created)
+            diedImmediately = age < Self.healthCheckWindow
+            if diedImmediately {
+                logger.error("Surface \(id) died after \(String(format: "%.1f", age))s, treating as launch failure")
+            }
+        } else {
+            diedImmediately = false
+        }
+
         if respawnableIDs.contains(id) {
-            // Agent: respawn the surface
+            // If the surface died immediately, show error state instead of respawning in a loop.
+            if diedImmediately {
+                let command = surfaceParams[id]?.command ?? "(default shell)"
+                failedSurfaces[id] = command
+                objectWillChange.send()
+                return
+            }
+
+            guard !respawning.contains(id) else {
+                logger.detailed("Skipping concurrent respawn for surface \(id)")
+                return
+            }
             guard let params = surfaceParams[id],
                   let app = TerminalApp.shared.app else { return }
+
+            respawning.insert(id)
             surfaces.removeValue(forKey: id)
             let newView = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars)
             newView.workstreamID = id
             surfaces[id] = newView
+            respawning.remove(id)
+            if newView.surface == nil {
+                logger.error("Respawn failed for surface \(id)")
+                failedSurfaces[id] = params.command ?? "(default shell)"
+            } else {
+                creationTimes[id] = Date()
+                logger.detailed("Respawned surface \(id)")
+            }
+            objectWillChange.send()
+        } else if diedImmediately {
+            // Terminal tab died immediately: show error instead of closing the tab.
+            let command = surfaceParams[id]?.command ?? "(default shell)"
+            failedSurfaces[id] = command
             objectWillChange.send()
         } else {
-            // Terminal/browser tabs: close the tab
             removeSurface(for: id)
             NotificationCenter.default.post(name: .terminalTabExited, object: id)
         }
