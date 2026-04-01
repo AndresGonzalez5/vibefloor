@@ -8,7 +8,7 @@ private let logger = Logger(subsystem: "factoryfloor", category: "vibe.symlinks"
 
 enum SymlinkCreator {
     /// Default directories to symlink if they exist in the source project.
-    static let defaultSymlinks = ["node_modules", ".terraform", "vendor"]
+    static let defaultSymlinks = [".terraform", "vendor"]
 
     /// Create symlinks in worktreeDir pointing to directories/files in sourceDir.
     /// Uses the config's symlink list if available, otherwise falls back to defaults.
