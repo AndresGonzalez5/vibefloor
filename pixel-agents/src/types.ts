@@ -6,6 +6,8 @@ export interface AgentEvent {
     | 'agentStatus'
     | 'agentToolStart'
     | 'agentToolDone'
+    | 'agentIdle'
+    | 'agentWaiting'
     | 'setupProgress';
   agentId: string;
   name?: string;

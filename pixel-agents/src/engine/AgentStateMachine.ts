@@ -2,7 +2,7 @@
 
 import type { Direction } from './SpriteEngine';
 
-export type AgentState = 'idle' | 'type' | 'read' | 'walk';
+export type AgentState = 'idle' | 'type' | 'read' | 'walk' | 'wait';
 
 // Animation frame sequences and timing per state
 const ANIM_FRAMES: Record<AgentState, number[]> = {
@@ -10,6 +10,7 @@ const ANIM_FRAMES: Record<AgentState, number[]> = {
   type: [3, 4],
   read: [5, 6],
   idle: [1],
+  wait: [1, 1, 0, 1],
 };
 
 const FRAME_DURATION: Record<AgentState, number> = {
@@ -17,6 +18,7 @@ const FRAME_DURATION: Record<AgentState, number> = {
   type: 0.3,
   read: 0.3,
   idle: 1.0,
+  wait: 0.8,
 };
 
 // Map tool names to agent states
@@ -32,8 +34,6 @@ const TOOL_STATE_MAP: Record<string, AgentState> = {
   NotebookEdit: 'type',
 };
 
-const IDLE_RETURN_DELAY = 0.5;
-
 export function toolToState(toolName: string): AgentState {
   return TOOL_STATE_MAP[toolName] ?? 'type';
 }
@@ -43,19 +43,8 @@ export class AgentStateMachine {
   direction: Direction = 'down';
   private frameIndex = 0;
   private frameTimer = 0;
-  private idleDelayTimer = -1; // negative means not counting down
 
   update(dt: number): void {
-    // Handle delayed return to idle
-    if (this.idleDelayTimer >= 0) {
-      this.idleDelayTimer -= dt;
-      if (this.idleDelayTimer < 0) {
-        this.state = 'idle';
-        this.frameIndex = 0;
-        this.frameTimer = 0;
-      }
-    }
-
     const frames = ANIM_FRAMES[this.state];
     if (frames.length <= 1) return;
 
@@ -68,7 +57,6 @@ export class AgentStateMachine {
   }
 
   transition(newState: AgentState): void {
-    this.idleDelayTimer = -1;
     this.state = newState;
     this.frameIndex = 0;
     this.frameTimer = 0;
@@ -77,10 +65,6 @@ export class AgentStateMachine {
     if (newState === 'type' || newState === 'read') {
       this.direction = 'down';
     }
-  }
-
-  scheduleIdle(): void {
-    this.idleDelayTimer = IDLE_RETURN_DELAY;
   }
 
   getCurrentFrame(): number {

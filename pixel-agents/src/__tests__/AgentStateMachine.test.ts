@@ -128,35 +128,38 @@ describe('AgentStateMachine', () => {
     });
   });
 
-  describe('scheduleIdle (return to idle after tool done)', () => {
-    it('returns to idle after delay', () => {
+  describe('wait state', () => {
+    it('transitions to wait state', () => {
       const sm = new AgentStateMachine();
-      sm.transition('type');
-      expect(sm.state).toBe('type');
-
-      sm.scheduleIdle();
-
-      // Not yet idle — delay is 0.5s
-      sm.update(0.3);
-      expect(sm.state).toBe('type');
-
-      // After enough time, should be idle
-      sm.update(0.3);
-      expect(sm.state).toBe('idle');
+      sm.transition('wait');
+      expect(sm.state).toBe('wait');
     });
 
-    it('cancels scheduled idle on new transition', () => {
+    it('advances frames for "wait" state (frames [1,1,0,1], duration 0.8)', () => {
       const sm = new AgentStateMachine();
+      sm.transition('wait');
+      expect(sm.getCurrentFrame()).toBe(1); // index 0
+
+      sm.update(0.8);
+      expect(sm.getCurrentFrame()).toBe(1); // index 1
+
+      sm.update(0.8);
+      expect(sm.getCurrentFrame()).toBe(0); // index 2
+
+      sm.update(0.8);
+      expect(sm.getCurrentFrame()).toBe(1); // index 3
+
+      sm.update(0.8);
+      expect(sm.getCurrentFrame()).toBe(1); // wraps to index 0
+    });
+
+    it('can transition from wait to type', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('wait');
+      expect(sm.state).toBe('wait');
+
       sm.transition('type');
-      sm.scheduleIdle();
-
-      sm.update(0.2);
-      // Transition to a new state before idle kicks in
-      sm.transition('read');
-      expect(sm.state).toBe('read');
-
-      sm.update(1.0); // well past the original delay
-      expect(sm.state).toBe('read'); // should NOT have gone to idle
+      expect(sm.state).toBe('type');
     });
   });
 });

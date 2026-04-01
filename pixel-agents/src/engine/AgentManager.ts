@@ -12,11 +12,13 @@ export interface Agent {
   stateMachine: AgentStateMachine;
   x: number;
   y: number;
+  lastEventTime: number; // timestamp of last event (performance.now())
 }
 
 const AGENT_SPACING = 160;
 const BASE_X = 80;
 const BASE_Y = 50;
+const SAFETY_TIMEOUT_MS = 30_000; // 30 seconds without events → force idle
 
 let nextPalette = 0;
 
@@ -37,6 +39,7 @@ export class AgentManager {
       stateMachine: new AgentStateMachine(),
       x: BASE_X + index * AGENT_SPACING,
       y: BASE_Y,
+      lastEventTime: performance.now(),
     };
     this.agents.set(id, agent);
     return agent;
@@ -47,8 +50,16 @@ export class AgentManager {
   }
 
   updateAll(dt: number): void {
+    const now = performance.now();
     for (const agent of this.agents.values()) {
       agent.stateMachine.update(dt);
+      // Safety timeout: if agent has been non-idle for >30s without events, force idle
+      if (
+        agent.stateMachine.state !== 'idle' &&
+        now - agent.lastEventTime > SAFETY_TIMEOUT_MS
+      ) {
+        agent.stateMachine.transition('idle');
+      }
     }
   }
 
@@ -75,8 +86,13 @@ export class AgentManager {
         break;
       }
       case 'agentToolStart': {
-        const agent = this.agents.get(event.agentId);
-        if (agent && event.tool) {
+        // Auto-create agent if it doesn't exist yet (hook events may arrive before agentCreated)
+        let agent = this.agents.get(event.agentId);
+        if (!agent) {
+          agent = this.createAgent(event.agentId, event.name ?? event.agentId, event.palette);
+        }
+        agent.lastEventTime = performance.now();
+        if (event.tool) {
           const newState: AgentState = toolToState(event.tool);
           agent.stateMachine.transition(newState);
         }
@@ -85,8 +101,27 @@ export class AgentManager {
       case 'agentToolDone': {
         const agent = this.agents.get(event.agentId);
         if (agent) {
-          agent.stateMachine.scheduleIdle();
+          agent.lastEventTime = performance.now();
+          agent.stateMachine.transition('idle');
         }
+        break;
+      }
+      case 'agentIdle': {
+        const agent = this.agents.get(event.agentId);
+        if (agent) {
+          agent.lastEventTime = performance.now();
+          agent.stateMachine.transition('idle');
+        }
+        break;
+      }
+      case 'agentWaiting': {
+        // Auto-create agent if it doesn't exist yet (same pattern as agentToolStart)
+        let agent = this.agents.get(event.agentId);
+        if (!agent) {
+          agent = this.createAgent(event.agentId, event.name ?? event.agentId, event.palette);
+        }
+        agent.lastEventTime = performance.now();
+        agent.stateMachine.transition('wait');
         break;
       }
       case 'agentStatus': {

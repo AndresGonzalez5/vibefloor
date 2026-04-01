@@ -182,16 +182,20 @@ struct PixelAgentsWebView: NSViewRepresentable {
         var webView: WKWebView?
         private var agentCount: Binding<Int>
         private var lastActivity: Binding<String>
-        private var transcriptWatcher: TranscriptWatcher?
+        private let projectDirectory: String
         private var webViewReady = false
         private var pendingEvents: [AgentEvent] = []
         private nonisolated(unsafe) var setupObserver: NSObjectProtocol?
 
         init(projectDirectory: String, agentCount: Binding<Int>, lastActivity: Binding<String>) {
+            self.projectDirectory = projectDirectory
             self.agentCount = agentCount
             self.lastActivity = lastActivity
             super.init()
-            setupTranscriptWatcher(projectDirectory: projectDirectory)
+            // Register with hook router so HTTP hook events reach this coordinator
+            HookEventRouter.shared.register(projectDir: projectDirectory) { [weak self] event in
+                self?.handleAgentEvent(event)
+            }
             setupObserver = NotificationCenter.default.addObserver(
                 forName: .asyncSetupStateChanged,
                 object: nil,
@@ -204,7 +208,7 @@ struct PixelAgentsWebView: NSViewRepresentable {
         }
 
         deinit {
-            transcriptWatcher?.stop()
+            HookEventRouter.shared.unregister(projectDir: projectDirectory)
             if let setupObserver {
                 NotificationCenter.default.removeObserver(setupObserver)
             }
@@ -271,14 +275,6 @@ struct PixelAgentsWebView: NSViewRepresentable {
             }
         }
 
-        private func setupTranscriptWatcher(projectDirectory: String) {
-            let watcher = TranscriptWatcher(projectDir: projectDirectory)
-            watcher.onEvent = { [weak self] event in
-                self?.handleAgentEvent(event)
-            }
-            transcriptWatcher = watcher
-        }
-
         private func handleAgentEvent(_ event: AgentEvent) {
             guard webViewReady else {
                 pendingEvents.append(event)
@@ -317,15 +313,15 @@ struct PixelAgentsWebView: NSViewRepresentable {
             case "ready":
                 logger.info("Pixel Agents WebView ready")
                 webViewReady = true
+                // Create main agent (palette 0, name "Claude")
+                sendAgentEvent(AgentEvent.created(agentId: "main", name: "Claude", palette: 0))
+                // Send config so JS knows theme, app name, version
+                sendConfig()
                 // Flush any events that arrived before the WebView was ready
                 for event in pendingEvents {
                     sendAgentEvent(event)
                 }
                 pendingEvents.removeAll()
-                // Send config so JS knows theme, app name, version
-                sendConfig()
-                // Start watching transcripts now that JS can receive events
-                transcriptWatcher?.start()
 
             case "requestConfig":
                 logger.info("WebView requested config")

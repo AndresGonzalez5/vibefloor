@@ -17,6 +17,8 @@ struct AgentEvent: Codable, Sendable {
         case agentStatus
         case agentToolStart
         case agentToolDone
+        case agentIdle
+        case agentWaiting
     }
 
     enum CodingKeys: String, CodingKey {
@@ -48,5 +50,13 @@ struct AgentEvent: Codable, Sendable {
 
     static func toolDone(agentId: String) -> AgentEvent {
         AgentEvent(type: .agentToolDone, agentId: agentId)
+    }
+
+    static func idle(agentId: String) -> AgentEvent {
+        AgentEvent(type: .agentIdle, agentId: agentId)
+    }
+
+    static func waiting(agentId: String) -> AgentEvent {
+        AgentEvent(type: .agentWaiting, agentId: agentId)
     }
 }

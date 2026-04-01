@@ -22,6 +22,7 @@ extension Notification.Name {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_: Notification) {
+        HookEventReceiver.shared.stop()
         let tmuxPath = ToolStatus.detect().tmux.path
         if let tmuxPath {
             TmuxSession.killAllSessions(tmuxPath: tmuxPath)
@@ -57,6 +58,19 @@ struct FF2App: App {
     @State private var pendingURLDirectory: String?
 
     init() {
+        // Start the hook event receiver and wire it to the router
+        HookEventReceiver.shared.onEvent = { projectDir, event in
+            HookEventRouter.shared.route(projectDir: projectDir, event: event)
+        }
+        HookEventReceiver.shared.start()
+
+        // Install ff-hook into ~/.claude/settings.json so Claude Code forwards events
+        if let hookURL = Bundle.main.url(forResource: "ff-hook", withExtension: nil, subdirectory: "Scripts") {
+            HookInstaller.install(hookScriptPath: hookURL.path)
+        } else if let hookURL = Bundle.main.url(forResource: "ff-hook", withExtension: nil) {
+            HookInstaller.install(hookScriptPath: hookURL.path)
+        }
+
         let crashReportingEnabled = UserDefaults.standard.object(forKey: "factoryfloor.crashReportingEnabled") as? Bool ?? true
         if crashReportingEnabled {
             SentrySDK.start { options in

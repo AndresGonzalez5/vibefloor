@@ -134,14 +134,39 @@ describe('AgentManager', () => {
       expect(agent!.stateMachine.state).toBe('walk');
     });
 
-    it('ignores events for unknown agent ids', () => {
-      // Should not throw
+    it('auto-creates agent on agentToolStart for unknown agent ids', () => {
       manager.handleEvent({
         type: 'agentToolStart',
         agentId: 'unknown',
         tool: 'Edit',
       });
-      expect(manager.size).toBe(0);
+      expect(manager.size).toBe(1);
+      const agent = manager.getAgent('unknown');
+      expect(agent).toBeDefined();
+      expect(agent!.stateMachine.state).toBe('type');
+    });
+
+    it('routes agentIdle event to transition to idle', () => {
+      manager.createAgent('a1', 'Alice');
+      manager.handleEvent({ type: 'agentToolStart', agentId: 'a1', tool: 'Edit' });
+      expect(manager.getAgent('a1')!.stateMachine.state).toBe('type');
+
+      manager.handleEvent({ type: 'agentIdle', agentId: 'a1' });
+      expect(manager.getAgent('a1')!.stateMachine.state).toBe('idle');
+    });
+
+    it('routes agentWaiting event to transition to wait', () => {
+      manager.createAgent('a1', 'Alice');
+      manager.handleEvent({ type: 'agentWaiting', agentId: 'a1' });
+      expect(manager.getAgent('a1')!.stateMachine.state).toBe('wait');
+    });
+
+    it('auto-creates agent on agentWaiting for unknown agent ids', () => {
+      manager.handleEvent({ type: 'agentWaiting', agentId: 'new-agent' });
+      expect(manager.size).toBe(1);
+      const agent = manager.getAgent('new-agent');
+      expect(agent).toBeDefined();
+      expect(agent!.stateMachine.state).toBe('wait');
     });
   });
 

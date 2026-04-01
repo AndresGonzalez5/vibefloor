@@ -92,6 +92,8 @@ targets:
         buildPhase: resources
       - path: Resources/Scripts/ff
         buildPhase: resources
+      - path: Resources/Scripts/ff-hook
+        buildPhase: resources
       - path: Resources/PixelAgents
         buildPhase: resources
         type: folder
