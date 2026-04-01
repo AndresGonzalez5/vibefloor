@@ -412,7 +412,7 @@ struct TerminalContainerView: View {
                 tabContent
             }
             Divider()
-            PixelAgentsPanelView(projectDirectory: projectDirectory)
+            PixelAgentsPanelView(projectDirectory: workingDirectory)
         }
         .onAppear {
             cachedClaudeCommand = buildClaudeCommand()

@@ -9,8 +9,9 @@ private let logger = Logger(subsystem: "factoryfloor", category: "transcript-wat
 /// Watches Claude Code JSONL transcripts and emits pixel agent events.
 ///
 /// Given a project working directory, it resolves the Claude project hash path,
-/// finds active session .jsonl files, and tails them for tool_use / tool_result records.
-/// Subagent transcripts are discovered automatically from the subagents/ subdirectory.
+/// finds the most recent active session .jsonl file, and tails it for tool_use / tool_result
+/// records. Subagent transcripts are discovered dynamically — only new subagent files that
+/// appear after watching starts will create pixel agent characters.
 final class TranscriptWatcher: @unchecked Sendable {
 
     /// Callback invoked on the main queue whenever an agent event is detected.
@@ -37,6 +38,14 @@ final class TranscriptWatcher: @unchecked Sendable {
     private var directorySource: DispatchSourceFileSystemObject?
     private var pollTimer: DispatchSourceTimer?
 
+    // The active session we're tracking (most recently modified .jsonl)
+    private var activeSessionId: String?
+    private var activeSessionDir: URL?
+
+    // Known subagent files at start — we only create pixel agents for NEW ones
+    private var initialSubagentFiles: Set<String> = []
+    private var hasRecordedInitialSubagents = false
+
     // Palette assignment for agents
     private var nextPalette = 0
     private var agentPalettes: [String: Int] = [:]
@@ -44,8 +53,16 @@ final class TranscriptWatcher: @unchecked Sendable {
     // Track active tools per agent to emit toolDone
     private var activeTools: [String: String] = [:]
 
+    // Track last event time per agent for idle timeout
+    private var lastEventTime: [String: Date] = [:]
+    private let idleTimeout: TimeInterval = 3.0
+
+    // Whether we've emitted the main Claude agent
+    private var mainAgentCreated = false
+
     private struct WatchedFile {
         var offset: UInt64
+        var agentId: String
         var fileSource: DispatchSourceFileSystemObject?
     }
 
@@ -84,9 +101,12 @@ final class TranscriptWatcher: @unchecked Sendable {
     // MARK: - Claude Project Path Resolution
 
     /// Converts a working directory path to the Claude project hash directory.
-    /// e.g. /Users/foo/Desktop/myproject → ~/.claude/projects/-Users-foo-Desktop-myproject/
+    /// Claude Code replaces both `/` and `.` with `-` in the path.
+    /// e.g. /Users/foo/.factoryfloor/worktrees/bar → ~/.claude/projects/-Users-foo--factoryfloor-worktrees-bar/
     static func resolveClaudeProjectPath(for directory: String) -> URL {
-        let sanitized = directory.replacingOccurrences(of: "/", with: "-")
+        let sanitized = directory
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ".", with: "-")
         let claudeDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/projects")
             .appendingPathComponent(sanitized)
@@ -96,91 +116,185 @@ final class TranscriptWatcher: @unchecked Sendable {
     // MARK: - Watching Setup
 
     private func setupWatching() {
-        // Ensure the claude projects directory exists
+        // Always show the main Claude agent — even before a session exists
+        emitMainAgentCreated()
+
         let dirPath = claudeProjectPath.path
-        guard FileManager.default.fileExists(atPath: dirPath) else {
-            logger.info("Claude project path does not exist yet: \(dirPath). Starting poll timer.")
-            startPollTimer()
-            return
+        logger.info("Looking for Claude transcripts at: \(dirPath)")
+
+        if FileManager.default.fileExists(atPath: dirPath) {
+            findAndWatchActiveSession()
+        } else {
+            logger.info("Claude project path does not exist yet — will poll until it appears.")
         }
 
-        attachDirectoryWatcher()
-        scanForTranscripts()
         startPollTimer()
     }
 
-    private func attachDirectoryWatcher() {
-        let dirPath = claudeProjectPath.path
-        let descriptor = open(dirPath, O_EVTONLY)
-        guard descriptor >= 0 else {
-            logger.warning("Cannot open directory for watching: \(dirPath)")
-            return
-        }
-
-        let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: descriptor,
-            eventMask: [.write, .extend, .rename],
-            queue: queue
-        )
-        source.setEventHandler { [weak self] in
-            self?.scanForTranscripts()
-        }
-        source.setCancelHandler {
-            close(descriptor)
-        }
-        directorySource = source
-        source.resume()
-    }
-
-    /// Poll timer as a fallback — DispatchSource doesn't always fire for nested changes.
+    /// Poll timer serves three purposes:
+    /// 1. Re-discover active session if a newer one appears
+    /// 2. Discover new subagent files
+    /// 3. Poll watched files for new content (DispatchSource doesn't always fire)
     private func startPollTimer() {
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + 2, repeating: 2.0)
+        timer.schedule(deadline: .now() + 1, repeating: 1.0)
         timer.setEventHandler { [weak self] in
-            self?.scanForTranscripts()
+            guard let self else { return }
+            // Re-check for newer session (handles session starts after app launch)
+            self.checkForNewerSession()
+            // Poll all watched files for new content
+            self.pollAllFiles()
+            // Check for new subagent files
+            self.scanForNewSubagents()
+            // Return idle agents that haven't had activity
+            self.checkIdleTimeouts()
         }
         pollTimer = timer
         timer.resume()
     }
 
-    // MARK: - Transcript Discovery
+    // MARK: - Active Session Discovery
 
-    private func scanForTranscripts() {
+    /// Checks if a newer session .jsonl has appeared and switches to it.
+    /// Also handles the case where the Claude project dir didn't exist at startup.
+    private func checkForNewerSession() {
+        let fm = FileManager.default
+        let dirPath = claudeProjectPath.path
+        guard fm.fileExists(atPath: dirPath) else {
+            // Directory might appear once Claude Code starts in this worktree
+            return
+        }
+        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return }
+
+        var latestDate: Date = .distantPast
+        var latestSessionId: String?
+
+        for entry in entries where entry.hasSuffix(".jsonl") {
+            let filePath = claudeProjectPath.appendingPathComponent(entry)
+            guard let attrs = try? fm.attributesOfItem(atPath: filePath.path),
+                  let modDate = attrs[.modificationDate] as? Date else { continue }
+            if modDate > latestDate {
+                latestDate = modDate
+                latestSessionId = String(entry.dropLast(6))
+            }
+        }
+
+        guard let newSessionId = latestSessionId else { return }
+
+        // If this is a different session than what we're watching, switch
+        if newSessionId != activeSessionId {
+            logger.info("Switching to newer session: \(newSessionId)")
+            // Stop watching old files (but keep the main Claude agent)
+            for (url, watched) in watchedFiles {
+                watched.fileSource?.cancel()
+                watchedFiles[url] = nil
+            }
+            // Reset subagent state
+            initialSubagentFiles.removeAll()
+            hasRecordedInitialSubagents = false
+            activeTools.removeAll()
+            // Remove any subagent pixel agents (keep main)
+            for (agentId, _) in agentPalettes where agentId != "main" {
+                emit(.removed(agentId: agentId))
+            }
+            agentPalettes = agentPalettes.filter { $0.key == "main" }
+
+            findAndWatchActiveSession()
+        }
+    }
+
+    /// Finds the most recently modified .jsonl file and watches it.
+    private func findAndWatchActiveSession() {
         let fm = FileManager.default
         let dirPath = claudeProjectPath.path
         guard fm.fileExists(atPath: dirPath) else { return }
+        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return }
 
-        // Find session directories (UUIDs) and their .jsonl files
-        guard let sessionDirs = try? fm.contentsOfDirectory(atPath: dirPath) else { return }
+        // Find the most recently modified .jsonl file
+        var latestDate: Date = .distantPast
+        var latestFile: URL?
+        var latestSessionId: String?
 
-        for entry in sessionDirs {
-            let entryPath = claudeProjectPath.appendingPathComponent(entry)
+        for entry in entries {
+            guard entry.hasSuffix(".jsonl") else { continue }
+            let filePath = claudeProjectPath.appendingPathComponent(entry)
+            guard let attrs = try? fm.attributesOfItem(atPath: filePath.path),
+                  let modDate = attrs[.modificationDate] as? Date else { continue }
 
-            // Top-level .jsonl file (the session itself)
-            if entry.hasSuffix(".jsonl") {
-                watchFileIfNew(entryPath, agentId: "main")
-                continue
+            if modDate > latestDate {
+                latestDate = modDate
+                latestFile = filePath
+                // Session ID is the filename without .jsonl
+                latestSessionId = String(entry.dropLast(6))
             }
+        }
 
-            // Session directory — check for subagents/
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: entryPath.path, isDirectory: &isDir), isDir.boolValue else { continue }
+        guard let sessionFile = latestFile, let sessionId = latestSessionId else {
+            logger.info("No JSONL session files found")
+            return
+        }
 
-            let subagentsDir = entryPath.appendingPathComponent("subagents")
-            guard fm.fileExists(atPath: subagentsDir.path) else { continue }
+        activeSessionId = sessionId
+        activeSessionDir = claudeProjectPath.appendingPathComponent(sessionId)
 
-            guard let subFiles = try? fm.contentsOfDirectory(atPath: subagentsDir.path) else { continue }
-            for subFile in subFiles {
-                if subFile.hasSuffix(".jsonl") {
-                    let agentId = String(subFile.dropLast(6)) // remove .jsonl
-                    let subPath = subagentsDir.appendingPathComponent(subFile)
-                    watchFileIfNew(subPath, agentId: agentId)
+        logger.info("Active session: \(sessionId) (modified: \(latestDate))")
 
-                    // Try to read the meta.json for the agent name
-                    let metaPath = subagentsDir.appendingPathComponent(subFile.replacingOccurrences(of: ".jsonl", with: ".meta.json"))
-                    emitAgentCreatedIfNew(agentId: agentId, metaPath: metaPath)
-                }
-            }
+        // Record existing subagent files so we don't create pixel agents for them
+        recordInitialSubagents()
+
+        // Watch the main session file
+        watchFileIfNew(sessionFile, agentId: "main")
+    }
+
+    /// Record which subagent files already exist — we only animate NEW ones
+    private func recordInitialSubagents() {
+        guard let sessionDir = activeSessionDir else { return }
+        let subagentsDir = sessionDir.appendingPathComponent("subagents")
+        let fm = FileManager.default
+
+        guard fm.fileExists(atPath: subagentsDir.path),
+              let files = try? fm.contentsOfDirectory(atPath: subagentsDir.path) else {
+            hasRecordedInitialSubagents = true
+            return
+        }
+
+        for file in files where file.hasSuffix(".jsonl") {
+            initialSubagentFiles.insert(file)
+        }
+        hasRecordedInitialSubagents = true
+        logger.info("Recorded \(self.initialSubagentFiles.count) existing subagent files (will ignore)")
+    }
+
+    // MARK: - Subagent Discovery
+
+    /// Check for new subagent .jsonl files that appeared since we started watching
+    private func scanForNewSubagents() {
+        guard hasRecordedInitialSubagents, let sessionDir = activeSessionDir else { return }
+
+        let subagentsDir = sessionDir.appendingPathComponent("subagents")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: subagentsDir.path),
+              let files = try? fm.contentsOfDirectory(atPath: subagentsDir.path) else { return }
+
+        for file in files where file.hasSuffix(".jsonl") {
+            // Skip files that existed before we started
+            guard !initialSubagentFiles.contains(file) else { continue }
+
+            let agentId = String(file.dropLast(6)) // remove .jsonl
+            let filePath = subagentsDir.appendingPathComponent(file)
+
+            // Only process if we haven't seen this file before
+            guard watchedFiles[filePath] == nil else { continue }
+
+            // This is a NEW subagent — create a pixel agent for it
+            let metaFile = file.replacingOccurrences(of: ".jsonl", with: ".meta.json")
+            let metaPath = subagentsDir.appendingPathComponent(metaFile)
+            emitSubagentCreated(agentId: agentId, metaPath: metaPath)
+
+            // Watch its transcript
+            watchFileIfNew(filePath, agentId: agentId)
+
+            logger.info("New subagent discovered: \(agentId)")
         }
     }
 
@@ -192,9 +306,9 @@ final class TranscriptWatcher: @unchecked Sendable {
         // Start from end of file (only watch new activity)
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? UInt64) ?? 0
 
-        var watched = WatchedFile(offset: fileSize, fileSource: nil)
+        var watched = WatchedFile(offset: fileSize, agentId: agentId, fileSource: nil)
 
-        // Attach FS event source
+        // Attach FS event source as primary notification
         let descriptor = open(url.path, O_EVTONLY)
         if descriptor >= 0 {
             let source = DispatchSource.makeFileSystemObjectSource(
@@ -203,7 +317,7 @@ final class TranscriptWatcher: @unchecked Sendable {
                 queue: queue
             )
             source.setEventHandler { [weak self] in
-                self?.readNewLines(from: url, agentId: agentId)
+                self?.readNewLines(from: url)
             }
             source.setCancelHandler {
                 close(descriptor)
@@ -213,23 +327,30 @@ final class TranscriptWatcher: @unchecked Sendable {
         }
 
         watchedFiles[url] = watched
-
-        // Emit main agent created for the primary session
-        if agentId == "main" {
-            emitMainAgentCreated()
-        }
-
         logger.info("Watching transcript: \(url.lastPathComponent) as \(agentId)")
     }
 
     // MARK: - Reading New Lines
 
-    private func readNewLines(from url: URL, agentId: String) {
+    /// Poll all watched files for new content — fallback when DispatchSource doesn't fire
+    private func pollAllFiles() {
+        for url in watchedFiles.keys {
+            readNewLines(from: url)
+        }
+    }
+
+    private func readNewLines(from url: URL) {
         guard var watched = watchedFiles[url] else { return }
 
         guard let handle = try? FileHandle(forReadingFrom: url) else { return }
         defer { try? handle.close() }
 
+        // Check if file has grown
+        handle.seekToEndOfFile()
+        let currentSize = handle.offsetInFile
+        guard currentSize > watched.offset else { return }
+
+        // Read new data
         handle.seek(toFileOffset: watched.offset)
         let data = handle.readDataToEndOfFile()
         guard !data.isEmpty else { return }
@@ -241,7 +362,7 @@ final class TranscriptWatcher: @unchecked Sendable {
 
         let lines = text.components(separatedBy: "\n")
         for line in lines where !line.isEmpty {
-            parseLine(line, agentId: agentId)
+            parseLine(line, agentId: watched.agentId)
         }
     }
 
@@ -273,6 +394,7 @@ final class TranscriptWatcher: @unchecked Sendable {
                 guard !toolName.hasPrefix("mcp__") && toolName != "Skill" && toolName != "ToolSearch" else { continue }
 
                 activeTools[agentId] = toolName
+                lastEventTime[agentId] = Date()
                 emit(.toolStart(agentId: agentId, tool: toolName))
             }
         }
@@ -286,6 +408,24 @@ final class TranscriptWatcher: @unchecked Sendable {
             // A tool_result means the previous tool finished
             if activeTools[agentId] != nil {
                 activeTools[agentId] = nil
+                lastEventTime[agentId] = Date()
+                emit(.toolDone(agentId: agentId))
+            }
+        }
+    }
+
+    // MARK: - Idle Timeout
+
+    /// If an agent has been active (tool running) for longer than idleTimeout
+    /// with no new events, emit toolDone to return it to idle.
+    private func checkIdleTimeouts() {
+        let now = Date()
+        for (agentId, tool) in activeTools {
+            guard let lastTime = lastEventTime[agentId] else { continue }
+            if now.timeIntervalSince(lastTime) > idleTimeout {
+                activeTools[agentId] = nil
+                lastEventTime[agentId] = nil
+                logger.debug("Idle timeout for \(agentId), was using \(tool)")
                 emit(.toolDone(agentId: agentId))
             }
         }
@@ -294,18 +434,19 @@ final class TranscriptWatcher: @unchecked Sendable {
     // MARK: - Agent Creation
 
     private func emitMainAgentCreated() {
+        guard !mainAgentCreated else { return }
+        mainAgentCreated = true
         let palette = assignPalette(for: "main")
         emit(.created(agentId: "main", name: "Claude", palette: palette))
     }
 
-    private func emitAgentCreatedIfNew(agentId: String, metaPath: URL) {
+    private func emitSubagentCreated(agentId: String, metaPath: URL) {
         guard agentPalettes[agentId] == nil else { return }
 
         var name = "Sub-agent"
         if let data = try? Data(contentsOf: metaPath),
            let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let desc = meta["description"] as? String {
-            // Use first ~20 chars of description as name
             name = String(desc.prefix(20))
         }
 

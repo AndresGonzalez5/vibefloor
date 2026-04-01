@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ABOUTME: Development convenience script for Factory Floor.
+# ABOUTME: Development convenience script for VibeFloor.
 # ABOUTME: Usage: ./scripts/dev.sh [build|run|test|clean]
 
 set -e
@@ -7,7 +7,7 @@ set -e
 PROJECT="FactoryFloor.xcodeproj"
 SCHEME="FactoryFloor"
 TEST_SCHEME="FactoryFloorTests"
-APP_NAME="Factory Floor Debug"
+APP_NAME="VibeFloor"
 BUILD_DIR="build/debug/derived"
 APP_PATH="$BUILD_DIR/Build/Products/Debug/$APP_NAME.app"
 SPM_CACHE="$HOME/Library/Caches/factoryfloor/spm"
@@ -62,11 +62,11 @@ case "${1:-build}" in
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
       OTHER_CODE_SIGN_FLAGS="--options=runtime" \
       build
-    echo "==> Release build at: $RELEASE_DIR/Build/Products/Release/Factory Floor.app"
+    echo "==> Release build at: $RELEASE_DIR/Build/Products/Release/VibeFloor.app"
     if [ "${2:-}" = "--run" ]; then
-      pkill -xf ".*/Contents/MacOS/Factory Floor" 2>/dev/null || true
+      pkill -xf ".*/Contents/MacOS/VibeFloor" 2>/dev/null || true
       sleep 0.5
-      open "$RELEASE_DIR/Build/Products/Release/Factory Floor.app"
+      open "$RELEASE_DIR/Build/Products/Release/VibeFloor.app"
     fi
     ;;
   clean)

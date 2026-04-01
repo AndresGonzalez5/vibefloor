@@ -33,11 +33,7 @@ enum AppConstants {
     }()
 
     static let appName: String = {
-        #if DEBUG
-            "Factory Floor Debug"
-        #else
-            "Factory Floor"
-        #endif
+        "VibeFloor"
     }()
 
     static let urlScheme: String = {

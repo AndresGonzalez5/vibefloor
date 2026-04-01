@@ -14,9 +14,9 @@ export interface Agent {
   y: number;
 }
 
-const AGENT_SPACING = 80;
-const BASE_X = 60;
-const BASE_Y = 100;
+const AGENT_SPACING = 160;
+const BASE_X = 80;
+const BASE_Y = 50;
 
 let nextPalette = 0;
 

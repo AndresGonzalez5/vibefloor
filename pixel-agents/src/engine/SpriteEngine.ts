@@ -28,16 +28,25 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+// Try to load an image; resolve to null if it fails (optional assets)
+function tryLoadImage(src: string): Promise<HTMLImageElement | null> {
+  return loadImage(src).catch(() => null);
+}
+
 export class SpriteEngine {
   private charSheets: Map<number, HTMLImageElement> = new Map();
-  private floorTile: HTMLImageElement | null = null;
-  private deskImage: HTMLImageElement | null = null;
-  private pcImage: HTMLImageElement | null = null;
   private loaded = false;
+
+  // Floor tiles
+  floorTiles: Map<number, HTMLImageElement> = new Map();
+
+  // Furniture images (keyed by name)
+  furniture: Map<string, HTMLImageElement> = new Map();
 
   async loadAll(): Promise<void> {
     if (this.loaded) return;
 
+    // Characters
     const charPromises: Promise<void>[] = [];
     for (let i = 0; i < PALETTE_COUNT; i++) {
       charPromises.push(
@@ -47,25 +56,51 @@ export class SpriteEngine {
       );
     }
 
-    const floorPromise = loadImage(assetPath('floors/floor_0.png')).then(
-      (img) => {
-        this.floorTile = img;
-      },
+    // Floor tiles (0-8)
+    const floorPromises: Promise<void>[] = [];
+    for (let i = 0; i <= 8; i++) {
+      floorPromises.push(
+        tryLoadImage(assetPath(`floors/floor_${i}.png`)).then((img) => {
+          if (img) this.floorTiles.set(i, img);
+        }),
+      );
+    }
+
+    // Furniture
+    const furnitureEntries: [string, string][] = [
+      ['desk_front', 'furniture/DESK/DESK_FRONT.png'],
+      ['desk_side', 'furniture/DESK/DESK_SIDE.png'],
+      ['pc_on', 'furniture/PC/PC_FRONT_ON_1.png'],
+      ['pc_side', 'furniture/PC/PC_SIDE.png'],
+      ['chair_front', 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_FRONT.png'],
+      ['chair_back', 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_BACK.png'],
+      ['chair_side', 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_SIDE.png'],
+      ['bookshelf', 'furniture/BOOKSHELF/BOOKSHELF.png'],
+      ['double_bookshelf', 'furniture/DOUBLE_BOOKSHELF/DOUBLE_BOOKSHELF.png'],
+      ['plant', 'furniture/PLANT/PLANT.png'],
+      ['large_plant', 'furniture/LARGE_PLANT/LARGE_PLANT.png'],
+      ['cactus', 'furniture/CACTUS/CACTUS.png'],
+      ['whiteboard', 'furniture/WHITEBOARD/WHITEBOARD.png'],
+      ['clock', 'furniture/CLOCK/CLOCK.png'],
+      ['coffee', 'furniture/COFFEE/COFFEE.png'],
+      ['bin', 'furniture/BIN/BIN.png'],
+      ['small_painting', 'furniture/SMALL_PAINTING/SMALL_PAINTING.png'],
+      ['large_painting', 'furniture/LARGE_PAINTING/LARGE_PAINTING.png'],
+      ['sofa_front', 'furniture/SOFA/SOFA_FRONT.png'],
+      ['pot', 'furniture/POT/POT.png'],
+      ['wall', 'walls/wall_0.png'],
+      // Fallback flat files from original location
+      ['desk_front_flat', 'furniture/DESK_FRONT.png'],
+      ['pc_on_flat', 'furniture/PC_FRONT_ON_1.png'],
+    ];
+
+    const furniturePromises = furnitureEntries.map(([key, path]) =>
+      tryLoadImage(assetPath(path)).then((img) => {
+        if (img) this.furniture.set(key, img);
+      }),
     );
 
-    const deskPromise = loadImage(assetPath('furniture/DESK_FRONT.png')).then(
-      (img) => {
-        this.deskImage = img;
-      },
-    );
-
-    const pcPromise = loadImage(
-      assetPath('furniture/PC_FRONT_ON_1.png'),
-    ).then((img) => {
-      this.pcImage = img;
-    });
-
-    await Promise.all([...charPromises, floorPromise, deskPromise, pcPromise]);
+    await Promise.all([...charPromises, ...floorPromises, ...furniturePromises]);
     this.loaded = true;
   }
 
@@ -73,16 +108,21 @@ export class SpriteEngine {
     return this.loaded;
   }
 
-  getFloorTile(): HTMLImageElement | null {
-    return this.floorTile;
+  getFloorTile(index = 0): HTMLImageElement | null {
+    return this.floorTiles.get(index) ?? null;
   }
 
+  getFurniture(name: string): HTMLImageElement | null {
+    return this.furniture.get(name) ?? null;
+  }
+
+  // Legacy getters for backward compatibility
   getDeskImage(): HTMLImageElement | null {
-    return this.deskImage;
+    return this.getFurniture('desk_front') ?? this.getFurniture('desk_front_flat');
   }
 
   getPcImage(): HTMLImageElement | null {
-    return this.pcImage;
+    return this.getFurniture('pc_on') ?? this.getFurniture('pc_on_flat');
   }
 
   drawCharacter(
@@ -124,10 +164,19 @@ export class SpriteEngine {
     x: number,
     y: number,
     zoom: number,
+    mirrored = false,
   ): void {
     ctx.imageSmoothingEnabled = false;
     const dw = image.width * zoom;
     const dh = image.height * zoom;
-    ctx.drawImage(image, x, y, dw, dh);
+    if (mirrored) {
+      ctx.save();
+      ctx.translate(x + dw, y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(image, 0, 0, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.drawImage(image, x, y, dw, dh);
+    }
   }
 }
