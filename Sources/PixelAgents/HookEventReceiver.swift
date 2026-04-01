@@ -274,7 +274,7 @@ final class HookEventReceiver: @unchecked Sendable {
             }
 
             logger.info("Hook SubagentStart: \(aid, privacy: .public) name=\(name, privacy: .public) palette=\(palette)")
-            return [AgentEvent.created(agentId: aid, name: name, palette: palette)]
+            return [AgentEvent.created(agentId: aid, name: name, palette: palette, parentAgentId: "main")]
 
         case "SubagentStop":
             let aid = agentId(from: eventInput)

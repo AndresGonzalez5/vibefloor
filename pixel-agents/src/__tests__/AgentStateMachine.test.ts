@@ -70,15 +70,15 @@ describe('AgentStateMachine', () => {
       expect(sm.state).toBe('walk');
     });
 
-    it('sets direction to "down" for type and read states', () => {
+    it('preserves direction for type and read states (seat facing determines direction)', () => {
       const sm = new AgentStateMachine();
       sm.direction = 'up';
       sm.transition('type');
-      expect(sm.direction).toBe('down');
+      expect(sm.direction).toBe('up');
 
       sm.direction = 'left';
       sm.transition('read');
-      expect(sm.direction).toBe('down');
+      expect(sm.direction).toBe('left');
     });
 
     it('does not change direction for walk state', () => {
@@ -160,6 +160,117 @@ describe('AgentStateMachine', () => {
 
       sm.transition('type');
       expect(sm.state).toBe('type');
+    });
+  });
+
+  describe('spawning state', () => {
+    it('transitions to spawning state', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('spawning');
+      expect(sm.state).toBe('spawning');
+    });
+
+    it('has static frame [1] with 1.0s duration', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('spawning');
+      expect(sm.getCurrentFrame()).toBe(1);
+      sm.update(1.0);
+      expect(sm.getCurrentFrame()).toBe(1); // single frame, no change
+    });
+
+    it('can transition from spawning to walk', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('spawning');
+      sm.transition('walk');
+      expect(sm.state).toBe('walk');
+    });
+  });
+
+  describe('despawning state', () => {
+    it('transitions to despawning state', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('despawning');
+      expect(sm.state).toBe('despawning');
+    });
+
+    it('has static frame [1] with 1.0s duration', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('despawning');
+      expect(sm.getCurrentFrame()).toBe(1);
+      sm.update(2.0);
+      expect(sm.getCurrentFrame()).toBe(1);
+    });
+  });
+
+  describe('wandering state', () => {
+    it('transitions to wandering state', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('wandering');
+      expect(sm.state).toBe('wandering');
+    });
+
+    it('uses walk frames [0, 1, 2, 1] at 0.15s', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('wandering');
+      expect(sm.getCurrentFrame()).toBe(0);
+
+      sm.update(0.15);
+      expect(sm.getCurrentFrame()).toBe(1);
+
+      sm.update(0.15);
+      expect(sm.getCurrentFrame()).toBe(2);
+
+      sm.update(0.15);
+      expect(sm.getCurrentFrame()).toBe(1);
+
+      sm.update(0.15);
+      expect(sm.getCurrentFrame()).toBe(0); // wraps
+    });
+  });
+
+  describe('briefing state', () => {
+    it('transitions to briefing state', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('briefing');
+      expect(sm.state).toBe('briefing');
+    });
+
+    it('has static frame [1] with 1.0s duration', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('briefing');
+      expect(sm.getCurrentFrame()).toBe(1);
+      sm.update(3.0);
+      expect(sm.getCurrentFrame()).toBe(1);
+    });
+
+    it('can transition from briefing to idle', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('briefing');
+      sm.transition('idle');
+      expect(sm.state).toBe('idle');
+    });
+  });
+
+  describe('reporting state', () => {
+    it('transitions to reporting state', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('reporting');
+      expect(sm.state).toBe('reporting');
+    });
+
+    it('has static frame [1] with 1.0s duration', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('reporting');
+      expect(sm.getCurrentFrame()).toBe(1);
+      sm.update(3.0);
+      expect(sm.getCurrentFrame()).toBe(1);
+    });
+
+    it('can transition from reporting to walk', () => {
+      const sm = new AgentStateMachine();
+      sm.transition('reporting');
+      sm.transition('walk');
+      expect(sm.state).toBe('walk');
     });
   });
 });

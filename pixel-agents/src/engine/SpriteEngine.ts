@@ -71,6 +71,7 @@ export class SpriteEngine {
       ['desk_front', 'furniture/DESK/DESK_FRONT.png'],
       ['desk_side', 'furniture/DESK/DESK_SIDE.png'],
       ['pc_on', 'furniture/PC/PC_FRONT_ON_1.png'],
+      ['pc_off', 'furniture/PC/PC_FRONT_OFF.png'],
       ['pc_side', 'furniture/PC/PC_SIDE.png'],
       ['chair_front', 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_FRONT.png'],
       ['chair_back', 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_BACK.png'],

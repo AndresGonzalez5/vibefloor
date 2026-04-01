@@ -10,6 +10,7 @@ struct AgentEvent: Codable, Sendable {
     var palette: Int?
     var tool: String?
     var status: String?
+    var parentAgentId: String?
 
     enum EventType: String, Codable, Sendable {
         case agentCreated
@@ -28,12 +29,13 @@ struct AgentEvent: Codable, Sendable {
         case palette
         case tool
         case status
+        case parentAgentId
     }
 
     // -- Factory methods --
 
-    static func created(agentId: String, name: String, palette: Int) -> AgentEvent {
-        AgentEvent(type: .agentCreated, agentId: agentId, name: name, palette: palette)
+    static func created(agentId: String, name: String, palette: Int, parentAgentId: String? = nil) -> AgentEvent {
+        AgentEvent(type: .agentCreated, agentId: agentId, name: name, palette: palette, parentAgentId: parentAgentId)
     }
 
     static func removed(agentId: String) -> AgentEvent {

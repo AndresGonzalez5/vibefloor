@@ -18,6 +18,10 @@ export interface AgentEvent {
   step?: string;
   progress?: number;
   done?: boolean;
+  // subagent fields
+  parentAgentId?: string;
+  // error bubble trigger
+  error?: boolean;
 }
 
 // Window augmentation for the vibefloor bridge

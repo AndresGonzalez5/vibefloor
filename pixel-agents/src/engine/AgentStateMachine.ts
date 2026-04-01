@@ -2,7 +2,7 @@
 
 import type { Direction } from './SpriteEngine';
 
-export type AgentState = 'idle' | 'type' | 'read' | 'walk' | 'wait';
+export type AgentState = 'idle' | 'type' | 'read' | 'walk' | 'wait' | 'spawning' | 'despawning' | 'wandering' | 'briefing' | 'reporting';
 
 // Animation frame sequences and timing per state
 const ANIM_FRAMES: Record<AgentState, number[]> = {
@@ -11,6 +11,11 @@ const ANIM_FRAMES: Record<AgentState, number[]> = {
   read: [5, 6],
   idle: [1],
   wait: [1, 1, 0, 1],
+  spawning: [1],
+  despawning: [1],
+  wandering: [0, 1, 2, 1],
+  briefing: [1],
+  reporting: [1],
 };
 
 const FRAME_DURATION: Record<AgentState, number> = {
@@ -19,6 +24,11 @@ const FRAME_DURATION: Record<AgentState, number> = {
   read: 0.3,
   idle: 1.0,
   wait: 0.8,
+  spawning: 1.0,
+  despawning: 1.0,
+  wandering: 0.15,
+  briefing: 1.0,
+  reporting: 1.0,
 };
 
 // Map tool names to agent states
@@ -61,10 +71,10 @@ export class AgentStateMachine {
     this.frameIndex = 0;
     this.frameTimer = 0;
 
-    // Set a sensible direction for desk activities
-    if (newState === 'type' || newState === 'read') {
-      this.direction = 'down';
-    }
+    // Don't override direction for desk activities — the seat's facing
+    // direction (set by OfficeLayout) determines which way the agent
+    // looks at the computer. The old hardcoded 'down' was wrong for
+    // the tile-based layout where desks are above chairs.
   }
 
   getCurrentFrame(): number {

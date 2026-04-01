@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react';
 import { SpriteEngine } from './engine/SpriteEngine';
 import { AgentManager } from './engine/AgentManager';
 import { OfficeRenderer } from './engine/OfficeRenderer';
+import { TileMap } from './engine/TileMap';
+import { OfficeLayout } from './engine/OfficeLayout';
 import { subscribe, unsubscribe } from './vibefloorBridge';
 import type { AgentEvent } from './types';
 
@@ -15,7 +17,13 @@ export default function PixelCanvas() {
     if (!canvas) return;
 
     const sprites = new SpriteEngine();
-    const agentManager = new AgentManager();
+
+    // Initialize tile-based layout system
+    const layout = new OfficeLayout();
+    const tileMap = new TileMap(layout.cols, layout.rows, layout.tileSize, layout.zoom);
+    layout.initBlockedTiles(tileMap);
+
+    const agentManager = new AgentManager(tileMap, layout);
     let renderer: OfficeRenderer | null = null;
 
     // Event handler for bridge events
@@ -31,7 +39,7 @@ export default function PixelCanvas() {
     // Initialize
     sprites.loadAll().then(() => {
       if (!canvas) return;
-      renderer = new OfficeRenderer(canvas, sprites, agentManager);
+      renderer = new OfficeRenderer(canvas, sprites, agentManager, tileMap, layout);
       renderer.start();
     });
 
