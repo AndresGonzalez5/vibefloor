@@ -97,6 +97,25 @@ export class AgentManager {
         }
         break;
       }
+      case 'setupProgress': {
+        const SETUP_ID = '__setup__';
+        if (event.done) {
+          const agent = this.agents.get(SETUP_ID);
+          if (agent) {
+            agent.stateMachine.transition('walk');
+            setTimeout(() => this.removeAgent(SETUP_ID), 1500);
+          }
+        } else {
+          if (!this.agents.has(SETUP_ID)) {
+            this.createAgent(SETUP_ID, 'Setup', 3);
+          }
+          const agent = this.agents.get(SETUP_ID)!;
+          // Alternate between type and read to look busy
+          const state = (event.progress ?? 0) > 0.5 ? 'read' : 'type';
+          agent.stateMachine.transition(state);
+        }
+        break;
+      }
     }
   }
 }
