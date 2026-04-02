@@ -31,6 +31,24 @@ case "${1:-build}" in
       open "$APP_PATH"
     fi
     ;;
+  full)
+    shift 2>/dev/null || true
+    echo "==> Building pixel-agents..."
+    (cd pixel-agents && npm run build)
+    echo "==> Building and running VibeFloor..."
+    xcodegen generate
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
+      -derivedDataPath "$BUILD_DIR" -clonedSourcePackagesDirPath "$SPM_CACHE" \
+      CURRENT_PROJECT_VERSION="$BRANCH" build
+    pkill -xf ".*/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+    sleep 0.5
+    if [ -n "${1:-}" ]; then
+      DIR=$(cd "$1" && pwd)
+      open "$APP_PATH" --args "$DIR"
+    else
+      open "$APP_PATH"
+    fi
+    ;;
   br)
     shift 2>/dev/null || true
     xcodegen generate
@@ -79,6 +97,7 @@ case "${1:-build}" in
     echo "  build    Build (debug)"
     echo "  run      Kill and relaunch (optionally with a directory)"
     echo "  br       Build and run"
+    echo "  full     Build pixel-agents, then build and run"
     echo "  test     Run tests"
     echo "  release  Build Release matching CI (hardened runtime)"
     echo "  release --run  Build and run Release"
