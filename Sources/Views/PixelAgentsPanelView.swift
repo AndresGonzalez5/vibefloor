@@ -185,6 +185,7 @@ struct PixelAgentsWebView: NSViewRepresentable {
         private let projectDirectory: String
         private var webViewReady = false
         private var pendingEvents: [AgentEvent] = []
+        private var pendingSetupState: AsyncSetupState?
         private nonisolated(unsafe) var setupObserver: NSObjectProtocol?
 
         init(projectDirectory: String, agentCount: Binding<Int>, lastActivity: Binding<String>) {
@@ -236,6 +237,12 @@ struct PixelAgentsWebView: NSViewRepresentable {
 
         /// Translates an `AsyncSetupState` into a `setupProgress` WebView event.
         private func sendSetupProgress(state: AsyncSetupState) {
+            guard webViewReady else {
+                // Store latest state so it can be flushed when WebView is ready
+                pendingSetupState = state
+                return
+            }
+
             let step: String
             let progress: Double
             let done: Bool
@@ -322,6 +329,11 @@ struct PixelAgentsWebView: NSViewRepresentable {
                     sendAgentEvent(event)
                 }
                 pendingEvents.removeAll()
+                // Flush pending setup progress (setup may have started before WebView loaded)
+                if let state = pendingSetupState {
+                    pendingSetupState = nil
+                    sendSetupProgress(state: state)
+                }
 
             case "requestConfig":
                 logger.info("WebView requested config")

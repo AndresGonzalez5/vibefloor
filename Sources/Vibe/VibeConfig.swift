@@ -16,7 +16,7 @@ struct VibeConfig: Codable, Sendable {
         var installCommand: [String] {
             switch self {
             case .npm: return ["npm", "ci", "--prefer-offline"]
-            case .yarn: return ["yarn", "install", "--frozen-lockfile", "--prefer-offline"]
+            case .yarn: return ["yarn", "install", "--immutable"]
             case .pnpm: return ["pnpm", "install", "--frozen-lockfile"]
             case .bun: return ["bun", "install", "--frozen-lockfile"]
             }

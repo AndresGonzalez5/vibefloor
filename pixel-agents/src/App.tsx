@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { initBridge, getRuntime } from './vibefloorBridge';
 import { startDevMode, stopDevMode } from './devMode';
 import PixelCanvas from './PixelCanvas';
-import SetupOverlay from './components/SetupOverlay';
 
 function App() {
   useEffect(() => {
@@ -23,7 +22,6 @@ function App() {
       }}
     >
       <PixelCanvas />
-      <SetupOverlay />
     </div>
   );
 }

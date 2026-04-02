@@ -153,11 +153,17 @@ actor AsyncSetupService {
 
         // Step 6: Install dependencies (longest step)
         await updateState(for: workstreamID, to: .inProgress(step: "Installing dependencies", progress: 0.7))
+        logger.warning("[SETUP-DEBUG] About to run DependencyInstaller.install in \(worktreePath, privacy: .public)")
         let installResult: DependencyInstaller.InstallResult? = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 let result = DependencyInstaller.install(in: worktreePath, config: config)
                 continuation.resume(returning: result)
             }
+        }
+        if let result = installResult {
+            logger.warning("[SETUP-DEBUG] Install result: success=\(result.success) output=\(result.output.prefix(200), privacy: .public) error=\(result.errorOutput.prefix(200), privacy: .public)")
+        } else {
+            logger.warning("[SETUP-DEBUG] Install returned nil (needsInstall=false or no package manager)")
         }
         if let result = installResult, !result.success {
             errors.append("Dependency install failed: \(result.errorOutput)")

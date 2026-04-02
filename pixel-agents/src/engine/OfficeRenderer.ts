@@ -319,36 +319,88 @@ export class OfficeRenderer {
   }
 
   private drawFloor(w: number, h: number): void {
-    const tile = this.sprites.getFloorTile(FLOOR_TILE_INDEX) ?? this.sprites.getFloorTile(0);
-    if (!tile) return;
-
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = false;
-    const tw = tile.width * ZOOM;
-    const th = tile.height * ZOOM;
+    const ts = TILE_SIZE * ZOOM; // tile size in pixels
 
-    for (let y = CONTENT_TOP; y < h; y += th) {
-      for (let x = 0; x < w; x += tw) {
-        ctx.drawImage(tile, x, y, tw, th);
+    if (this.layout) {
+      // Zone-based floor rendering: tile + color tint per zone
+      for (let row = 0; row < this.layout.rows; row++) {
+        for (let col = 0; col < this.layout.cols; col++) {
+          const tileIndex = this.layout.getFloorTileIndex(col, row);
+          const tile = this.sprites.getFloorTile(tileIndex) ?? this.sprites.getFloorTile(0);
+          if (!tile) continue;
+          const x = col * ts;
+          const y = CONTENT_TOP + row * ts;
+          ctx.drawImage(tile, x, y, ts, ts);
+
+          // Apply zone color tint overlay
+          const tint = this.layout.getFloorTint(col, row);
+          if (tint) {
+            ctx.fillStyle = tint;
+            ctx.fillRect(x, y, ts, ts);
+          }
+        }
+      }
+      // Fill any remaining space beyond the grid with default tile
+      const gridW = this.layout.cols * ts;
+      const gridH = this.layout.rows * ts;
+      const defaultTile = this.sprites.getFloorTile(FLOOR_TILE_INDEX) ?? this.sprites.getFloorTile(0);
+      if (defaultTile) {
+        const tw = defaultTile.width * ZOOM;
+        const th = defaultTile.height * ZOOM;
+        for (let y = CONTENT_TOP; y < h; y += th) {
+          for (let x = 0; x < w; x += tw) {
+            if (x < gridW && y < CONTENT_TOP + gridH) continue;
+            ctx.drawImage(defaultTile, x, y, tw, th);
+          }
+        }
+      }
+    } else {
+      // Legacy: single tile for entire floor
+      const tile = this.sprites.getFloorTile(FLOOR_TILE_INDEX) ?? this.sprites.getFloorTile(0);
+      if (!tile) return;
+      const tw = tile.width * ZOOM;
+      const th = tile.height * ZOOM;
+      for (let y = CONTENT_TOP; y < h; y += th) {
+        for (let x = 0; x < w; x += tw) {
+          ctx.drawImage(tile, x, y, tw, th);
+        }
       }
     }
   }
 
   private drawWallDecorations(_w: number): void {
     const ctx = this.ctx;
-    const clock = this.sprites.getFurniture('clock');
-    if (clock) {
-      this.sprites.drawFurniture(ctx, clock, 16, CONTENT_TOP - clock.height * ZOOM + 4, ZOOM);
-    }
+    const ts = TILE_SIZE * ZOOM;
 
-    // Large painting centered above boss desk area (col 7-8)
     if (this.tileMap) {
+      // Large painting above boss desk area (col 7-8)
       const largePainting = this.sprites.getFurniture('large_painting');
       if (largePainting) {
         const bossX = this.tileMap.tileToPixel(7, 0).x;
         this.sprites.drawFurniture(ctx, largePainting, bossX, CONTENT_TOP - largePainting.height * ZOOM + 4, ZOOM);
       }
+
+      // Clock on wall above meeting area (col 9)
+      const clock = this.sprites.getFurniture('clock');
+      if (clock) {
+        const clockX = 9 * ts + (ts - clock.width * ZOOM) / 2;
+        this.sprites.drawFurniture(ctx, clock, clockX, CONTENT_TOP - clock.height * ZOOM + 4, ZOOM);
+      }
+
+      // Small painting on right side of wall (col 10-11 area)
+      const smallPainting2 = this.sprites.getFurniture('small_painting_2') ?? this.sprites.getFurniture('small_painting');
+      if (smallPainting2) {
+        const paintX = 10 * ts;
+        this.sprites.drawFurniture(ctx, smallPainting2, paintX, CONTENT_TOP - smallPainting2.height * ZOOM + 6, ZOOM);
+      }
     } else {
+      // Legacy: single painting centered
+      const clock = this.sprites.getFurniture('clock');
+      if (clock) {
+        this.sprites.drawFurniture(ctx, clock, 16, CONTENT_TOP - clock.height * ZOOM + 4, ZOOM);
+      }
       const smallPainting = this.sprites.getFurniture('small_painting');
       if (smallPainting) {
         this.sprites.drawFurniture(ctx, smallPainting, 400 - (smallPainting.width * ZOOM) / 2, CONTENT_TOP - smallPainting.height * ZOOM + 4, ZOOM);
@@ -357,6 +409,8 @@ export class OfficeRenderer {
   }
 
   private drawFloorDecorations(w: number, _h: number): void {
+    // Legacy mode only — layout-driven mode places these as furniture items
+    if (this.layout) return;
     const ctx = this.ctx;
     const cactus = this.sprites.getFurniture('cactus');
     if (cactus) {

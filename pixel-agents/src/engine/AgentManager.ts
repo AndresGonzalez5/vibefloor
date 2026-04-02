@@ -48,7 +48,7 @@ export interface Agent {
   choreographyTimer: number;
   eventBuffer: AgentEvent[];
   parentAgentId: string | null;
-  pendingSubagent: { id: string; name: string; palette?: number; parentAgentId: string } | null;
+  pendingSubagent: { id: string; name: string; palette?: number; parentAgentId: string } | null; // deprecated, kept for type compat
 }
 
 const AGENT_SPACING = 160;
@@ -61,6 +61,7 @@ let nextPalette = 0;
 
 export class AgentManager {
   private agents: Map<string, Agent> = new Map();
+  private pendingRemovals: Set<string> = new Set();
   private tileMap: TileMap | null;
   private layout: OfficeLayout | null;
 
@@ -155,6 +156,13 @@ export class AgentManager {
     }
 
     this.agents.set(id, agent);
+
+    // Safety net: if removal arrived before creation, queue despawn after spawn
+    if (this.pendingRemovals.has(id)) {
+      this.pendingRemovals.delete(id);
+      agent.eventBuffer.push({ type: 'agentRemoved', agentId: id });
+    }
+
     return agent;
   }
 
@@ -230,7 +238,8 @@ export class AgentManager {
       }
 
       // Idle micro-behavior update (also runs during active micro-behaviors like fidget/headTurn)
-      if ((agent.stateMachine.state === 'idle' || agent.idleBehavior !== null) && !agent.choreographyActive && !agent.wanderState) {
+      // Setup agent stays at desk working — no idle/wander behaviors
+      if ((agent.stateMachine.state === 'idle' || agent.idleBehavior !== null) && !agent.choreographyActive && !agent.wanderState && agent.id !== '__setup__') {
         this.updateIdleBehavior(agent, dt);
       }
 
@@ -245,9 +254,10 @@ export class AgentManager {
       }
 
       // Safety timeout: if agent has been non-idle for >30s without events, force idle
-      // Does NOT apply to spawning/despawning/briefing/reporting states
+      // Does NOT apply to spawning/despawning/briefing/reporting states or the setup agent
       const nonTimeoutStates: AgentState[] = ['idle', 'walk', 'spawning', 'despawning', 'briefing', 'reporting'];
       if (
+        agent.id !== '__setup__' &&
         !nonTimeoutStates.includes(agent.stateMachine.state) &&
         now - agent.lastEventTime > SAFETY_TIMEOUT_MS
       ) {
@@ -328,7 +338,12 @@ export class AgentManager {
             agent.stateMachine.direction = seat.facing;
           }
         }
-        agent.stateMachine.transition('idle');
+        // Setup agent starts working immediately on arrival
+        if (agent.id === '__setup__') {
+          agent.stateMachine.transition('type');
+        } else {
+          agent.stateMachine.transition('idle');
+        }
       }
     } else {
       // Interpolate toward target
@@ -516,74 +531,14 @@ export class AgentManager {
   // --- Phase 4: Choreography ---
 
   private updateChoreography(agent: Agent, dt: number): void {
-    // Parent choreography: spawn subagent sequence
-    // Phase 1: walking to spawn area (handled by walkStep, check arrival)
-    if (agent.choreographyPhase === 1) {
-      // Walking to spawn area — wait for path completion
-      if (!agent.path) {
-        // Arrived at spawn area — spawn the subagent
-        agent.choreographyPhase = 2;
-        agent.choreographyTimer = 0;
-
-        // Spawn the pending subagent
-        if (agent.pendingSubagent) {
-          const sub = agent.pendingSubagent;
-          const subAgent = this.createAgent(sub.id, sub.name, sub.palette);
-          subAgent.parentAgentId = sub.parentAgentId;
-          agent.pendingSubagent = null;
-        }
-
-        // Show briefing bubble
-        agent.stateMachine.transition('briefing');
-        agent.bubbleState = BubbleRenderer.show('briefing', 1.5);
-      }
-    }
+    // Parent choreography: briefing bubble at desk (boss never leaves)
     // Phase 2: showing briefing bubble (wait for timer)
-    else if (agent.choreographyPhase === 2) {
+    if (agent.choreographyPhase === 2) {
       agent.choreographyTimer += dt;
       if (agent.choreographyTimer >= 1.5) {
-        // Walk back to seat
-        agent.choreographyPhase = 3;
-        if (this.tileMap && this.layout && agent.targetSeat !== null) {
-          const seat = this.layout.getSeats().find(s => s.id === agent.targetSeat);
-          if (seat) {
-            const returnPath = this.tileMap.findPath(
-              [agent.tileX, agent.tileY],
-              seat.chairTile,
-            );
-            if (returnPath.length > 1) {
-              agent.path = returnPath;
-              agent.pathIndex = 1;
-              agent.stateMachine.transition('walk');
-            } else {
-              // Already at seat
-              agent.choreographyPhase = 0;
-              agent.choreographyActive = false;
-              agent.stateMachine.transition('idle');
-              this.replayEventBuffer(agent);
-            }
-          }
-        } else {
-          agent.choreographyPhase = 0;
-          agent.choreographyActive = false;
-          agent.stateMachine.transition('idle');
-          this.replayEventBuffer(agent);
-        }
-      }
-    }
-    // Phase 3: walking back to seat (handled by walkStep, check arrival)
-    else if (agent.choreographyPhase === 3) {
-      if (!agent.path) {
-        // Arrived back at seat
+        // Briefing done — boss stays at desk
         agent.choreographyPhase = 0;
         agent.choreographyActive = false;
-        // Set facing direction from seat
-        if (this.layout && agent.targetSeat !== null) {
-          const seat = this.layout.getSeats().find(s => s.id === agent.targetSeat);
-          if (seat) {
-            agent.stateMachine.direction = seat.facing;
-          }
-        }
         agent.stateMachine.transition('idle');
         this.replayEventBuffer(agent);
       }
@@ -614,36 +569,10 @@ export class AgentManager {
     // Phase 12: despawning (handled by matrix effect in main loop)
   }
 
-  private startSubagentSpawnChoreography(parentAgent: Agent, subagentInfo: { id: string; name: string; palette?: number; parentAgentId: string }): void {
-    parentAgent.choreographyActive = true;
-    parentAgent.choreographyPhase = 1;
-    parentAgent.choreographyTimer = 0;
-    parentAgent.pendingSubagent = subagentInfo;
-
-    // Walk parent to spawn tile area
-    if (this.tileMap && this.layout) {
-      const spawnTile = this.layout.spawnTile;
-      // Walk to a tile adjacent to spawn (1 tile away)
-      const adjacentTile: TileCoord = [spawnTile[0] + 1, spawnTile[1]];
-      const walkable = this.tileMap.isWalkable(adjacentTile[0], adjacentTile[1]) ? adjacentTile : spawnTile;
-      const path = this.tileMap.findPath([parentAgent.tileX, parentAgent.tileY], walkable);
-      if (path.length > 1) {
-        parentAgent.path = path;
-        parentAgent.pathIndex = 1;
-        parentAgent.stateMachine.transition('walk');
-        parentAgent.choreographyTarget = walkable;
-      } else {
-        // Already near spawn, go directly to phase 2
-        parentAgent.choreographyPhase = 2;
-        parentAgent.choreographyTimer = 0;
-        // Spawn subagent immediately
-        const subAgent = this.createAgent(subagentInfo.id, subagentInfo.name, subagentInfo.palette);
-        subAgent.parentAgentId = subagentInfo.parentAgentId;
-        parentAgent.pendingSubagent = null;
-        parentAgent.stateMachine.transition('briefing');
-        parentAgent.bubbleState = BubbleRenderer.show('briefing', 1.5);
-      }
-    }
+  private startSubagentSpawnChoreography(_parentAgent: Agent, subagentInfo: { id: string; name: string; palette?: number; parentAgentId: string }): void {
+    // Create subagent immediately at spawn tile — boss stays at desk, no choreography
+    const subAgent = this.createAgent(subagentInfo.id, subagentInfo.name, subagentInfo.palette);
+    subAgent.parentAgentId = subagentInfo.parentAgentId;
   }
 
   private startSubagentDespawnChoreography(subagent: Agent): void {
@@ -652,6 +581,11 @@ export class AgentManager {
     subagent.choreographyActive = true;
 
     if (parentAgent && this.tileMap) {
+      // Ensure parent is at their desk before subagent walks over to report
+      if (parentAgent.wanderState) {
+        this.interruptWander(parentAgent);
+      }
+
       // Walk toward parent's seat (adjacent tile)
       const parentSeat = this.layout?.getSeat(parentAgent.id);
       if (parentSeat) {
@@ -696,6 +630,15 @@ export class AgentManager {
 
   private applyToolEvent(agent: Agent, event: AgentEvent): void {
     switch (event.type) {
+      case 'agentRemoved': {
+        // Deferred removal (arrived before agent was created)
+        if (agent.parentAgentId && this.tileMap) {
+          this.startSubagentDespawnChoreography(agent);
+        } else {
+          this.removeAgent(agent.id);
+        }
+        break;
+      }
       case 'agentToolStart': {
         agent.lastEventTime = performance.now();
         agent.idleTimer = 0;
@@ -782,6 +725,9 @@ export class AgentManager {
         if (agent && agent.parentAgentId && this.tileMap) {
           // Subagent removal: trigger reporting choreography
           this.startSubagentDespawnChoreography(agent);
+        } else if (!agent) {
+          // Agent not yet created (e.g. rapid spawn/stop) — remember for later
+          this.pendingRemovals.add(event.agentId);
         } else {
           this.removeAgent(event.agentId);
         }
@@ -830,7 +776,10 @@ export class AgentManager {
           agent.lastEventTime = performance.now();
           agent.idleTimer = 0;
           agent.stateMachine.transition('idle');
-          agent.bubbleState = BubbleRenderer.show(event.error ? 'error' : 'done', 1.5);
+          // Suppress done bubble for Agent tool — subagent reporting handles the visual
+          if (event.tool !== 'Agent') {
+            agent.bubbleState = BubbleRenderer.show(event.error ? 'error' : 'done', 1.5);
+          }
         }
         break;
       }
@@ -878,17 +827,43 @@ export class AgentManager {
         if (event.done) {
           const agent = this.agents.get(SETUP_ID);
           if (agent) {
-            agent.stateMachine.transition('walk');
-            setTimeout(() => this.removeAgent(SETUP_ID), 1500);
+            if (agent.parentAgentId && this.tileMap) {
+              // Report to boss via subagent despawn choreography
+              this.startSubagentDespawnChoreography(agent);
+            } else {
+              agent.stateMachine.transition('walk');
+              setTimeout(() => this.removeAgent(SETUP_ID), 1500);
+            }
           }
         } else {
           if (!this.agents.has(SETUP_ID)) {
-            this.createAgent(SETUP_ID, 'Setup', 3);
+            // Find boss agent to link setup as a subagent
+            const bossId = this.layout?.getSeats().find(s => s.isBoss && s.occupied)?.agentId ?? null;
+            const bossAgent = bossId ? this.agents.get(bossId) : null;
+
+            if (bossAgent && !bossAgent.choreographyActive) {
+              this.startSubagentSpawnChoreography(bossAgent, {
+                id: SETUP_ID,
+                name: 'Setup',
+                palette: 3,
+                parentAgentId: bossAgent.id,
+              });
+            } else {
+              const agent = this.createAgent(SETUP_ID, 'Setup', 3);
+              if (bossId) agent.parentAgentId = bossId;
+            }
           }
-          const agent = this.agents.get(SETUP_ID)!;
-          // Alternate between type and read to look busy
-          const state = (event.progress ?? 0) > 0.5 ? 'read' : 'type';
-          agent.stateMachine.transition(state);
+          const agent = this.agents.get(SETUP_ID);
+          if (agent) {
+            // Keep event time fresh so safety timeout doesn't force idle
+            agent.lastEventTime = performance.now();
+            // Only transition to work states once the agent is seated (not walking/spawning)
+            const isSeated = !agent.path || agent.pathIndex >= agent.path.length;
+            if (isSeated && !agent.matrixState) {
+              const state = (event.progress ?? 0) > 0.5 ? 'read' : 'type';
+              agent.stateMachine.transition(state);
+            }
+          }
         }
         break;
       }
