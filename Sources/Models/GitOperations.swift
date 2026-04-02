@@ -25,6 +25,44 @@ struct WorktreeInfo: Identifiable {
     }
 }
 
+struct WorktreeDetail {
+    struct FileChange: Identifiable {
+        enum Status: String {
+            case modified = "M"
+            case added = "A"
+            case deleted = "D"
+            case renamed = "R"
+            case untracked = "??"
+
+            var icon: String {
+                switch self {
+                case .modified: return "pencil"
+                case .added: return "plus"
+                case .deleted: return "minus"
+                case .renamed: return "arrow.right"
+                case .untracked: return "questionmark"
+                }
+            }
+        }
+
+        let status: Status
+        let path: String
+        let isStaged: Bool
+
+        var id: String { "\(isStaged ? "S" : "U")\(path)" }
+    }
+
+    struct UnmergedCommit: Identifiable {
+        let hash: String
+        let message: String
+
+        var id: String { hash }
+    }
+
+    let changes: [FileChange]
+    let unmergedCommits: [UnmergedCommit]
+}
+
 enum GitOperations {
     private static var gitPath: String? {
         CommandLineTools.path(for: "git")
@@ -174,6 +212,75 @@ enum GitOperations {
     static func hasUncommittedChanges(at path: String) -> Bool {
         guard let status = run(args: ["status", "--porcelain"], in: path) else { return false }
         return !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Get detailed changes and unmerged commits for a worktree.
+    static func worktreeDetail(at worktreePath: String, mainRepoPath: String) -> WorktreeDetail {
+        var changes: [WorktreeDetail.FileChange] = []
+
+        if let status = run(args: ["status", "--porcelain"], in: worktreePath) {
+            for line in status.components(separatedBy: "\n") where !line.isEmpty {
+                let trimmed = line
+                guard trimmed.count >= 3 else { continue }
+
+                let indexStatus = trimmed[trimmed.startIndex]
+                let workTreeStatus = trimmed[trimmed.index(after: trimmed.startIndex)]
+                let filePath = String(trimmed.dropFirst(3))
+
+                if indexStatus == "?" {
+                    changes.append(.init(status: .untracked, path: filePath, isStaged: false))
+                } else {
+                    if indexStatus != " " {
+                        let status = parseStatus(indexStatus)
+                        changes.append(.init(status: status, path: filePath, isStaged: true))
+                    }
+                    if workTreeStatus != " " {
+                        let status = parseStatus(workTreeStatus)
+                        changes.append(.init(status: status, path: filePath, isStaged: false))
+                    }
+                }
+            }
+        }
+
+        var commits: [WorktreeDetail.UnmergedCommit] = []
+        let baseBranch = defaultBranch(at: mainRepoPath)
+        if let log = run(args: ["log", "\(baseBranch)..HEAD", "--oneline"], in: worktreePath) {
+            for line in log.components(separatedBy: "\n") where !line.isEmpty {
+                let parts = line.split(separator: " ", maxSplits: 1)
+                guard parts.count == 2 else { continue }
+                commits.append(.init(hash: String(parts[0]), message: String(parts[1])))
+            }
+        }
+
+        return WorktreeDetail(changes: changes, unmergedCommits: commits)
+    }
+
+    /// Force-remove a git worktree by path, discarding uncommitted changes.
+    static func forceRemoveWorktreeByPath(worktreePath: String, projectPath: String) {
+        _ = run(args: ["worktree", "remove", "--force", worktreePath], in: projectPath)
+
+        let fm = FileManager.default
+        if fm.fileExists(atPath: worktreePath) {
+            try? fm.removeItem(atPath: worktreePath)
+            _ = run(args: ["worktree", "prune"], in: projectPath)
+        }
+    }
+
+    /// Discard all uncommitted changes: reset staged, checkout unstaged, clean untracked.
+    static func discardAllChanges(at path: String) {
+        _ = run(args: ["reset", "HEAD"], in: path)
+        _ = run(args: ["checkout", "--", "."], in: path)
+        _ = run(args: ["clean", "-fd"], in: path)
+    }
+
+    private static func parseStatus(_ char: Character) -> WorktreeDetail.FileChange.Status {
+        switch char {
+        case "M": return .modified
+        case "A": return .added
+        case "D": return .deleted
+        case "R": return .renamed
+        default: return .modified
+        }
     }
 
     /// List existing worktrees for a project with branch and dirty status.
