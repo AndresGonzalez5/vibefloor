@@ -40,6 +40,8 @@ enum CommandLineTools {
             "/usr/local/bin/\(name)",
             "/usr/bin/\(name)",
             "\(NSHomeDirectory())/.local/bin/\(name)",
+            "/run/current-system/sw/bin/\(name)",
+            "\(NSHomeDirectory())/.nix-profile/bin/\(name)",
         ]
 
         for location in knownLocations where isExecutable(location) {
@@ -75,7 +77,7 @@ enum CommandLineTools {
             let process = Process()
             let pipe = Pipe()
             process.executableURL = URL(fileURLWithPath: shell)
-            process.arguments = ["-lic", "echo $PATH"]
+            process.arguments = ["-lic", "printenv PATH"]
             process.standardOutput = pipe
             process.standardError = FileHandle.nullDevice
             do {
