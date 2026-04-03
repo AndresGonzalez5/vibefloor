@@ -272,10 +272,10 @@ struct TerminalContainerView: View {
         let scriptContent: String
         if useTmux, let tmuxPath = appEnv.toolStatus.tmux.path {
             let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: "agent")
-            scriptContent = TmuxSession.sourceableScript(tmuxPath: tmuxPath, sessionName: session, command: rawFallback, environmentVars: envVars)
+            scriptContent = "clear\n" + TmuxSession.sourceableScript(tmuxPath: tmuxPath, sessionName: session, command: rawFallback, environmentVars: envVars)
         } else {
             // `exit` after claude closes the shell, triggering surface respawn.
-            scriptContent = "\(rawFallback)\nexit"
+            scriptContent = "clear\n\(rawFallback)\nexit"
         }
         let scriptPath = AgentLaunchParams.writeScript(scriptContent, for: workstreamID)
         return AgentLaunchParams(command: nil, initialInput: "source \(CommandBuilder.shellQuote(scriptPath))\n")
