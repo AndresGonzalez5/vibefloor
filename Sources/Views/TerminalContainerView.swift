@@ -456,7 +456,13 @@ struct TerminalContainerView: View {
         .onChange(of: autoRenameBranch) { cachedAgentParams = buildClaudeCommand() }
         .onChange(of: workstreamName) { cachedAgentParams = buildClaudeCommand() }
         .onChange(of: appEnv.isDetecting) {
+            let hadParams = cachedAgentParams != nil
             cachedAgentParams = buildClaudeCommand()
+            // If the agent surface was created before params were ready (plain shell),
+            // destroy it so preloadSurfaces recreates it with the correct initialInput.
+            if !hadParams && cachedAgentParams != nil {
+                surfaceCache.removeSurface(for: claudeID)
+            }
             preloadSurfaces()
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in activeTab = .info }
