@@ -811,9 +811,9 @@ private struct AgentLaunchParams {
 
     /// Write a command to a temp script file, returning the path.
     static func writeScript(_ command: String, for workstreamID: UUID) -> String {
-        let dir = AppConstants.cacheDirectory.appendingPathComponent("agent-scripts")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let path = dir.appendingPathComponent("\(workstreamID.uuidString.lowercased()).sh").path
+        let path = AppConstants.agentScriptPath(for: workstreamID)
+        let dir = (path as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         try? command.write(toFile: path, atomically: true, encoding: .utf8)
         return path
     }
