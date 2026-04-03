@@ -70,6 +70,16 @@ enum DependencyInstaller {
         process.standardOutput = outPipe
         process.standardError = errPipe
 
+        // GUI apps inherit a minimal PATH from launchd. Inject the login shell
+        // PATH so that shebang-based tools (e.g. npm → #!/usr/bin/env node)
+        // can resolve their runtime.
+        let shell = CommandBuilder.userShell
+        if let shellPath = CommandLineTools.loginShellPath(shell: shell) {
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = shellPath
+            process.environment = env
+        }
+
         do {
             try process.run()
             process.waitUntilExit()

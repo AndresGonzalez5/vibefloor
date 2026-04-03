@@ -27,6 +27,15 @@ enum ShellCommand {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = errPipe
 
+        // GUI apps inherit a minimal PATH from launchd. Inject the login shell
+        // PATH so commands can find tools installed via version managers (nvm, etc.).
+        let shell = CommandBuilder.userShell
+        if let resolvedPath = CommandLineTools.loginShellPath(shell: shell) {
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = resolvedPath
+            process.environment = env
+        }
+
         do {
             try process.run()
             process.waitUntilExit()
