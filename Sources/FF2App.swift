@@ -29,7 +29,11 @@ extension Notification.Name {
     static let openExternalBrowser = Notification.Name("factoryfloor.openExternalBrowser")
     static let clearProjects = Notification.Name("factoryfloor.clearProjects")
     static let openExternalTerminal = Notification.Name("factoryfloor.openExternalTerminal")
-    static let switchToWorkstream = Notification.Name("factoryfloor.switchToWorkstream")
+    static let nextWorkstream = Notification.Name("factoryfloor.nextWorkstream")
+    static let prevWorkstream = Notification.Name("factoryfloor.prevWorkstream")
+    static let nextProject = Notification.Name("factoryfloor.nextProject")
+    static let prevProject = Notification.Name("factoryfloor.prevProject")
+    static let archiveWorkstream = Notification.Name("factoryfloor.archiveWorkstream")
 }
 
 @MainActor
@@ -263,29 +267,14 @@ struct FF2App: App {
                 Button("Toggle Sidebar") {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
-                .keyboardShortcut("s", modifiers: [.command, .control])
+                .keyboardShortcut("s", modifiers: [.command, .option])
 
                 Divider()
-
-                Button("Toggle Info") {
-                    NotificationCenter.default.post(name: .toggleInfo, object: nil)
-                }
-                .keyboardShortcut("i", modifiers: .command)
-
-                Button("Environment") {
-                    NotificationCenter.default.post(name: .toggleEnvironment, object: nil)
-                }
-                .keyboardShortcut("e", modifiers: .command)
-
-                Button("Rebuild Setup") {
-                    NotificationCenter.default.post(name: .rebuildSetup, object: nil)
-                }
-                .keyboardShortcut("r", modifiers: [.control, .shift])
 
                 Button("Start/Rerun") {
                     NotificationCenter.default.post(name: .rerunScript, object: nil)
                 }
-                .keyboardShortcut("s", modifiers: [.control, .shift])
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
 
                 Divider()
 
@@ -309,6 +298,28 @@ struct FF2App: App {
                 }
                 .keyboardShortcut("[", modifiers: [.command, .shift])
 
+                Button("Next Workstream") {
+                    NotificationCenter.default.post(name: .nextWorkstream, object: nil)
+                }
+                .keyboardShortcut("]", modifiers: .command)
+
+                Button("Previous Workstream") {
+                    NotificationCenter.default.post(name: .prevWorkstream, object: nil)
+                }
+                .keyboardShortcut("[", modifiers: .command)
+
+                Button("Next Project") {
+                    NotificationCenter.default.post(name: .nextProject, object: nil)
+                }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+
+                Button("Previous Project") {
+                    NotificationCenter.default.post(name: .prevProject, object: nil)
+                }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+
+                Divider()
+
                 Button("Address Bar") {
                     NotificationCenter.default.post(name: .focusAddressBar, object: nil)
                 }
@@ -322,12 +333,17 @@ struct FF2App: App {
                 Button("Open in External Browser") {
                     NotificationCenter.default.post(name: .openExternalBrowser, object: nil)
                 }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
+                .keyboardShortcut("b", modifiers: [.command, .option])
 
                 Button("Open in External Terminal") {
                     NotificationCenter.default.post(name: .openExternalTerminal, object: nil)
                 }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .keyboardShortcut("t", modifiers: [.command, .option])
+
+                Button("Archive Workstream") {
+                    NotificationCenter.default.post(name: .archiveWorkstream, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             // Contextual shortcuts (in menu but minimal labels)
             CommandGroup(after: .toolbar) {
@@ -336,10 +352,6 @@ struct FF2App: App {
                 ForEach(1 ... 9, id: \.self) { n in
                     Button("Switch to Tab \(n)") { NotificationCenter.default.post(name: .switchByNumber, object: n) }
                         .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
-                }
-                ForEach(1 ... 9, id: \.self) { n in
-                    Button("Switch to Workstream \(n)") { NotificationCenter.default.post(name: .switchToWorkstream, object: n) }
-                        .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .control)
                 }
             }
         }

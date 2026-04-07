@@ -556,10 +556,17 @@ struct TerminalContainerView: View {
         mainContent
             .onReceive(NotificationCenter.default.publisher(for: .switchByNumber)) { notification in
                 guard let n = notification.object as? Int, n >= 1 else { return }
-                // Cmd+1-9 maps to closeable tabs (terminals and browsers)
-                let customTabs = tabs.filter(\.isCloseable)
-                guard n <= customTabs.count else { return }
-                activeTab = customTabs[n - 1]
+                // Cmd+1-9 maps to all tabs in display order
+                guard n <= tabs.count else { return }
+                activeTab = tabs[n - 1]
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .nextTab)) { _ in
+                guard let currentIndex = tabs.firstIndex(of: activeTab) else { return }
+                activeTab = tabs[(currentIndex + 1) % tabs.count]
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .prevTab)) { _ in
+                guard let currentIndex = tabs.firstIndex(of: activeTab) else { return }
+                activeTab = tabs[(currentIndex - 1 + tabs.count) % tabs.count]
             }
             .onReceive(NotificationCenter.default.publisher(for: .terminalTabExited)) { notification in
                 guard let surfaceID = notification.object as? UUID else { return }

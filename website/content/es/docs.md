@@ -151,32 +151,34 @@ Factory Floor prioriza el teclado. Aquí está todo.
 | ⌘Shift+N | Nuevo proyecto |
 | ⌘, | Ajustes |
 | ⌘/ | Ayuda |
+| ⌘Option+S | Mostrar/ocultar barra lateral |
 
 #### Workstream {#workstream}
 
 | Atajo | Acción |
 |----------|--------|
-| ⌘Return | Foco en Coding Agent |
-| ⌘I | Panel de Info |
-| ⌘E | Environment |
-| ⌘T | Nuevo Terminal |
-| ⌘B | Nuevo navegador |
-| ⌘W | Cerrar tab |
-| ⌘L | Barra de direcciones (navegador) |
-| ⌘0 | Volver al proyecto |
 | ⌘1-9 | Cambiar tab |
 | ⌘Shift+[ | Tab anterior |
 | ⌘Shift+] | Tab siguiente |
-| Ctrl+Shift+R | Reconstruir setup |
-| Ctrl+Shift+S | Iniciar/reiniciar run |
+| ⌘Return | Foco en Coding Agent |
+| ⌘T | Nuevo Terminal |
+| ⌘B | Nuevo navegador |
+| ⌘W | Cerrar tab |
+| ⌘Shift+W | Archivar workstream |
+| ⌘L | Barra de direcciones (navegador) |
+| ⌘Shift+Return | Iniciar/reiniciar run |
 
 #### Navegación {#navigation-1}
 
 | Atajo | Acción |
 |----------|--------|
-| Ctrl+1-9 | Cambiar workstream (desde cualquier vista) |
-| ⌘Shift+O | Abrir en navegador externo |
-| ⌘Shift+E | Abrir en terminal externo |
+| ⌘[ | Workstream anterior |
+| ⌘] | Workstream siguiente |
+| ⌘↑ | Proyecto anterior |
+| ⌘↓ | Proyecto siguiente |
+| ⌘0 | Volver al proyecto |
+| ⌘Option+B | Abrir en navegador externo |
+| ⌘Option+T | Abrir en terminal externo |
 
 ---
 

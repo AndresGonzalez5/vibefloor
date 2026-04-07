@@ -165,19 +165,21 @@ When adding, removing, or changing keyboard shortcuts:
 5. Update website shortcuts section
 
 Current shortcuts:
+- **Cmd+1-9**: Switch tab (all tabs in display order)
+- **Cmd+Shift+[/]**: Cycle tabs
 - **Cmd+Return**: Focus Coding Agent
-- **Cmd+I**: Info panel
-- **Cmd+E**: Environment
 - **Cmd+T**: New Terminal
 - **Cmd+B**: New Browser
 - **Cmd+W**: Close tab
+- **Cmd+Shift+W**: Archive workstream
 - **Cmd+L**: Address bar (browser)
+- **Cmd+Shift+Return**: Start/Rerun
+- **Cmd+[/]**: Cycle workstreams
+- **Cmd+Up/Down**: Cycle projects
 - **Cmd+0**: Back to project
-- **Cmd+1-9**: Switch tab (custom tabs only; Info=Cmd+I, Agent=Cmd+Return)
-- **Ctrl+1-9**: Switch workstream (works from any view in a project)
-- **Cmd+Shift+[/]**: Cycle tabs
-- **Cmd+Shift+O**: External browser
-- **Cmd+Shift+E**: External terminal
+- **Cmd+Option+S**: Toggle sidebar
+- **Cmd+Option+B**: External browser
+- **Cmd+Option+T**: External terminal
 - **Cmd+/**: Help
 
 ## Naming

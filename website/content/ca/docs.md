@@ -151,32 +151,34 @@ Factory Floor prioritza el teclat. Aquí tens tot.
 | ⌘Shift+N | Nou projecte |
 | ⌘, | Configuració |
 | ⌘/ | Ajuda |
+| ⌘Option+S | Commuta barra lateral |
 
 #### Workstream {#workstream}
 
 | Drecera | Acció |
 |----------|--------|
-| ⌘Return | Focus Coding Agent |
-| ⌘I | Panell Info |
-| ⌘E | Environment |
-| ⌘T | Nou Terminal |
-| ⌘B | Nou navegador |
-| ⌘W | Tanca tab |
-| ⌘L | Barra d'adreces (navegador) |
-| ⌘0 | Torna al projecte |
 | ⌘1-9 | Canvia de tab |
 | ⌘Shift+[ | Tab anterior |
 | ⌘Shift+] | Tab següent |
-| Ctrl+Shift+R | Reconstrueix setup |
-| Ctrl+Shift+S | Inicia/reinicia run |
+| ⌘Return | Focus Coding Agent |
+| ⌘T | Nou Terminal |
+| ⌘B | Nou navegador |
+| ⌘W | Tanca tab |
+| ⌘Shift+W | Arxiva workstream |
+| ⌘L | Barra d'adreces (navegador) |
+| ⌘Shift+Return | Inicia/reinicia run |
 
 #### Navegació {#navigation-1}
 
 | Drecera | Acció |
 |----------|--------|
-| Ctrl+1-9 | Canvia de workstream (des de qualsevol vista) |
-| ⌘Shift+O | Obre al navegador extern |
-| ⌘Shift+E | Obre al terminal extern |
+| ⌘[ | Workstream anterior |
+| ⌘] | Workstream següent |
+| ⌘↑ | Projecte anterior |
+| ⌘↓ | Projecte següent |
+| ⌘0 | Torna al projecte |
+| ⌘Option+B | Obre al navegador extern |
+| ⌘Option+T | Obre al terminal extern |
 
 ---
 
