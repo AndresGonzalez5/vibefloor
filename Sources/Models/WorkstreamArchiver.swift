@@ -31,13 +31,19 @@ enum WorkstreamArchiver {
         if let ws = project.workstreams.first(where: { $0.id == workstreamID }) {
             let projectDir = project.directory
             let worktreeDir = ws.worktreePath ?? projectDir
-            let standardizedPath = URL(fileURLWithPath: worktreeDir).standardizedFileURL.path
+            let standardizedPath = URL(fileURLWithPath: worktreeDir).standardizedFileURL.path  // archiver stores its own copy (worktree may not exist as WorktreeInfo)
             let wsName = ws.name
             let projName = project.name
             // Evict pixel agents cache entry for this workstream's working directory
             pixelAgentsCache?.removeEntry(for: worktreeDir)
             archivingPaths.insert(standardizedPath)
             Task.detached {
+                defer {
+                    Task { @MainActor in
+                        archivingPaths.remove(standardizedPath)
+                        NotificationCenter.default.post(name: archivingDidComplete, object: nil)
+                    }
+                }
                 ScriptConfig.runTeardown(in: worktreeDir, projectDirectory: projectDir)
                 GitOperations.removeWorktree(projectPath: projectDir, workstreamName: wsName, projectName: projName)
                 if let tmuxPath {
@@ -45,10 +51,6 @@ enum WorkstreamArchiver {
                 }
                 // Clean up the agent launch script for this workstream.
                 try? FileManager.default.removeItem(atPath: AppConstants.agentScriptPath(for: workstreamID))
-                await MainActor.run {
-                    archivingPaths.remove(standardizedPath)
-                    NotificationCenter.default.post(name: archivingDidComplete, object: nil)
-                }
             }
         }
         surfaceCache.removeWorkstreamSurfaces(for: workstreamID)

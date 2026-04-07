@@ -146,9 +146,7 @@ struct ProjectOverviewView: View {
                 if !worktrees.isEmpty {
                     Section {
                         ForEach(worktrees) { wt in
-                            let isArchiving = WorkstreamArchiver.archivingPaths.contains(
-                                URL(fileURLWithPath: wt.path).standardizedFileURL.path
-                            )
+                            let isArchiving = WorkstreamArchiver.archivingPaths.contains(wt.standardizedPath)
                             if wt.isMain || isArchiving {
                                 WorktreeInfoRow(worktree: wt, isArchiving: isArchiving)
                             } else {
@@ -262,7 +260,7 @@ struct ProjectOverviewView: View {
     private var prunableCount: Int {
         worktrees.filter { wt in
             !wt.isMain && !wt.isDirty
-                && !WorkstreamArchiver.archivingPaths.contains(URL(fileURLWithPath: wt.path).standardizedFileURL.path)
+                && !WorkstreamArchiver.archivingPaths.contains(wt.standardizedPath)
         }.count
     }
 

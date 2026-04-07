@@ -23,6 +23,10 @@ struct WorktreeInfo: Identifiable {
     var id: String {
         path
     }
+
+    var standardizedPath: String {
+        URL(fileURLWithPath: path).standardizedFileURL.path
+    }
 }
 
 struct WorktreeDetail {
