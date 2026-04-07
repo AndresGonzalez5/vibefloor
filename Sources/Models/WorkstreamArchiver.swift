@@ -50,14 +50,16 @@ enum WorkstreamArchiver {
             let projName = project.name
             archivingPaths.insert(standardizedPath)
             Task.detached {
+                defer {
+                    Task { @MainActor in
+                        archivingPaths.remove(standardizedPath)
+                        NotificationCenter.default.post(name: archivingDidComplete, object: nil)
+                    }
+                }
                 ScriptConfig.runTeardown(in: worktreePath, projectDirectory: projectDir)
                 GitOperations.removeWorktree(projectPath: projectDir, worktreePath: worktreePath)
                 if let tmuxPath {
                     TmuxSession.killWorkstreamSessions(tmuxPath: tmuxPath, project: projName, workstream: wsName)
-                }
-                await MainActor.run {
-                    archivingPaths.remove(standardizedPath)
-                    NotificationCenter.default.post(name: archivingDidComplete, object: nil)
                 }
             }
         }
