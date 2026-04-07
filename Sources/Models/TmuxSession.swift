@@ -60,7 +60,7 @@ enum TmuxSession {
     /// Dedicated socket name so we don't interfere with the user's tmux.
     private static let socketName = AppConstants.appID
 
-    static func wrapCommand(tmuxPath: String, sessionName: String, command: String?, environmentVars: [String: String] = [:], shell: String = CommandBuilder.userShell) -> String {
+    static func wrapCommand(tmuxPath: String, sessionName: String, command: String?, environmentVars: [String: String] = [:], respawnOnExit: Bool = false, shell: String = CommandBuilder.userShell) -> String {
         let socket = shellEscape(socketName)
         let conf = shellEscape(configPath)
         let escaped = shellEscape(sessionName)
@@ -76,12 +76,20 @@ enum TmuxSession {
             // Command is already shell-quoted by the caller (runScriptCommand/scriptCommand)
             tmuxCmd += " \(command)"
         }
+        if respawnOnExit {
+            tmuxCmd += " \\; set-hook pane-died 'respawn-pane'"
+        }
 
         // Use login shell for proper PATH, with inner sh for POSIX syntax.
+        // Both the sh -c argument and the outer login shell argument use
+        // Fish-aware quoting when Fish is the shell.
         let setup = serverSetupCommand(tmuxPath: tmuxPath, configPath: configPath)
-        let posixCmd = shellEscape("\(setup); exec \(tmuxCmd)")
-        let shCmd = "exec sh -c \(posixCmd)"
-        return "\(shell) -lic \(shellEscape(shCmd))"
+        let innerCmd = "\(setup); exec \(tmuxCmd)"
+        let shArgQuote = CommandBuilder.isFish(shell)
+            ? CommandBuilder.shellQuote(innerCmd, forShell: shell)
+            : shellEscape(innerCmd)
+        let shCmd = "exec sh -c \(shArgQuote)"
+        return "\(shell) -lic \(CommandBuilder.shellQuote(shCmd, forShell: shell))"
     }
 
     /// Build a script that can be `source`d directly into an interactive shell (zsh).
@@ -178,9 +186,8 @@ enum TmuxSession {
         let socket = shellEscape(socketName)
         let conf = shellEscape(configPath)
         let logFile = shellEscape(stderrLogPath)
-        let startServer = "\(tmuxPath) -L \(socket) start-server 2>>\(logFile) || true"
+        let startServer = "\(tmuxPath) -L \(socket) -f \(conf) start-server 2>>\(logFile) || true"
         let sourceFile = "\(tmuxPath) -L \(socket) source-file \(conf) 2>>\(logFile)"
-        let clearPaneDiedHook = "\(tmuxPath) -L \(socket) set-hook -gu pane-died 2>>\(logFile) || true"
-        return "\(startServer); \(sourceFile); \(clearPaneDiedHook)"
+        return "\(startServer); \(sourceFile)"
     }
 }

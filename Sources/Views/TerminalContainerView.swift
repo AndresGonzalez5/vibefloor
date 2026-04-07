@@ -166,6 +166,8 @@ struct TerminalContainerView: View {
     @AppStorage("factoryfloor.tmuxMode") private var tmuxMode: Bool = false
     @AppStorage("factoryfloor.agentTeams") private var agentTeams: Bool = false
     @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
+    @AppStorage("factoryfloor.allowOutsideWorktree") private var allowOutsideWorktree: Bool = false
+    @AppStorage("factoryfloor.quickActionDebug") private var quickActionDebug: Bool = false
     @State private var activeTab: WorkspaceTab = .info
     @State private var tabs: [WorkspaceTab] = [.info, .agent]
     @State private var terminalCount = 0
@@ -173,12 +175,11 @@ struct TerminalContainerView: View {
     @State private var scriptConfig: ScriptConfig = .empty
     @State private var browserTitles: [UUID: String] = [:]
     @State private var terminalTitles: [UUID: String] = [:]
-    @State private var cachedAgentParams: AgentLaunchParams?
+    @State private var cachedClaudeCommand: String?
     @State private var draggedCustomTab: WorkspaceTab?
     @StateObject private var portDetector: PortDetector
     @State private var runStoppedManually = false
     @State private var runStarted = false
-
     init(workstreamID: UUID, workingDirectory: String, projectDirectory: String, projectName: String, workstreamName: String, bypassPermissions: Bool) {
         self.workstreamID = workstreamID
         self.workingDirectory = workingDirectory
@@ -191,6 +192,10 @@ struct TerminalContainerView: View {
 
     private var claudeID: UUID {
         workstreamID
+    }
+
+    private var quickActionRunner: QuickActionRunner {
+        surfaceCache.quickActionRunner(for: workstreamID)
     }
 
     /// Surface IDs that should be rendering for the active tab.
@@ -221,10 +226,11 @@ struct TerminalContainerView: View {
     }
 
     private var portSubtitle: String {
+        let label = appEnv.taskDescription(for: workingDirectory) ?? projectName
         if let port = portDetector.selectedPort {
-            return "localhost:\(port) · \u{2318}B for browser"
+            return "\(label) · localhost:\(port) · \u{2318}B for browser"
         }
-        return projectName
+        return label
     }
 
     private var browserDefaultURL: String {
@@ -237,9 +243,18 @@ struct TerminalContainerView: View {
         return appEnv.githubPR(for: projectDirectory, branch: branch)
     }
 
-    private func buildClaudeCommand() -> AgentLaunchParams? {
+    private func buildClaudeCommand() -> String? {
         guard let basePath = appEnv.toolStatus.claude.path else { return nil }
         let sessionID = workstreamID.uuidString.lowercased()
+
+        var systemPromptParts: [String] = []
+        if !allowOutsideWorktree {
+            systemPromptParts.append(SystemPrompts.restrictToWorktreePrompt(worktreePath: workingDirectory))
+        }
+        if autoRenameBranch {
+            systemPromptParts.append(SystemPrompts.autoRenameBranchPrompt)
+        }
+        let combinedSystemPrompt = systemPromptParts.isEmpty ? nil : systemPromptParts.joined(separator: "\n\n")
 
         var resume = CommandBuilder(basePath)
         resume.option("--resume", sessionID)
@@ -248,8 +263,8 @@ struct TerminalContainerView: View {
         }
         if useTmux { resume.flag("--teammate-mode"); resume.arg("tmux") }
         if bypassPermissions { resume.flag("--dangerously-skip-permissions") }
-        if autoRenameBranch {
-            resume.option("--append-system-prompt", SystemPrompts.autoRenameBranchPrompt)
+        if let combinedSystemPrompt {
+            resume.option("--append-system-prompt", combinedSystemPrompt)
         }
 
         var fresh = CommandBuilder(basePath)
@@ -259,56 +274,98 @@ struct TerminalContainerView: View {
         }
         if useTmux { fresh.flag("--teammate-mode"); fresh.arg("tmux") }
         if bypassPermissions { fresh.flag("--dangerously-skip-permissions") }
-        if autoRenameBranch {
-            fresh.option("--append-system-prompt", SystemPrompts.autoRenameBranchPrompt)
+        if let combinedSystemPrompt {
+            fresh.option("--append-system-prompt", combinedSystemPrompt)
         }
 
-        // Launch via initialInput so Claude runs inside an interactive shell.
-        // This preserves terminal capabilities (Shift+Return newlines, Cmd+click hyperlinks)
-        // that are lost when using ghostty's config.command directly.
-        // Commands are written to a script file so initialInput stays short.
-        let rawFallback = "\(resume.command) 2>/dev/null || \(fresh.command)"
+        let cmd = CommandBuilder.withFallback(
+            resume.command, fresh.command,
+            message: "Starting new session..."
+        )
 
-        let scriptContent: String
+        let finalCommand: String
+        var intermediates = [resume.command, fresh.command, cmd]
         if useTmux, let tmuxPath = appEnv.toolStatus.tmux.path {
             let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: "agent")
-            scriptContent = "clear\n" + TmuxSession.sourceableScript(tmuxPath: tmuxPath, sessionName: session, command: rawFallback, environmentVars: envVars)
+            finalCommand = TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: cmd, environmentVars: envVars, respawnOnExit: true)
+            intermediates.append(finalCommand)
         } else {
-            // `exit` after claude closes the shell, triggering surface respawn.
-            scriptContent = "clear\n\(rawFallback)\nexit"
+            finalCommand = cmd
         }
-        let scriptPath = AgentLaunchParams.writeScript(scriptContent, for: workstreamID)
-        return AgentLaunchParams(command: nil, initialInput: "source \(CommandBuilder.shellQuote(scriptPath))\n")
+
+        LaunchLogger.log(LaunchLogEntry(
+            workstreamID: workstreamID,
+            event: "agent-start",
+            finalCommand: finalCommand,
+            intermediateCommands: intermediates,
+            environmentVariables: envVars,
+            workingDirectory: workingDirectory,
+            toolPaths: LaunchLogEntry.ToolPaths(
+                claude: appEnv.toolStatus.claude.path,
+                tmux: appEnv.toolStatus.tmux.path,
+                ffRun: RunLauncher.executableURL()?.path
+            ),
+            settings: LaunchLogEntry.Settings(
+                tmuxMode: tmuxMode,
+                bypassPermissions: bypassPermissions,
+                agentTeams: agentTeams,
+                autoRenameBranch: autoRenameBranch,
+                allowOutsideWorktree: allowOutsideWorktree
+            ),
+            shell: CommandBuilder.userShell
+        ))
+
+        return finalCommand
+    }
+
+    private func rebuildClaudeCommand() {
+        cachedClaudeCommand = buildClaudeCommand()
+    }
+
+    private var fixedTabs: [WorkspaceTab] {
+        tabs.filter { !$0.isCloseable }
+    }
+
+    private var closeableTabs: [WorkspaceTab] {
+        tabs.filter(\.isCloseable)
     }
 
     private var tabBar: some View {
         HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.element) { _, tab in
+            // Fixed tabs (Info, Agent, Environment)
+            ForEach(fixedTabs, id: \.self) { tab in
                 tabButton(for: tab)
+            }
+
+            // Scrollable closeable tabs (terminals, browsers)
+            if !closeableTabs.isEmpty {
+                ScrollableTabStrip(
+                    tabs: closeableTabs,
+                    activeTab: activeTab,
+                    tabButton: { tab in tabButton(for: tab) }
+                )
             }
 
             Spacer()
 
-            AddTabButton(label: NSLocalizedString("Terminal", comment: ""), icon: "terminal", shortcut: "T", action: addTerminal)
-            AddTabButton(label: NSLocalizedString("Browser", comment: ""), icon: "globe", shortcut: "B", action: addBrowser)
-
             if let pr = branchPR, let url = URL(string: pr.url) {
+                let prColor: Color = pr.state == "MERGED" ? .purple : .green
                 Button(action: { NSWorkspace.shared.open(url) }) {
                     HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.pull")
+                        Image(systemName: pr.state == "MERGED" ? "arrow.triangle.merge" : "arrow.triangle.pull")
                             .font(.system(size: 11))
-                        Text("#\(pr.number)")
+                        Text(verbatim: "#\(pr.number)")
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.12))
+                    .background(prColor.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 5))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(prColor)
                 }
                 .buttonStyle(.borderless)
                 .help(pr.title)
-                .accessibilityLabel("Pull request #\(pr.number)")
+                .accessibilityLabel(Text(verbatim: "Pull request #\(pr.number)"))
                 .accessibilityHint(pr.title)
             }
         }
@@ -349,6 +406,7 @@ struct TerminalContainerView: View {
         switch activeTab {
         case .info:
             WorkstreamInfoView(
+                workstreamID: workstreamID,
                 workstreamName: workstreamName,
                 workingDirectory: workingDirectory,
                 projectName: projectName,
@@ -356,7 +414,7 @@ struct TerminalContainerView: View {
                 scriptConfig: scriptConfig
             )
         case .agent:
-            if sessionMode == .waitingForTools {
+            if sessionMode == .waitingForTools || appEnv.isDetecting {
                 terminalLoadingView(message: "Checking terminal tools...")
             } else if appEnv.toolStatus.claude.path == nil {
                 VStack(spacing: 16) {
@@ -372,15 +430,16 @@ struct TerminalContainerView: View {
                         .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
+            } else if let claudeCommand = cachedClaudeCommand {
                 SingleTerminalView(
                     surfaceID: claudeID,
                     workingDirectory: workingDirectory,
-                    command: cachedAgentParams?.command,
-                    initialInput: cachedAgentParams?.initialInput,
+                    command: claudeCommand,
                     isFocused: true,
                     environmentVars: envVars
                 )
+            } else {
+                terminalLoadingView(message: "Preparing Coding Agent...")
             }
         case .environment:
             if sessionMode == .waitingForTools {
@@ -412,6 +471,29 @@ struct TerminalContainerView: View {
     }
 
     private var mainContent: some View {
+        mainLayout
+            .onChange(of: tmuxMode) { rebuildClaudeCommand() }
+            .onChange(of: bypassPermissions) { rebuildClaudeCommand() }
+            .onChange(of: autoRenameBranch) { rebuildClaudeCommand() }
+            .onChange(of: allowOutsideWorktree) { rebuildClaudeCommand() }
+            .onChange(of: workstreamName) { rebuildClaudeCommand() }
+            .onChange(of: appEnv.isDetecting) {
+                rebuildClaudeCommand()
+                preloadSurfaces()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in activeTab = .info }
+            .onReceive(NotificationCenter.default.publisher(for: .focusAgent)) { _ in activeTab = .agent }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleEnvironment)) { _ in
+                if tabs.contains(.environment) { activeTab = .environment }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in addTerminal() }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in addBrowser() }
+            .onReceive(NotificationCenter.default.publisher(for: .closeTerminal)) { _ in
+                if activeTab.isCloseable { closeTab(activeTab) }
+            }
+    }
+
+    private var mainLayout: some View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 tabBar
@@ -422,7 +504,19 @@ struct TerminalContainerView: View {
             PixelAgentsPanelView(projectDirectory: workingDirectory)
         }
         .onAppear {
-            cachedAgentParams = buildClaudeCommand()
+            quickActionRunner.onSuccess = { action in
+                appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
+                if let branch = appEnv.branchName(for: workingDirectory) {
+                    if action == .abandonPR {
+                        appEnv.clearBranchPR(for: projectDirectory, branch: branch)
+                    }
+                    if action == .createPR || action == .abandonPR {
+                        appEnv.refreshGitHubInfo(for: projectDirectory, branch: branch)
+                    }
+                }
+            }
+            appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
+            cachedClaudeCommand = buildClaudeCommand()
             scriptConfig = ScriptConfig.load(from: projectDirectory)
             surfaceCache.respawnableIDs.insert(claudeID)
             if let snapshot = surfaceCache.restoreTabSnapshot(for: workstreamID) {
@@ -450,30 +544,11 @@ struct TerminalContainerView: View {
         .onChange(of: activeTab) {
             surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
             WorkspaceStateStore.save(RestorableWorkspaceTab(activeTab: activeTab), for: workstreamID)
+            appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
         }
-        .onChange(of: tmuxMode) { cachedAgentParams = buildClaudeCommand() }
-        .onChange(of: bypassPermissions) { cachedAgentParams = buildClaudeCommand() }
-        .onChange(of: autoRenameBranch) { cachedAgentParams = buildClaudeCommand() }
-        .onChange(of: workstreamName) { cachedAgentParams = buildClaudeCommand() }
-        .onChange(of: appEnv.isDetecting) {
-            let hadParams = cachedAgentParams != nil
-            cachedAgentParams = buildClaudeCommand()
-            // If the agent surface was created before params were ready (plain shell),
-            // destroy it so preloadSurfaces recreates it with the correct initialInput.
-            if !hadParams && cachedAgentParams != nil {
-                surfaceCache.removeSurface(for: claudeID)
-            }
-            preloadSurfaces()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in activeTab = .info }
-        .onReceive(NotificationCenter.default.publisher(for: .focusAgent)) { _ in activeTab = .agent }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleEnvironment)) { _ in
-            if tabs.contains(.environment) { activeTab = .environment }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in addTerminal() }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in addBrowser() }
-        .onReceive(NotificationCenter.default.publisher(for: .closeTerminal)) { _ in
-            if activeTab.isCloseable { closeTab(activeTab) }
+        .onReceive(NotificationCenter.default.publisher(for: .terminalActivity)) { notification in
+            guard let wsID = notification.object as? UUID, wsID == workstreamID else { return }
+            appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
         }
     }
 
@@ -485,14 +560,6 @@ struct TerminalContainerView: View {
                 let customTabs = tabs.filter(\.isCloseable)
                 guard n <= customTabs.count else { return }
                 activeTab = customTabs[n - 1]
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .nextTab)) { _ in
-                guard let idx = tabs.firstIndex(of: activeTab) else { return }
-                activeTab = tabs[(idx + 1) % tabs.count]
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .prevTab)) { _ in
-                guard let idx = tabs.firstIndex(of: activeTab) else { return }
-                activeTab = tabs[(idx - 1 + tabs.count) % tabs.count]
             }
             .onReceive(NotificationCenter.default.publisher(for: .terminalTabExited)) { notification in
                 guard let surfaceID = notification.object as? UUID else { return }
@@ -522,19 +589,63 @@ struct TerminalContainerView: View {
                 }
             }
             .navigationSubtitle(portSubtitle)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if let githubURL = appEnv.githubURL(for: projectDirectory) {
+                        Button {
+                            NSWorkspace.shared.open(githubURL)
+                        } label: {
+                            Label(NSLocalizedString("GitHub", comment: ""), image: "github")
+                                .labelStyle(.iconOnly)
+                        }
+                        .help("Open on GitHub")
+                    }
+
+                    Button(action: addTerminal) {
+                        Label(NSLocalizedString("Terminal", comment: ""), systemImage: "terminal")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .help("New Terminal (\u{2318}T)")
+
+                    Button(action: addBrowser) {
+                        Label(NSLocalizedString("Browser", comment: ""), systemImage: "globe")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .help("New Browser (\u{2318}B)")
+
+                    QuickActionButtons(
+                        runner: quickActionRunner,
+                        claudePath: appEnv.toolStatus.claude.path,
+                        ghPath: appEnv.toolStatus.gh.path,
+                        workingDirectory: workingDirectory,
+                        branchName: appEnv.branchName(for: workingDirectory),
+                        bypassPermissions: bypassPermissions,
+                        worktreeState: appEnv.worktreeState(for: workingDirectory),
+                        hasGitHubRemote: appEnv.hasGitHubRemote(projectDirectory),
+                        prState: branchPR?.state
+                    )
+                }
+            }
     }
 
     // MARK: - Tab management
+
+    /// Number of closeable tabs beyond which labels are hidden to save space.
+    private static let compactTabThreshold = 3
+
+    private var useCompactTabs: Bool {
+        tabs.filter(\.isCloseable).count > Self.compactTabThreshold
+    }
 
     private func tabLabel(_ tab: WorkspaceTab) -> String? {
         switch tab {
         case .info: return NSLocalizedString("Info", comment: "")
         case .agent: return NSLocalizedString("Agent", comment: "")
         case .environment: return NSLocalizedString("Environment", comment: "")
-        case let .terminal(id):
-            guard let title = terminalTitles[id], !title.isEmpty else { return nil }
-            return title.count > 20 ? String(title.prefix(20)) + "..." : title
+        case .terminal:
+            return nil
         case let .browser(id):
+            guard !useCompactTabs else { return nil }
             guard let title = browserTitles[id], !title.isEmpty else { return nil }
             return title.count > 20 ? String(title.prefix(20)) + "..." : title
         }
@@ -650,13 +761,12 @@ struct TerminalContainerView: View {
         guard let app = TerminalApp.shared.app else { return }
 
         // Agent surface
-        if let params = cachedAgentParams {
+        if let claudeCommand = cachedClaudeCommand {
             _ = surfaceCache.surface(
                 for: claudeID,
                 app: app,
                 workingDirectory: workingDirectory,
-                command: params.command,
-                initialInput: params.initialInput,
+                command: claudeCommand,
                 environmentVars: envVars
             )
         }
@@ -694,6 +804,7 @@ struct TerminalContainerView: View {
 
     private var envVars: [String: String] {
         WorkstreamEnvironment.variables(
+            workstreamID: workstreamID,
             projectName: projectName,
             workstreamName: workstreamName,
             projectDirectory: projectDirectory,
@@ -735,6 +846,7 @@ private struct WorkspaceTabButton: View {
             if let label {
                 Text(label)
                     .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                    .lineLimit(1)
             }
             if let shortcut {
                 (Text(Image(systemName: "command")) + Text(shortcut))
@@ -776,6 +888,208 @@ private struct WorkspaceTabDropDelegate: DropDelegate {
     }
 }
 
+private struct QuickActionButtons: View {
+    @ObservedObject var runner: QuickActionRunner
+    let claudePath: String?
+    let ghPath: String?
+    let workingDirectory: String
+    let branchName: String?
+    let bypassPermissions: Bool
+    let worktreeState: WorktreeState
+    let hasGitHubRemote: Bool
+    let prState: String?
+
+    private var hasOpenPR: Bool {
+        prState == "OPEN"
+    }
+
+    private func isVisible(_ action: QuickAction) -> Bool {
+        switch action {
+        case .commit:
+            return worktreeState.hasUncommittedChanges
+        case .push:
+            return worktreeState.hasUnpushedCommits && worktreeState.hasRemote
+        case .createPR:
+            return hasGitHubRemote && worktreeState.hasBranchCommits && prState == nil
+        case .abandonPR:
+            return hasOpenPR
+        }
+    }
+
+    private func disabledReason(for action: QuickAction) -> String? {
+        if action.usesLLM {
+            if claudePath == nil {
+                return NSLocalizedString("Claude Code is not installed.", comment: "")
+            }
+            if !bypassPermissions {
+                return NSLocalizedString("Enable \"Bypass permission prompts\" in Settings.", comment: "")
+            }
+        }
+        if action == .abandonPR, ghPath == nil {
+            return NSLocalizedString("gh CLI is not installed.", comment: "")
+        }
+        return nil
+    }
+
+    private func isRunningAction(_ action: QuickAction) -> Bool {
+        if case let .running(a) = runner.state { return a == action }
+        return false
+    }
+
+    private func resultState(for action: QuickAction) -> QuickActionState? {
+        switch runner.state {
+        case let .succeeded(a) where a == action: return runner.state
+        case let .failed(a) where a == action: return runner.state
+        default: return nil
+        }
+    }
+
+    var body: some View {
+        ForEach(QuickAction.allCases) { action in
+            if isVisible(action) {
+                QuickActionButton(
+                    action: action,
+                    isRunning: isRunningAction(action),
+                    resultState: resultState(for: action),
+                    disabledReason: disabledReason(for: action),
+                    onRun: { runAction(action) }
+                )
+            }
+        }
+    }
+
+    private func runAction(_ action: QuickAction) {
+        guard disabledReason(for: action) == nil else { return }
+        runner.run(
+            action: action,
+            claudePath: claudePath,
+            ghPath: ghPath,
+            workingDirectory: workingDirectory,
+            branchName: branchName
+        )
+    }
+}
+
+private struct QuickActionButton: View {
+    let action: QuickAction
+    let isRunning: Bool
+    let resultState: QuickActionState?
+    let disabledReason: String?
+    let onRun: () -> Void
+
+    private var isDisabled: Bool {
+        disabledReason != nil || isRunning
+    }
+
+    var body: some View {
+        Button(action: onRun) {
+            if isRunning {
+                ProgressView()
+                    .controlSize(.mini)
+            } else if case .succeeded = resultState {
+                Label(action.label, systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.green)
+            } else if case .failed = resultState {
+                Label(action.label, systemImage: "xmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.red)
+            } else {
+                Label(action.label, systemImage: action.icon)
+                    .labelStyle(.titleAndIcon)
+            }
+        }
+        .disabled(isDisabled)
+        .help(disabledReason ?? action.label)
+        .accessibilityLabel(action.label)
+    }
+}
+
+private struct ScrollableTabStrip<TabContent: View>: View {
+    let tabs: [WorkspaceTab]
+    let activeTab: WorkspaceTab
+    @ViewBuilder let tabButton: (WorkspaceTab) -> TabContent
+
+    @State private var contentOverflows = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var contentWidth: CGFloat = 0
+    @State private var viewportWidth: CGFloat = 0
+
+    private var canScrollLeft: Bool {
+        scrollOffset > 0
+    }
+
+    private var canScrollRight: Bool {
+        scrollOffset < contentWidth - viewportWidth
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            if contentOverflows, canScrollLeft {
+                scrollArrow(direction: .left)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        ForEach(tabs, id: \.self) { tab in
+                            tabButton(tab)
+                                .id(tab)
+                        }
+                    }
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ContentWidthKey.self, value: geo.size.width)
+                    })
+                }
+                .onPreferenceChange(ContentWidthKey.self) { width in
+                    contentWidth = width
+                    checkOverflow()
+                }
+                .background(GeometryReader { geo in
+                    Color.clear
+                        .onAppear { viewportWidth = geo.size.width; checkOverflow() }
+                        .onChange(of: geo.size.width) { _, new in viewportWidth = new; checkOverflow() }
+                })
+                .onChange(of: activeTab) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        proxy.scrollTo(activeTab, anchor: .center)
+                    }
+                }
+            }
+
+            if contentOverflows, canScrollRight {
+                scrollArrow(direction: .right)
+            }
+        }
+    }
+
+    private enum ScrollDirection {
+        case left, right
+    }
+
+    private func scrollArrow(direction: ScrollDirection) -> some View {
+        Button(action: {}) {
+            Image(systemName: direction == .left ? "chevron.left" : "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 16, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private func checkOverflow() {
+        contentOverflows = contentWidth > viewportWidth + 1
+    }
+}
+
+private struct ContentWidthKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 private struct AddTabButton: View {
     let label: String
     let icon: String
@@ -803,25 +1117,6 @@ private struct AddTabButton: View {
         }
         .buttonStyle(.borderless)
         .onHover { isHovering = $0 }
-    }
-}
-
-// MARK: - AgentLaunchParams
-
-/// Determines how the agent terminal is launched.
-/// Uses `initialInput` so Claude runs inside an interactive shell (needed for Shift+Return, Cmd+click).
-/// Commands are written to a script file so initialInput stays short.
-private struct AgentLaunchParams {
-    let command: String?
-    let initialInput: String?
-
-    /// Write a command to a temp script file, returning the path.
-    static func writeScript(_ command: String, for workstreamID: UUID) -> String {
-        let path = AppConstants.agentScriptPath(for: workstreamID)
-        let dir = (path as NSString).deletingLastPathComponent
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        try? command.write(toFile: path, atomically: true, encoding: .utf8)
-        return path
     }
 }
 
@@ -929,6 +1224,83 @@ private struct TerminalSurfaceView: NSViewRepresentable {
     }
 }
 
+// MARK: - Quick action debug
+
+private struct QuickActionDebugView: View {
+    @ObservedObject var runner: QuickActionRunner
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Quick Action Log")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if !runner.log.isEmpty {
+                    Button("Clear") { runner.clearLog() }
+                        .font(.system(size: 10))
+                        .buttonStyle(.borderless)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+
+            if runner.log.isEmpty {
+                Text("No quick actions run yet.")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(runner.log) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text(Self.timeFormatter.string(from: entry.timestamp))
+                                        .foregroundStyle(.tertiary)
+                                    Text(entry.action.label)
+                                        .foregroundStyle(.primary)
+                                    if let code = entry.exitCode {
+                                        Text("exit \(code)")
+                                            .foregroundStyle(code == 0 ? .green : .red)
+                                    } else {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                    }
+                                }
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+
+                                Text("$ " + entry.command)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+
+                                if !entry.output.isEmpty {
+                                    Text(entry.output)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.primary)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .frame(height: 200)
+        .background(.background)
+    }
+}
+
 // MARK: - Surface cache
 
 extension Notification.Name {
@@ -941,6 +1313,7 @@ final class TerminalSurfaceCache: ObservableObject {
     private var surfaceParams: [UUID: SurfaceParams] = [:]
     private var tabSnapshots: [UUID: WorkspaceTabSnapshot] = [:]
     private var webViews: [UUID: WKWebView] = [:]
+    private var quickActionRunners: [UUID: QuickActionRunner] = [:]
     /// Surface IDs that should respawn when closed (e.g., the agent).
     var respawnableIDs: Set<UUID> = []
     /// Guards against concurrent respawns for the same surface ID.
@@ -1023,9 +1396,18 @@ final class TerminalSurfaceCache: ObservableObject {
 
     func webView(for id: UUID) -> WKWebView {
         if let existing = webViews[id] { return existing }
-        let view = WKWebView()
+        let view = BrowserWebView()
         webViews[id] = view
         return view
+    }
+
+    func quickActionRunner(for workstreamID: UUID) -> QuickActionRunner {
+        if let existing = quickActionRunners[workstreamID] {
+            return existing
+        }
+        let runner = QuickActionRunner()
+        quickActionRunners[workstreamID] = runner
+        return runner
     }
 
     func removeWebView(for id: UUID) {
@@ -1043,6 +1425,9 @@ final class TerminalSurfaceCache: ObservableObject {
 
     func removeWorkstreamSurfaces(for workstreamID: UUID) {
         tabSnapshots.removeValue(forKey: workstreamID)
+        if let runner = quickActionRunners.removeValue(forKey: workstreamID) {
+            runner.cancel()
+        }
         // Remove agent surface
         removeSurface(for: workstreamID)
         // Build a set of all possible derived IDs and remove matches
@@ -1111,6 +1496,17 @@ final class TerminalSurfaceCache: ObservableObject {
         } else {
             removeSurface(for: id)
             NotificationCenter.default.post(name: .terminalTabExited, object: id)
+        }
+    }
+
+    // MARK: - Text injection
+
+    /// Send text to a terminal surface as if it were typed.
+    func sendText(to surfaceID: UUID, text: String) {
+        guard let view = surfaces[surfaceID],
+              let surface = view.surface else { return }
+        text.withCString { ptr in
+            ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
         }
     }
 

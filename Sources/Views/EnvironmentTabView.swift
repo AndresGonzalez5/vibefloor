@@ -14,7 +14,7 @@ func scriptCommand(script: String, role: String, shell: String = CommandBuilder.
     } else {
         inner = script
     }
-    return "\(shell) -lic \(CommandBuilder.shellQuote(inner))"
+    return "\(shell) -lic \(CommandBuilder.shellQuote(inner, forShell: shell))"
 }
 
 struct EnvironmentTabView: View {
@@ -47,6 +47,10 @@ struct EnvironmentTabView: View {
         VStack(spacing: 0) {
             if let error = scriptConfig.loadError {
                 configErrorBanner(error: error)
+                Divider()
+            }
+            if let source = scriptConfig.source, source != ".factoryfloor.json" {
+                configSourceBanner(source: source)
                 Divider()
             }
             environmentContent
@@ -145,9 +149,22 @@ struct EnvironmentTabView: View {
         let shortcut = "⌃⇧S"
         VStack(spacing: 0) {
             HStack {
-                Image(systemName: "play")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                if scriptConfig.run != nil, !runStarted {
+                    Button(action: {
+                        runStoppedManually = false
+                        runStarted = true
+                    }) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(NSLocalizedString("Start", comment: ""))
+                } else {
+                    Image(systemName: "play")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
 
@@ -202,8 +219,17 @@ struct EnvironmentTabView: View {
                             runStoppedManually = false
                             runStarted = true
                         }) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 24))
+                            HStack(spacing: 6) {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 14))
+                                Text("Start")
+                                    .font(.system(size: 13, weight: .medium))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.borderless)
                         Text(script)
@@ -241,6 +267,19 @@ struct EnvironmentTabView: View {
         .background(Color.yellow.opacity(0.08))
     }
 
+    private func configSourceBanner(source: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.blue)
+            Text(String(format: NSLocalizedString("Using scripts from %@", comment: ""), source))
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(10)
+        .background(Color.blue.opacity(0.05))
+    }
+
     private func scriptInstructions(title: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "doc.text")
@@ -264,15 +303,43 @@ struct EnvironmentTabView: View {
     }
 
     private func envCommand(script: String, role: String) -> String {
-        let command: String
-        if role == "run",
-           let launcherPath = RunLauncher.executableURL()?.path
-        {
-            command = runScriptCommand(script: script, workstreamID: workstreamID, launcherPath: launcherPath)
+        let baseCommand: String
+        let ffRunPath = RunLauncher.executableURL()?.path
+        if role == "run", let launcherPath = ffRunPath {
+            baseCommand = runScriptCommand(script: script, workstreamID: workstreamID, launcherPath: launcherPath)
         } else {
-            command = scriptCommand(script: script, role: role)
+            baseCommand = scriptCommand(script: script, role: role)
         }
-        return buildCommand(script: command, role: role)
+        let finalCommand = buildCommand(script: baseCommand, role: role)
+
+        let event = role == "run" ? "run-start" : "setup-start"
+        var intermediates = [script, baseCommand]
+        if finalCommand != baseCommand {
+            intermediates.append(finalCommand)
+        }
+        LaunchLogger.log(LaunchLogEntry(
+            workstreamID: workstreamID,
+            event: event,
+            finalCommand: finalCommand,
+            intermediateCommands: intermediates,
+            environmentVariables: environmentVars,
+            workingDirectory: workingDirectory,
+            toolPaths: LaunchLogEntry.ToolPaths(
+                claude: nil,
+                tmux: useTmux ? appEnv.toolStatus.tmux.path : nil,
+                ffRun: ffRunPath
+            ),
+            settings: LaunchLogEntry.Settings(
+                tmuxMode: useTmux,
+                bypassPermissions: false,
+                agentTeams: false,
+                autoRenameBranch: false,
+                allowOutsideWorktree: false
+            ),
+            shell: CommandBuilder.userShell
+        ))
+
+        return finalCommand
     }
 
     private func buildCommand(script: String, role: String) -> String {

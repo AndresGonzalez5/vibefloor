@@ -15,31 +15,37 @@ enum CommandLineTools {
             loginShellPath(shell: shell)
         }
     ) -> String? {
+        // Prefer the user's login shell PATH so we find the same binary
+        // their terminal would. GUI apps inherit a minimal PATH from launchd,
+        // so we resolve the full login shell PATH first.
+        if let shell = environment["SHELL"], !shell.isEmpty,
+           let shellPath = resolveFromShellPath(shell)
+        {
+            for directory in shellPath.split(separator: ":") {
+                let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(name).path
+                if isExecutable(candidate) {
+                    return candidate
+                }
+            }
+        }
+
+        // Fall back to the process PATH (minimal launchd PATH for GUI apps)
+        if let found = resolveFromPath(name, environment) {
+            return found
+        }
+
+        // Last resort: check well-known locations
         let knownLocations = [
             "/opt/homebrew/bin/\(name)",
             "/usr/local/bin/\(name)",
             "/usr/bin/\(name)",
             "\(NSHomeDirectory())/.local/bin/\(name)",
+            "/run/current-system/sw/bin/\(name)",
+            "\(NSHomeDirectory())/.nix-profile/bin/\(name)",
         ]
 
         for location in knownLocations where isExecutable(location) {
             return location
-        }
-
-        if let found = resolveFromPath(name, environment) {
-            return found
-        }
-
-        // GUI apps inherit a minimal PATH from launchd. Resolve the user's
-        // login shell PATH to find tools in non-standard locations.
-        guard let shell = environment["SHELL"], !shell.isEmpty else { return nil }
-        guard let shellPath = resolveFromShellPath(shell) else { return nil }
-
-        for directory in shellPath.split(separator: ":") {
-            let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(name).path
-            if isExecutable(candidate) {
-                return candidate
-            }
         }
 
         return nil
@@ -71,7 +77,7 @@ enum CommandLineTools {
             let process = Process()
             let pipe = Pipe()
             process.executableURL = URL(fileURLWithPath: shell)
-            process.arguments = ["-lic", "echo $PATH"]
+            process.arguments = ["-lic", "printenv PATH"]
             process.standardOutput = pipe
             process.standardError = FileHandle.nullDevice
             do {

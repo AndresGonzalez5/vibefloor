@@ -68,8 +68,10 @@ jobs:
         id: ghostty-cache
         uses: actions/cache@v5
         with:
-          path: ghostty/macos/GhosttyKit.xcframework
-          key: ghostty-xcframework-${{ hashFiles('ghostty/.git') }}
+          path: |
+            ghostty/macos/GhosttyKit.xcframework
+            ghostty/zig-out/share
+          key: ghostty-build-${{ hashFiles('ghostty/.git') }}
 
       - name: Build Ghostty xcframework
         if: steps.ghostty-cache.outputs.cache-hit != 'true'
@@ -279,7 +281,18 @@ jobs:
           VERSION: ${{ needs.release-please.outputs.version }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          gh release upload "$TAG_NAME" "build/release/$DMG_NAME" appcast.xml
+          for attempt in 1 2 3 4 5; do
+            if gh release upload --clobber "$TAG_NAME" "build/release/$DMG_NAME" appcast.xml; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::Failed to upload release assets for $TAG_NAME after $attempt attempts"
+              exit 1
+            fi
+
+            sleep 10
+          done
 
       - name: Update Homebrew cask
         env:

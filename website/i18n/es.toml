@@ -11,7 +11,7 @@ other = "Cómo funciona"
 other = "Configuración"
 
 [hero_badge]
-other = "Gratis y open source · macOS nativo · Terminal Ghostty"
+other = "Open Source"
 [hero_title_1]
 other = "Tu"
 [hero_title_accent]
@@ -87,6 +87,18 @@ other = "Automatiza el ciclo de vida de workstreams con scripts de setup, run y 
 other = "Añade un"
 [config_or_use]
 other = "a la raíz de tu proyecto."
+[config_hook]
+other = "Hook"
+[config_when]
+other = "Cuándo se ejecuta"
+[config_setup_desc]
+other = "Una vez, al crear un workstream. Para instalar dependencias o pasos de build."
+[config_run_desc]
+other = "Bajo demanda desde la pestaña Environment. Envuelto en ff-run para detección automática de puertos."
+[config_teardown_desc]
+other = "Al archivar un workstream. Para limpiar recursos como detener contenedores."
+[config_optional_note]
+other = "Todos los campos son opcionales. Los scripts se ejecutan en el directorio del workstream con tu shell de login."
 
 [env_label]
 other = "Entorno"
@@ -166,11 +178,13 @@ other = "Ver en GitHub"
 other = "Dale una estrella"
 
 [footer_poblenou]
-other = "Hecho con ❤️ en Poblenou, Barcelona"
+other = "Hecho con ❤️ en Poblenou, Barcelona 🇪🇺"
 
 # Sponsor
 [sponsor_intro]
-other = "Factory Floor es gratis y open source. Tu apoyo ayuda a financiar el desarrollo continuado y nuevas funcionalidades."
+other = "Factory Floor es gratis y open source."
+[sponsor_intro_2]
+other = "Tu apoyo ayuda a financiar el desarrollo continuado y nuevas funcionalidades."
 [sponsor_financial]
 other = "Apoyo financiero"
 [sponsor_other]
@@ -194,7 +208,11 @@ other = "Los bug reports y feature requests ayudan a mejorar la app."
 [sponsor_contribute]
 other = "Contribuye código"
 [sponsor_contribute_desc]
-other = "Los pull requests para correcciones, funcionalidades y traducciones son bienvenidos."
+other = "Los pull requests para correcciones y funcionalidades son bienvenidos."
+[sponsor_translate]
+other = "Traduce la app o el sitio web"
+[sponsor_translate_desc]
+other = "Ayuda a que Factory Floor sea accesible en más idiomas."
 [sponsor_ghostty]
 other = "Apoya a Ghostty"
 [sponsor_ghostty_desc]
@@ -211,6 +229,12 @@ other = "Instalar"
 other = "Actualizar"
 [get_download]
 other = "Descargar desde GitHub Releases"
+
+# Docs
+[nav_docs]
+other = "Docs"
+[docs_subtitle]
+other = "Todo lo que necesitas saber, nada de lo que no."
 
 # Changelog
 [changelog_subtitle]

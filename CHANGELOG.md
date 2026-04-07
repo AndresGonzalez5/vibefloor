@@ -1,5 +1,213 @@
 # Changelog
 
+## [0.1.65](https://github.com/alltuner/factoryfloor/compare/v0.1.64...v0.1.65) (2026-04-03)
+
+
+### Features
+
+* add Open on GitHub button for projects with GitHub remotes ([#330](https://github.com/alltuner/factoryfloor/issues/330)) ([9c7c7f5](https://github.com/alltuner/factoryfloor/commit/9c7c7f5dcd28c12059c16018b6d0f483d4bc175c))
+* Cmd+Click opens links in external browser and fix HTTP redirects ([#331](https://github.com/alltuner/factoryfloor/issues/331)) ([599253a](https://github.com/alltuner/factoryfloor/commit/599253a66066cc1ae4b586a3d04392bc7d9f7db2))
+* display agent-generated task descriptions in sidebar ([#336](https://github.com/alltuner/factoryfloor/issues/336)) ([6bac1fe](https://github.com/alltuner/factoryfloor/commit/6bac1fe9d625cd9710dd58433f9b79a867cca8b8))
+* make run play icons clickable and style center start button ([#328](https://github.com/alltuner/factoryfloor/issues/328)) ([0007372](https://github.com/alltuner/factoryfloor/commit/0007372a18fb6e6a729ec39102602b2340fd8fe2))
+* show task description in workstream title subtitle ([#339](https://github.com/alltuner/factoryfloor/issues/339)) ([3b475a9](https://github.com/alltuner/factoryfloor/commit/3b475a9e1de70060033e9257b03c043662e83964))
+* **website:** add docs section, issue templates, and improve site navigation ([#342](https://github.com/alltuner/factoryfloor/issues/342)) ([a20d0f0](https://github.com/alltuner/factoryfloor/commit/a20d0f0ce7f38c995cdfed8374e0cba456bd536f)), closes [#338](https://github.com/alltuner/factoryfloor/issues/338)
+
+
+### Bug Fixes
+
+* re-sort sidebar projects when workstream activity updates lastAccessedAt ([#327](https://github.com/alltuner/factoryfloor/issues/327)) ([0005ed6](https://github.com/alltuner/factoryfloor/commit/0005ed624fc45ad87843a4960e6e59dadfe37c10))
+* refresh git repo cache immediately when project is added via drag-drop ([#325](https://github.com/alltuner/factoryfloor/issues/325)) ([6921180](https://github.com/alltuner/factoryfloor/commit/692118070cf0254143ab297151aca7afb2489399))
+
+
+### Miscellaneous
+
+* ignore dirty state in ghostty submodule ([#346](https://github.com/alltuner/factoryfloor/issues/346)) ([400dcc0](https://github.com/alltuner/factoryfloor/commit/400dcc0f09446047a79716c4dec0918d2ef38e69))
+
+
+### Documentation
+
+* document Hugo AllTranslations bug in AGENTS.md ([#345](https://github.com/alltuner/factoryfloor/issues/345)) ([abbc136](https://github.com/alltuner/factoryfloor/commit/abbc1365a6bcb9d57c6741f61e418b52e6df5954))
+* **website:** translate docs to Catalan, Spanish, and Swedish ([#344](https://github.com/alltuner/factoryfloor/issues/344)) ([b0794b6](https://github.com/alltuner/factoryfloor/commit/b0794b676a85abefbb431bff8a5a80485fb1b2d6)), closes [#340](https://github.com/alltuner/factoryfloor/issues/340)
+
+## [0.1.64](https://github.com/alltuner/factoryfloor/compare/v0.1.63...v0.1.64) (2026-04-03)
+
+
+### Features
+
+* add Reveal in Finder and Open in External Terminal to sidebar context menus ([#310](https://github.com/alltuner/factoryfloor/issues/310)) ([775e188](https://github.com/alltuner/factoryfloor/commit/775e188b4b85706e59ed70e6782dca4e7b0aef1c))
+* adopt existing worktrees as workstreams and enrich worktree status ([#313](https://github.com/alltuner/factoryfloor/issues/313)) ([7f09a3f](https://github.com/alltuner/factoryfloor/commit/7f09a3f4074e802478e4a67be10e551456a179b6))
+* background fetch of origin default branch every 2 minutes ([#320](https://github.com/alltuner/factoryfloor/issues/320)) ([cd73dc5](https://github.com/alltuner/factoryfloor/commit/cd73dc5dd8b7ed722e420001834ed1ce8729ffed))
+* collapse doc tabs by default and pin to bottom of info views ([#315](https://github.com/alltuner/factoryfloor/issues/315)) ([7c38c6e](https://github.com/alltuner/factoryfloor/commit/7c38c6eb55c50c947a4b07143e35c0cff26e8974))
+* detect merged PRs and show archive prompt for completed workstreams ([#316](https://github.com/alltuner/factoryfloor/issues/316)) ([4c062ad](https://github.com/alltuner/factoryfloor/commit/4c062ad5f7b5d2b0a598058b7a6b1df1df346ddc))
+* support drag-and-drop of files and text onto embedded terminal ([#312](https://github.com/alltuner/factoryfloor/issues/312)) ([1d568a6](https://github.com/alltuner/factoryfloor/commit/1d568a6602e9368a34396e780a4054e57e5957ab))
+
+
+### Bug Fixes
+
+* differentiate merged vs open PRs and make PR badges clickable in worktree list ([#321](https://github.com/alltuner/factoryfloor/issues/321)) ([58d9c73](https://github.com/alltuner/factoryfloor/commit/58d9c7385156090d7a329c2c973b076e81735b97))
+* Fish 4.0 shell escaping breaks tmux and agent launch ([#324](https://github.com/alltuner/factoryfloor/issues/324)) ([323d136](https://github.com/alltuner/factoryfloor/commit/323d136350d1bd803f446d78031403765acb7b69))
+* init ghostty submodule properly instead of symlinking entire directory ([#323](https://github.com/alltuner/factoryfloor/issues/323)) ([702f786](https://github.com/alltuner/factoryfloor/commit/702f7867a634311eeff068e8674480add57da143)), closes [#322](https://github.com/alltuner/factoryfloor/issues/322)
+* persist quick action runner across workstream navigation ([#317](https://github.com/alltuner/factoryfloor/issues/317)) ([3c04488](https://github.com/alltuner/factoryfloor/commit/3c0448804f373d5d91d8339be1347b3453cd8940))
+* preserve active tab when cycling workstreams with Cmd+Shift+[/] ([#318](https://github.com/alltuner/factoryfloor/issues/318)) ([e4547be](https://github.com/alltuner/factoryfloor/commit/e4547be28a8d708996f2437450518b07588c075c))
+* skip submodule dirty checks in git status ([#314](https://github.com/alltuner/factoryfloor/issues/314)) ([8ae6395](https://github.com/alltuner/factoryfloor/commit/8ae6395a24ad4a096a7fc2be8ba95e8f02af2203))
+
+## [0.1.63](https://github.com/alltuner/factoryfloor/compare/v0.1.62...v0.1.63) (2026-04-02)
+
+
+### Features
+
+* quick actions, workspace UI improvements, and settings redesign ([#307](https://github.com/alltuner/factoryfloor/issues/307)) ([3842c21](https://github.com/alltuner/factoryfloor/commit/3842c21dd4be4877f82ed35b4e232a42b6c34857))
+
+
+### Bug Fixes
+
+* cache isGitRepo and port state to avoid main-thread I/O in sidebar ([#299](https://github.com/alltuner/factoryfloor/issues/299)) ([1a9999f](https://github.com/alltuner/factoryfloor/commit/1a9999f109d4f1a43480424ea85f95aeb972dc84))
+* check Ghostty resources exist before building ([#297](https://github.com/alltuner/factoryfloor/issues/297)) ([c89ca5a](https://github.com/alltuner/factoryfloor/commit/c89ca5a2c1b22b472427a605eadc2d1683bb982c)), closes [#284](https://github.com/alltuner/factoryfloor/issues/284)
+* detect CLI tools in fish shell and Nix environments ([#300](https://github.com/alltuner/factoryfloor/issues/300)) ([2c2c5b1](https://github.com/alltuner/factoryfloor/commit/2c2c5b1e624fc284e9d86443b7066c8134e87ba1))
+* PR number formatting and worktree zig-out symlink ([#301](https://github.com/alltuner/factoryfloor/issues/301)) ([d9b3a9b](https://github.com/alltuner/factoryfloor/commit/d9b3a9b68fd072a9d545fa254cdccee9111eab12))
+* sidebar branch name delay and improve workstream row content ([#306](https://github.com/alltuner/factoryfloor/issues/306)) ([86b83cf](https://github.com/alltuner/factoryfloor/commit/86b83cfa62b70a941db72b16d55fcca5a9756346))
+
+
+### Miscellaneous
+
+* **deps:** update actions/checkout action to v6 ([#305](https://github.com/alltuner/factoryfloor/issues/305)) ([1dc5605](https://github.com/alltuner/factoryfloor/commit/1dc5605a0cd8212e01b11a3c6575aefa6cdcf5ce))
+
+## [0.1.62](https://github.com/alltuner/factoryfloor/compare/v0.1.61...v0.1.62) (2026-04-01)
+
+
+### Bug Fixes
+
+* retry GitHub release asset uploads ([#295](https://github.com/alltuner/factoryfloor/issues/295)) ([f37aa7f](https://github.com/alltuner/factoryfloor/commit/f37aa7fbeab771937a8999ae191389a3041ac48d))
+
+## [0.1.61](https://github.com/alltuner/factoryfloor/compare/v0.1.60...v0.1.61) (2026-04-01)
+
+
+### Bug Fixes
+
+* handle notification delivery callback off main thread ([#293](https://github.com/alltuner/factoryfloor/issues/293)) ([d31f06f](https://github.com/alltuner/factoryfloor/commit/d31f06fcb42113e420fabb820d7104d237026157))
+
+## [0.1.60](https://github.com/alltuner/factoryfloor/compare/v0.1.59...v0.1.60) (2026-04-01)
+
+
+### Bug Fixes
+
+* remove sendable requirement from notification request protocol ([#291](https://github.com/alltuner/factoryfloor/issues/291)) ([337ff89](https://github.com/alltuner/factoryfloor/commit/337ff893ede250ac3f8ccaa65d863696eaf0b14f))
+
+## [0.1.59](https://github.com/alltuner/factoryfloor/compare/v0.1.58...v0.1.59) (2026-04-01)
+
+
+### Bug Fixes
+
+* avoid main-actor notification callback crash ([#289](https://github.com/alltuner/factoryfloor/issues/289)) ([ec03f7d](https://github.com/alltuner/factoryfloor/commit/ec03f7d7cd2b1fcce5713de683b84b0060eb2d79))
+
+## [0.1.58](https://github.com/alltuner/factoryfloor/compare/v0.1.57...v0.1.58) (2026-04-01)
+
+
+### Bug Fixes
+
+* handle notification authorization on main thread ([#287](https://github.com/alltuner/factoryfloor/issues/287)) ([6376d3a](https://github.com/alltuner/factoryfloor/commit/6376d3a78e9a630f0bdf4a4d97811d9c18d0f9aa))
+
+## [0.1.57](https://github.com/alltuner/factoryfloor/compare/v0.1.56...v0.1.57) (2026-04-01)
+
+
+### Bug Fixes
+
+* **ci:** cache ghostty share dirs needed by xcodegen ([#285](https://github.com/alltuner/factoryfloor/issues/285)) ([7b243c3](https://github.com/alltuner/factoryfloor/commit/7b243c30e3f2d1dd5e1111099f2388e9e8b9177d))
+
+## [0.1.56](https://github.com/alltuner/factoryfloor/compare/v0.1.55...v0.1.56) (2026-04-01)
+
+
+### Bug Fixes
+
+* align local release script signing with CI workflow ([#282](https://github.com/alltuner/factoryfloor/issues/282)) ([76a0dcf](https://github.com/alltuner/factoryfloor/commit/76a0dcfb7ceaba7d2db25614a1da33d39f3a13d2))
+* bundle ghostty terminfo and shell integration in app resources ([#283](https://github.com/alltuner/factoryfloor/issues/283)) ([bd4ea71](https://github.com/alltuner/factoryfloor/commit/bd4ea712cec51ae8d750dfc12afb10500e722eec))
+* use local entitlements to bypass library validation in dev release builds ([#280](https://github.com/alltuner/factoryfloor/issues/280)) ([2f8161c](https://github.com/alltuner/factoryfloor/commit/2f8161cb99efb4e811eb58c7582453acbe65a8c2)), closes [#279](https://github.com/alltuner/factoryfloor/issues/279)
+
+## [0.1.55](https://github.com/alltuner/factoryfloor/compare/v0.1.54...v0.1.55) (2026-03-31)
+
+
+### Bug Fixes
+
+* move notification authorization to applicationDidFinishLaunching ([#277](https://github.com/alltuner/factoryfloor/issues/277)) ([6085ffd](https://github.com/alltuner/factoryfloor/commit/6085ffd0e0ed57d2ec82f579964c4499281285af)), closes [#274](https://github.com/alltuner/factoryfloor/issues/274)
+
+## [0.1.54](https://github.com/alltuner/factoryfloor/compare/v0.1.53...v0.1.54) (2026-03-31)
+
+
+### Bug Fixes
+
+* dispatch notification authorization handler to main thread ([#275](https://github.com/alltuner/factoryfloor/issues/275)) ([fee40fc](https://github.com/alltuner/factoryfloor/commit/fee40fc4a99acc49d0243ed7d863927af6872202)), closes [#274](https://github.com/alltuner/factoryfloor/issues/274)
+
+## [0.1.53](https://github.com/alltuner/factoryfloor/compare/v0.1.52...v0.1.53) (2026-03-31)
+
+
+### Features
+
+* auto-fetch origin/main before worktree creation ([#257](https://github.com/alltuner/factoryfloor/issues/257)) ([cfa8dc6](https://github.com/alltuner/factoryfloor/commit/cfa8dc640decdad5d7816f6a3826f79c5370885a)), closes [#253](https://github.com/alltuner/factoryfloor/issues/253)
+* handle ghostty desktop notifications and bell actions ([#264](https://github.com/alltuner/factoryfloor/issues/264)) ([fde32f5](https://github.com/alltuner/factoryfloor/commit/fde32f563e40bb00643dc0721043c774b3b1ef04))
+* support conductor.json and superset config as script fallbacks ([#261](https://github.com/alltuner/factoryfloor/issues/261)) ([0a4f0bc](https://github.com/alltuner/factoryfloor/commit/0a4f0bc32c522b6053d843df1c3c0cc7f5076894)), closes [#256](https://github.com/alltuner/factoryfloor/issues/256)
+
+
+### Bug Fixes
+
+* enable desktop notifications by adding UNUserNotificationCenterDelegate ([#269](https://github.com/alltuner/factoryfloor/issues/269)) ([0c5d9f1](https://github.com/alltuner/factoryfloor/commit/0c5d9f14edd352a9f84af8cafa476d2f2fca637f))
+* match ghostty trackpad scroll speed and momentum ([#263](https://github.com/alltuner/factoryfloor/issues/263)) ([60996a2](https://github.com/alltuner/factoryfloor/commit/60996a2e26a8fae0df891e51babbfe527a2bba81)), closes [#262](https://github.com/alltuner/factoryfloor/issues/262)
+* prevent user tmux config from leaking into sessions ([#272](https://github.com/alltuner/factoryfloor/issues/272)) ([c7ccef9](https://github.com/alltuner/factoryfloor/commit/c7ccef93ed8236a6bcbb8ee277c6c1ffe4fa24b7))
+* resolve build error and warnings in ContentView and TerminalApp ([#265](https://github.com/alltuner/factoryfloor/issues/265)) ([06d476d](https://github.com/alltuner/factoryfloor/commit/06d476d7fb54bd2d4d9b643fb13ad378824f93f2))
+* respawn agent in tmux mode when process exits ([#267](https://github.com/alltuner/factoryfloor/issues/267)) ([f8e54a1](https://github.com/alltuner/factoryfloor/commit/f8e54a1c32152c064748540ed95550201824706f))
+* revert worktree-create hook to symlink only xcframework ([#273](https://github.com/alltuner/factoryfloor/issues/273)) ([9ed32b5](https://github.com/alltuner/factoryfloor/commit/9ed32b5584ba69ce097bb7c8f10123b8a9568151))
+* scope tmux respawn hook to agent sessions only ([#268](https://github.com/alltuner/factoryfloor/issues/268)) ([e4b57af](https://github.com/alltuner/factoryfloor/commit/e4b57af886f826acc73b30c1dd4c857ff2d7aaf4))
+* show explicit desktop notifications even when app is active ([#266](https://github.com/alltuner/factoryfloor/issues/266)) ([f0b04ca](https://github.com/alltuner/factoryfloor/commit/f0b04caa4ab9bbda5c02b731ecf82184fb2ac301))
+
+
+### Performance
+
+* show workstream UI instantly during worktree creation ([#258](https://github.com/alltuner/factoryfloor/issues/258)) ([8f31121](https://github.com/alltuner/factoryfloor/commit/8f31121cf49c260b08119c109ab41c1e6c987b85)), closes [#254](https://github.com/alltuner/factoryfloor/issues/254)
+
+
+### Miscellaneous
+
+* **deps:** update actions/checkout action to v6 ([#271](https://github.com/alltuner/factoryfloor/issues/271)) ([0ac67a2](https://github.com/alltuner/factoryfloor/commit/0ac67a28ac9d8bc53a349db69ec48878434b75c5))
+
+
+### Documentation
+
+* document .factoryfloor.json script configuration ([#259](https://github.com/alltuner/factoryfloor/issues/259)) ([d52c0a2](https://github.com/alltuner/factoryfloor/commit/d52c0a2878a273c75118b950c7cb295d5c2b334a)), closes [#255](https://github.com/alltuner/factoryfloor/issues/255)
+
+## [0.1.52](https://github.com/alltuner/factoryfloor/compare/v0.1.51...v0.1.52) (2026-03-31)
+
+
+### Bug Fixes
+
+* create empty initial commit on git init to enable worktrees ([#252](https://github.com/alltuner/factoryfloor/issues/252)) ([656e5f3](https://github.com/alltuner/factoryfloor/commit/656e5f38a80530fa037b898b6a4a2cc4c0703961))
+* prefer login shell PATH for tool detection ([#250](https://github.com/alltuner/factoryfloor/issues/250)) ([407683d](https://github.com/alltuner/factoryfloor/commit/407683dccfcb27f3b00f30a989dc0b216a54b331))
+
+## [0.1.51](https://github.com/alltuner/factoryfloor/compare/v0.1.50...v0.1.51) (2026-03-31)
+
+
+### Bug Fixes
+
+* stop overriding PATH and redirecting stderr in agent launch ([#248](https://github.com/alltuner/factoryfloor/issues/248)) ([cbc1d19](https://github.com/alltuner/factoryfloor/commit/cbc1d194999e706abbbb324dea71330ae5ae46ab))
+
+## [0.1.50](https://github.com/alltuner/factoryfloor/compare/v0.1.49...v0.1.50) (2026-03-31)
+
+
+### Features
+
+* improve terminal spawning resilience ([#235](https://github.com/alltuner/factoryfloor/issues/235)) ([8313c13](https://github.com/alltuner/factoryfloor/commit/8313c13a03134c3800248c06a520afa7cee73c2d))
+* improve update experience for Homebrew users ([#246](https://github.com/alltuner/factoryfloor/issues/246)) ([c4db1d2](https://github.com/alltuner/factoryfloor/commit/c4db1d2b8fce6d2ca8f6967ac2d1a6d54d810418))
+* per-workstream debug log files for launches ([#247](https://github.com/alltuner/factoryfloor/issues/247)) ([5c156f5](https://github.com/alltuner/factoryfloor/commit/5c156f5b27d9029d270b71dbd236a7aeab5b7ff0))
+* **website:** add download button to /get/ page ([#240](https://github.com/alltuner/factoryfloor/issues/240)) ([3f1b212](https://github.com/alltuner/factoryfloor/commit/3f1b212fdbdd18aee032053a16642271fe793fb8)), closes [#231](https://github.com/alltuner/factoryfloor/issues/231)
+
+
+### Bug Fixes
+
+* consolidate settings from 7 sections to 4 ([#242](https://github.com/alltuner/factoryfloor/issues/242)) ([9607073](https://github.com/alltuner/factoryfloor/commit/9607073d1155333d6c2270ac61b78b005728f361)), closes [#233](https://github.com/alltuner/factoryfloor/issues/233)
+* fade onboarding content so skyline remains visible in small windows ([#245](https://github.com/alltuner/factoryfloor/issues/245)) ([c0b998c](https://github.com/alltuner/factoryfloor/commit/c0b998c81827e0321f1cff9dc3e5e8e2ee03eb45))
+* increase DMG window height so skyline is visible ([#238](https://github.com/alltuner/factoryfloor/issues/238)) ([79e9a32](https://github.com/alltuner/factoryfloor/commit/79e9a32919973d639418d06a71929a0e83f2c360)), closes [#230](https://github.com/alltuner/factoryfloor/issues/230)
+* resolve compiler warnings in Launcher, BrowserView, and Updater ([#241](https://github.com/alltuner/factoryfloor/issues/241)) ([645ea15](https://github.com/alltuner/factoryfloor/commit/645ea15efdfd3e7a6424eff7a958fa2e5ebb04af)), closes [#228](https://github.com/alltuner/factoryfloor/issues/228)
+* trigger Sparkle update from sidebar instead of opening website ([#237](https://github.com/alltuner/factoryfloor/issues/237)) ([5b74416](https://github.com/alltuner/factoryfloor/commit/5b7441650749205026c9316c49f2f03db976f4c8)), closes [#232](https://github.com/alltuner/factoryfloor/issues/232)
+* use interactive login shell (-lic) for tool version manager support ([#243](https://github.com/alltuner/factoryfloor/issues/243)) ([d48ee31](https://github.com/alltuner/factoryfloor/commit/d48ee3131ca760cfe2876bddb2c4a8ec2b2370b1))
+
 ## [0.1.49](https://github.com/alltuner/factoryfloor/compare/v0.1.48...v0.1.49) (2026-03-30)
 
 

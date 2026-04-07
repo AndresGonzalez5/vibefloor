@@ -40,12 +40,14 @@ targets:
       path: FactoryFloor/Info.plist
       properties:
         CFBundleDisplayName: $(PRODUCT_NAME)
-        CFBundleVersion: "0.1.49" # x-release-please-version
-        CFBundleShortVersionString: "0.1.49" # x-release-please-version
+        CFBundleVersion: "0.1.65" # x-release-please-version
+        CFBundleShortVersionString: "0.1.65" # x-release-please-version
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSMainStoryboardFile: ""
         NSPrincipalClass: NSApplication
         LSUIElement: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
         SUPublicEDKey: "grC1rloxT0gFZ2mQVIuDTZlkNFXwXLZhn9+xs4YGuXo="
         SUFeedURL: https://factory-floor.com/appcast.xml
         SUEnableAutomaticChecks: true
@@ -97,6 +99,14 @@ targets:
       - path: Resources/PixelAgents
         buildPhase: resources
         type: folder
+      - path: Resources/notification.wav
+        buildPhase: resources
+      - path: ghostty/zig-out/share/terminfo
+        type: folder
+        buildPhase: resources
+      - path: ghostty/zig-out/share/ghostty
+        type: folder
+        buildPhase: resources
     preBuildScripts:
       - script: |
           set -e

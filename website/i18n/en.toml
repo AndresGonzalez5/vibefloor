@@ -12,7 +12,7 @@ other = "Config"
 
 # Hero
 [hero_badge]
-other = "Free & open source · macOS native · Ghostty terminal"
+other = "Open Source"
 [hero_title_1]
 other = "Your"
 [hero_title_accent]
@@ -91,6 +91,18 @@ other = "Automate your workstream lifecycle with setup, run, and teardown script
 other = "Add a"
 [config_or_use]
 other = "to your project root."
+[config_hook]
+other = "Hook"
+[config_when]
+other = "When it runs"
+[config_setup_desc]
+other = "Once, when a workstream is created. Use for installing dependencies or build steps."
+[config_run_desc]
+other = "On demand via the Environment tab. Wrapped in ff-run for automatic port detection."
+[config_teardown_desc]
+other = "When a workstream is archived. Use for cleanup like stopping containers."
+[config_optional_note]
+other = "All fields are optional. Scripts run in the workstream directory using your login shell."
 
 # Env vars
 [env_label]
@@ -173,11 +185,13 @@ other = "View on GitHub"
 other = "Star the project"
 
 [footer_poblenou]
-other = "Made with ❤️ in Poblenou, Barcelona"
+other = "Made with ❤️ in Poblenou, Barcelona 🇪🇺"
 
 # Sponsor
 [sponsor_intro]
-other = "Factory Floor is free and open source. Your support helps fund continued development and new features."
+other = "Factory Floor is free and open source."
+[sponsor_intro_2]
+other = "Your support helps fund continued development and new features."
 [sponsor_financial]
 other = "Financial support"
 [sponsor_other]
@@ -201,7 +215,11 @@ other = "Bug reports and feature requests help improve the app."
 [sponsor_contribute]
 other = "Contribute code"
 [sponsor_contribute_desc]
-other = "Pull requests for bug fixes, features, and translations are welcome."
+other = "Pull requests for bug fixes and features are welcome."
+[sponsor_translate]
+other = "Translate the app or website"
+[sponsor_translate_desc]
+other = "Help make Factory Floor accessible in more languages."
 [sponsor_ghostty]
 other = "Support Ghostty"
 [sponsor_ghostty_desc]
@@ -218,6 +236,12 @@ other = "Install"
 other = "Upgrade"
 [get_download]
 other = "Download from GitHub Releases"
+
+# Docs
+[nav_docs]
+other = "Docs"
+[docs_subtitle]
+other = "Everything you need to know, nothing you don't."
 
 # Changelog
 [changelog_subtitle]

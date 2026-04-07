@@ -25,11 +25,13 @@
 
 /* Alerts */
 "Remove Project" = "Ta bort projekt";
-"Archive Workstream" = "Arkivera arbetsflöde";
-"Archive" = "Arkivera";
-"Archive Anyway" = "Arkivera ändå";
+"Remove Workstream" = "Ta bort arbetsflöde";
+"Ongoing terminals and Coding Agent sessions will be killed. The worktree and its files will remain on disk." = "Pågående terminaler och kodningsagentsessioner kommer att avslutas. Arbetsträdet och dess filer förblir på disken.";
+"Purge Workstream" = "Rensa arbetsflöde";
+"Purge" = "Rensa";
+"Purge Anyway" = "Rensa ändå";
 "This workstream has uncommitted changes that will be lost." = "Detta arbetsflöde har osparade ändringar som kommer att gå förlorade.";
-"The worktree and its branch will be removed." = "Arbetsträdet och dess gren kommer att tas bort.";
+"The worktree and its branch will be permanently deleted." = "Arbetsträdet och dess gren kommer att raderas permanent.";
 "Projects Not Found" = "Projekt hittades inte";
 "The following projects were removed because their directories no longer exist on disk: %@" = "Följande projekt togs bort eftersom deras kataloger inte längre finns på disken: %@";
 "Cancel" = "Avbryt";
@@ -64,9 +66,12 @@
 "Terminal" = "Terminal";
 "None" = "Ingen";
 "Browser" = "Webbläsare";
+"GitHub" = "GitHub";
 "Coding Agent" = "Kodningsagent";
 "Bypass permission prompts" = "Hoppa över behörighetsförfrågningar";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "När aktiverad kommer kodningsagenten inte att be om bekräftelse innan ändringar görs. Använd med försiktighet: agenten kan redigera filer, köra kommandon och göra commits utan att fråga.";
+"Allow writes outside worktree" = "Tillåt skrivningar utanför worktree";
+"When enabled, the coding agent can modify files anywhere on disk. When disabled, writes are restricted to the worktree directory." = "När aktiverad kan kodningsagenten ändra filer var som helst på disken. När inaktiverad begränsas skrivningar till worktree-katalogen.";
 "External Terminal" = "Extern terminal";
 "Requires tmux to be installed." = "Kräver att tmux är installerat.";
 "URL" = "URL";
@@ -78,6 +83,8 @@
 "Clean" = "Rent";
 "Uncommitted changes" = "Osparade ändringar";
 "Archiving..." = "Arkiverar...";
+"Commits ahead" = "Commits före";
+"Open as workstream" = "Öppna som arbetsflöde";
 "Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams." = "Arbetsträd på disk för detta repository. Rensning tar bort rena arbetsträd och deras associerade arbetsflöden.";
 "Prune %d clean worktree" = "Rensa %d rent arbetsträd";
 "Prune %d clean worktrees" = "Rensa %d rena arbetsträd";
@@ -99,6 +106,7 @@
 "Automatically open Factory Floor when you log in." = "Öppna Factory Floor automatiskt vid inloggning.";
 "Detailed logging" = "Detaljerad loggning";
 "Log setup, run, and teardown script output to files for debugging." = "Logga utdata från konfigurations-, körnings- och nedmonteringsskript till filer för felsökning.";
+"Open Logs Directory" = "Öppna loggkatalog";
 
 /* Settings - Environment */
 "Environment" = "Miljö";
@@ -121,7 +129,7 @@
 "Agent Teams" = "Agentteam";
 "Enables experimental multi-agent coordination. Agents can spawn teammates, delegate tasks, and collaborate across workstreams." = "Aktiverar experimentell multi-agentkoordinering. Agenter kan skapa teammedlemmar, delegera uppgifter och samarbeta mellan arbetsflöden.";
 "Auto-rename branch" = "Byt namn på gren automatiskt";
-"The agent will rename the worktree branch to match the task on the first request (e.g., fix-login-timeout)." = "Agenten byter namn på arbetsträdsgrenen för att matcha uppgiften vid den första förfrågan (t.ex. fix-login-timeout).";
+"On the first request, the agent renames the branch to match the task and writes a short description visible in the sidebar." = "Vid den första förfrågan byter agenten namn på grenen för att matcha uppgiften och skriver en kort beskrivning synlig i sidofältet.";
 "External Browser" = "Extern webbläsare";
 
 /* Settings - Advanced */
@@ -165,6 +173,12 @@
 "Opens the current workstream directory" = "Öppnar det aktuella arbetsflödets katalog";
 "Open in external browser" = "Öppna i extern webbläsare";
 "Open in external terminal" = "Öppna i extern terminal";
+"Open in External Terminal" = "Öppna i extern terminal";
+"Open on GitHub" = "Öppna på GitHub";
+"Reveal in Finder" = "Visa i Finder";
+"Copy project path" = "Kopiera projektsökväg";
+"Copy branch name" = "Kopiera grennamn";
+"Copy worktree path" = "Kopiera worktree-sökväg";
 
 /* Agent tab - Claude not installed */
 "Claude Code not found" = "Claude Code hittades inte";
@@ -237,6 +251,7 @@
 /* Help */
 "Sponsor" = "Sponsra";
 "Report a Bug" = "Rapportera en bugg";
+"Documentation" = "Dokumentation";
 "Request a Feature" = "Föreslå en funktion";
 "Rebuild" = "Bygg om";
 "Rerun" = "Kör igen";
@@ -244,3 +259,23 @@
 "Stop" = "Stoppa";
 
 "Restarting..." = "Startar om...";
+"Preparing workstream..." = "Förbereder arbetsflöde...";
+
+/* Update Banner */
+"v%@ available" = "v%@ tillgänglig";
+"Release Notes" = "Versionsanteckningar";
+"Using scripts from %@" = "Använder skript från %@";
+
+/* Quick Actions */
+"Quick Actions" = "Snabbåtgärder";
+"Commit" = "Commit";
+"Push" = "Push";
+"Create PR" = "Skapa PR";
+"Abandon PR" = "Överge PR";
+"This branch has been merged." = "Denna gren har mergats.";
+"gh CLI is not installed." = "gh CLI är inte installerat.";
+"Claude Code is not installed." = "Claude Code är inte installerat.";
+"Enable \"Bypass permission prompts\" in Settings." = "Aktivera \"Hoppa över behörighetsfrågor\" i Inställningar.";
+"No GitHub remote found for this project." = "Ingen GitHub-fjärrserver hittades för detta projekt.";
+"Quick action debug" = "Felsökning av snabbåtgärder";
+"Show a debug panel with command output from quick actions (Create PR, Commit & Push)." = "Visa en felsökningspanel med kommandoutdata från snabbåtgärder (Skapa PR, Commit & Push).";

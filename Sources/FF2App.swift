@@ -1,9 +1,22 @@
 // ABOUTME: Main application entry point.
 // ABOUTME: Initializes the ghostty terminal engine and presents the main window.
 
+import os
 import Sentry
 import Sparkle
 import SwiftUI
+import UserNotifications
+
+private let logger = Logger(subsystem: "factoryfloor", category: "app")
+
+protocol NotificationAuthorizationRequesting {
+    func requestAuthorization(
+        options: UNAuthorizationOptions,
+        completionHandler: @escaping @Sendable (Bool, (any Error)?) -> Void
+    )
+}
+
+extension UNUserNotificationCenter: NotificationAuthorizationRequesting {}
 
 extension Notification.Name {
     static let openDirectory = Notification.Name("factoryfloor.openDirectory")
@@ -21,7 +34,75 @@ extension Notification.Name {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    enum NotificationAuthorizationLogLevel {
+        case info
+        case warning
+    }
+
+    func applicationDidFinishLaunching(_: Notification) {
+        // Debug settings should not persist across launches
+        UserDefaults.standard.set(false, forKey: "factoryfloor.quickActionDebug")
+
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        Self.requestNotificationAuthorization(using: center)
+    }
+
+    nonisolated static func handleNotificationAuthorizationResult(
+        granted: Bool,
+        error: (any Error)?,
+        log: @escaping @Sendable (String, NotificationAuthorizationLogLevel) -> Void = { message, level in
+            switch level {
+            case .info:
+                logger.info("\(message, privacy: .public)")
+            case .warning:
+                logger.warning("\(message, privacy: .public)")
+            }
+        }
+    ) {
+        if Thread.isMainThread {
+            if let error {
+                log("Notification permission error: \(error.localizedDescription)", .warning)
+            } else if !granted {
+                log("Notification permission denied by user", .info)
+            }
+            return
+        }
+
+        Task { @MainActor in
+            if let error {
+                log("Notification permission error: \(error.localizedDescription)", .warning)
+            } else if !granted {
+                log("Notification permission denied by user", .info)
+            }
+        }
+    }
+
+    nonisolated static func requestNotificationAuthorization(
+        using center: NotificationAuthorizationRequesting,
+        log: @escaping @Sendable (String, NotificationAuthorizationLogLevel) -> Void = { message, level in
+            switch level {
+            case .info:
+                logger.info("\(message, privacy: .public)")
+            case .warning:
+                logger.warning("\(message, privacy: .public)")
+            }
+        }
+    ) {
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            handleNotificationAuthorizationResult(granted: granted, error: error, log: log)
+        }
+    }
+
+    nonisolated func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+
     func applicationWillTerminate(_: Notification) {
         HookEventReceiver.shared.stop()
         let tmuxPath = ToolStatus.detect().tmux.path

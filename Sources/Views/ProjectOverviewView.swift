@@ -5,10 +5,13 @@ import SwiftUI
 
 struct ProjectOverviewView: View {
     @Binding var project: Project
-    let onArchiveWorkstream: (UUID) -> Void
+    let onSelectWorkstream: (UUID) -> Void
+    let onRemoveWorkstream: (UUID) -> Void
+    let onPurgeWorkstream: (UUID) -> Void
     let onProjectChanged: () -> Void
 
     @EnvironmentObject var appEnv: AppEnvironment
+    @AppStorage("factoryfloor.workstreamSortOrder") private var workstreamSortOrder: ProjectSortOrder = .recent
     @State private var worktrees: [WorktreeInfo] = []
     @State private var showingPruneConfirm = false
     @State private var isPruning = false
@@ -30,7 +33,7 @@ struct ProjectOverviewView: View {
                     .multilineTextAlignment(.center)
                     .onChange(of: project.name) { _, _ in onProjectChanged() }
 
-                DirectoryRow(path: project.directory, defaultTerminal: defaultTerminal)
+                DirectoryRow(path: project.directory, defaultTerminal: defaultTerminal, githubURL: appEnv.githubURL(for: project.directory))
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
@@ -131,13 +134,62 @@ struct ProjectOverviewView: View {
                                     .foregroundStyle(.secondary)
                             }
                             ForEach(prs, id: \.number) { pr in
-                                LabeledContent("#\(pr.number)") {
+                                LabeledContent {
                                     Text(pr.title)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
+                                } label: {
+                                    Text(verbatim: "#\(pr.number)")
                                 }
                             }
                         }
+                    }
+                }
+
+                // MARK: - Workstreams
+
+                Section {
+                    if project.workstreams.isEmpty {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 8) {
+                                Text("No workstreams yet")
+                                    .foregroundStyle(.secondary)
+                                (Text("Press ") + Text(Image(systemName: "command")) + Text(" N ") + Text("to create one."))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                    } else {
+                        let sorted = sortedWorkstreams(project.workstreams)
+                        ForEach(Array(sorted.enumerated()), id: \.element.id) { index, workstream in
+                            WorkstreamRow(
+                                workstream: workstream,
+                                shortcutNumber: index < 9 ? index + 1 : nil,
+                                onSelect: { onSelectWorkstream(workstream.id) },
+                                onRemove: { onRemoveWorkstream(workstream.id) },
+                                onPurge: { onPurgeWorkstream(workstream.id) }
+                            )
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("Workstreams")
+                        Spacer()
+                        if project.workstreams.count > 1 {
+                            Picker("", selection: $workstreamSortOrder) {
+                                ForEach(ProjectSortOrder.allCases, id: \.self) { order in
+                                    Text(order.rawValue).tag(order)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 120)
+                        }
+                        Text("\(project.workstreams.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -146,15 +198,12 @@ struct ProjectOverviewView: View {
                 if !worktrees.isEmpty {
                     Section {
                         ForEach(worktrees) { wt in
-                            let isArchiving = WorkstreamArchiver.archivingPaths.contains(wt.standardizedPath)
-                            if wt.isMain || isArchiving {
-                                WorktreeInfoRow(worktree: wt, isArchiving: isArchiving)
-                            } else {
-                                Button(action: { selectedWorktreeForDetail = wt }) {
-                                    WorktreeInfoRow(worktree: wt)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                            WorktreeInfoRow(
+                                worktree: wt,
+                                projectDirectory: project.directory,
+                                isWorkstream: workstreamPaths.contains(wt.path),
+                                onAdopt: { adoptWorktree(wt) }
+                            )
                         }
 
                         if isPruning {
@@ -191,7 +240,16 @@ struct ProjectOverviewView: View {
             }
             .formStyle(.grouped)
 
-            // Doc tabs
+            // Markdown content
+            if let selected = selectedDoc,
+               let doc = docFiles.first(where: { $0.name == selected })
+            {
+                Divider()
+                MarkdownContentView(markdown: doc.content)
+                    .id(selected)
+            }
+
+            // Doc tabs pinned to bottom
             if !docFiles.isEmpty {
                 Divider()
                 HStack(spacing: 0) {
@@ -199,21 +257,13 @@ struct ProjectOverviewView: View {
                         DocTabButton(
                             name: doc.name,
                             isActive: selectedDoc == doc.name,
-                            action: { selectedDoc = doc.name }
+                            action: { selectedDoc = selectedDoc == doc.name ? nil : doc.name }
                         )
                     }
                     Spacer()
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
-                Divider()
-
-                if let selected = selectedDoc,
-                   let doc = docFiles.first(where: { $0.name == selected })
-                {
-                    MarkdownContentView(markdown: doc.content)
-                        .id(selected)
-                }
             }
         } // VStack
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -257,11 +307,12 @@ struct ProjectOverviewView: View {
         }
     }
 
+    private var workstreamPaths: Set<String> {
+        Set(project.workstreams.compactMap(\.worktreePath))
+    }
+
     private var prunableCount: Int {
-        worktrees.filter { wt in
-            !wt.isMain && !wt.isDirty
-                && !WorkstreamArchiver.archivingPaths.contains(wt.standardizedPath)
-        }.count
+        worktrees.filter { !$0.isMain && !$0.isDirty && !$0.hasBranchCommits }.count
     }
 
     private func loadRepoDetail() {
@@ -273,11 +324,35 @@ struct ProjectOverviewView: View {
         }
     }
 
+    private func adoptWorktree(_ worktree: WorktreeInfo) {
+        let name = worktree.branch ?? worktree.path.components(separatedBy: "/").last ?? "workstream"
+        let workstream = Workstream(name: name, worktreePath: worktree.path)
+        NotificationCenter.default.post(
+            name: .workstreamCreated,
+            object: nil,
+            userInfo: ["projectID": project.id, "workstream": workstream]
+        )
+    }
+
     private func refreshWorktrees() {
         let dir = project.directory
         Task.detached {
             let wts = GitOperations.listWorktreesWithInfo(at: dir)
             await updateWorktrees(wts)
+            // Populate PR cache for worktree branches
+            let branches = Set(wts.compactMap(\.branch))
+            await MainActor.run {
+                appEnv.refreshBranchPRs(for: dir, branches: branches)
+            }
+        }
+    }
+
+    private func sortedWorkstreams(_ workstreams: [Workstream]) -> [Workstream] {
+        switch workstreamSortOrder {
+        case .recent:
+            return workstreams.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+        case .alphabetical:
+            return workstreams.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
     }
 
@@ -292,7 +367,7 @@ struct ProjectOverviewView: View {
     private func pruneWorktrees() {
         isPruning = true
         let dir = project.directory
-        let prunablePaths = Set(worktrees.filter { !$0.isMain && !$0.isDirty }.map(\.path))
+        let prunablePaths = Set(worktrees.filter { !$0.isMain && !$0.isDirty && !$0.hasBranchCommits }.map(\.path))
         Task.detached {
             GitOperations.pruneCleanWorktrees(at: dir)
             await applyPrunedWorktrees(prunablePaths)
@@ -307,7 +382,6 @@ struct ProjectOverviewView: View {
     @MainActor
     private func updateDocFiles(_ docFiles: [DocFile]) {
         self.docFiles = docFiles
-        selectedDoc = docFiles.first?.name
     }
 
     @MainActor
@@ -324,68 +398,154 @@ struct ProjectOverviewView: View {
 
 private struct WorktreeInfoRow: View {
     let worktree: WorktreeInfo
-    var isArchiving: Bool = false
+    let projectDirectory: String
+    let isWorkstream: Bool
+    let onAdopt: () -> Void
 
-    @State private var isHovering = false
+    @EnvironmentObject var appEnv: AppEnvironment
+
+    private var pr: GitHubPR? {
+        guard let branch = worktree.branch else { return nil }
+        return appEnv.githubPR(for: projectDirectory, branch: branch)
+    }
 
     var body: some View {
         HStack {
             Image(systemName: worktree.isMain ? "folder.fill" : "arrow.triangle.branch")
                 .foregroundStyle(worktree.isMain ? .blue : .secondary)
-                .frame(width: 20)
+                .frame(width: 20, alignment: .top)
+                .padding(.top, 4)
             VStack(alignment: .leading, spacing: 2) {
                 Text(worktree.branch ?? "detached")
                     .font(.system(.body, design: .monospaced))
                 Text(worktree.path.abbreviatedPath)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-            }
-            Spacer()
-            if isArchiving {
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .controlSize(.mini)
-                    Text("Archiving...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if !worktree.isMain {
+                    HStack(spacing: 8) {
+                        if let pr {
+                            let prColor: Color = pr.state == "MERGED" ? .purple : .green
+                            Link(destination: URL(string: pr.url)!) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: pr.state == "MERGED" ? "arrow.triangle.merge" : "arrow.triangle.pull")
+                                        .font(.system(size: 10))
+                                    Text(verbatim: "#\(pr.number)")
+                                        .font(.caption)
+                                }
+                                .foregroundStyle(prColor)
+                            }
+                        }
+                        if worktree.isDirty {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(.orange)
+                                    .frame(width: 6, height: 6)
+                                Text("Uncommitted changes")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        } else if worktree.hasBranchCommits {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 10))
+                                Text("Commits ahead")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(.blue)
+                        } else {
+                            Text("Clean")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                    }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-            } else if worktree.isMain {
+            }
+            .frame(minHeight: 36, alignment: .leading)
+            Spacer()
+            if worktree.isMain {
                 Text("main")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if worktree.isDirty {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(.orange)
-                        .frame(width: 6, height: 6)
-                    Text("Uncommitted changes")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(isHovering ? Color.orange.opacity(0.15) : .clear)
-                )
-            } else {
-                Text("Clean")
-                    .font(.caption)
-                    .foregroundStyle(.green)
+            } else if !isWorkstream {
+                Button(action: onAdopt) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.rectangle.on.folder")
+                            .font(.system(size: 12))
+                        Text("Open")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(isHovering ? Color.green.opacity(0.15) : .clear)
-                    )
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
             }
         }
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            if !worktree.isMain && !isArchiving {
-                isHovering = hovering
+    }
+}
+
+private struct WorkstreamRow: View {
+    let workstream: Workstream
+    var shortcutNumber: Int?
+    let onSelect: () -> Void
+    let onRemove: () -> Void
+    let onPurge: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                Image(systemName: "terminal")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workstream.name)
+                        .font(.system(.body, design: .monospaced))
+                    if let path = workstream.worktreePath {
+                        Text(path.abbreviatedPath)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(minHeight: 36, alignment: .leading)
+                Spacer()
+                if let n = shortcutNumber {
+                    Text("\(Image(systemName: "control"))\(n)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, 4)
+                }
+                Button(action: {
+                    onRemove()
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(Color.primary.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovering ? 1 : 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isHovering ? Color.accentColor.opacity(0.15) : .clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            Button(action: onRemove) {
+                Label("Remove", systemImage: "xmark")
+            }
+            Button(role: .destructive, action: onPurge) {
+                Label("Purge", systemImage: "trash")
             }
         }
     }

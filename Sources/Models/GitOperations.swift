@@ -19,6 +19,8 @@ struct WorktreeInfo: Identifiable {
     let branch: String?
     let isDirty: Bool
     let isMain: Bool
+    let hasUnpushedCommits: Bool
+    let hasBranchCommits: Bool
 
     var id: String {
         path
@@ -78,9 +80,12 @@ enum GitOperations {
         return FileManager.default.fileExists(atPath: gitDir.path)
     }
 
-    /// Initialize a git repo at the given path.
+    /// Initialize a git repo at the given path with an empty initial commit.
     static func initRepo(at path: String) -> Bool {
-        return run(args: ["init"], in: path) != nil
+        guard run(args: ["init"], in: path) != nil else { return false }
+        // Create an empty commit so the repo has a HEAD ref, which is
+        // required for worktree creation.
+        return run(args: ["commit", "--allow-empty", "-m", "Initial commit"], in: path) != nil
     }
 
     /// Get repo information for display.
@@ -101,7 +106,7 @@ enum GitOperations {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let commitCount = countStr.flatMap(Int.init)
 
-        let status = run(args: ["status", "--porcelain"], in: path)?
+        let status = run(args: ["status", "--porcelain", "--ignore-submodules=dirty"], in: path)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let isDirty = status.map { !$0.isEmpty } ?? false
 
@@ -173,6 +178,8 @@ enum GitOperations {
             symlinkEnvFiles(from: projectPath, to: worktreeDir.path)
         }
 
+        addExcludeEntry(at: projectPath, pattern: ".factoryfloor-state/")
+
         return worktreeDir.path
     }
 
@@ -196,25 +203,46 @@ enum GitOperations {
         }
     }
 
-    /// Remove a git worktree.
-    static func removeWorktree(projectPath: String, workstreamName: String, projectName: String) {
-        let worktreeDir = AppConstants.worktreesDirectory
-            .appendingPathComponent(sanitize(projectName))
-            .appendingPathComponent(sanitize(workstreamName))
+    /// Append a pattern to .git/info/exclude if not already present.
+    private static func addExcludeEntry(at repoPath: String, pattern: String) {
+        let excludeURL = URL(fileURLWithPath: repoPath).appendingPathComponent(".git/info/exclude")
+        let fm = FileManager.default
 
-        _ = run(args: ["worktree", "remove", "--force", worktreeDir.path], in: projectPath)
+        // Ensure the info directory exists
+        let infoDir = excludeURL.deletingLastPathComponent()
+        try? fm.createDirectory(at: infoDir, withIntermediateDirectories: true)
+
+        let existing = (try? String(contentsOf: excludeURL, encoding: .utf8)) ?? ""
+        let lines = existing.components(separatedBy: .newlines)
+        if lines.contains(pattern) { return }
+
+        let entry = existing.hasSuffix("\n") || existing.isEmpty ? pattern + "\n" : "\n" + pattern + "\n"
+        if let data = entry.data(using: .utf8), let handle = try? FileHandle(forWritingTo: excludeURL) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            handle.closeFile()
+        } else {
+            try? (existing + entry).write(to: excludeURL, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Remove a git worktree.
+    static func removeWorktree(projectPath: String, worktreePath: String) {
+        let worktreeDir = URL(fileURLWithPath: worktreePath)
+
+        _ = run(args: ["worktree", "remove", "--force", worktreePath], in: projectPath)
 
         // Clean up empty directories
         try? FileManager.default.removeItem(at: worktreeDir)
-        let projectWorktreeDir = AppConstants.worktreesDirectory.appendingPathComponent(sanitize(projectName))
-        if let contents = try? FileManager.default.contentsOfDirectory(atPath: projectWorktreeDir.path), contents.isEmpty {
-            try? FileManager.default.removeItem(at: projectWorktreeDir)
+        let parentDir = worktreeDir.deletingLastPathComponent()
+        if let contents = try? FileManager.default.contentsOfDirectory(atPath: parentDir.path), contents.isEmpty {
+            try? FileManager.default.removeItem(at: parentDir)
         }
     }
 
     /// Check if a worktree has uncommitted changes (staged, unstaged, or untracked files).
     static func hasUncommittedChanges(at path: String) -> Bool {
-        guard let status = run(args: ["status", "--porcelain"], in: path) else { return false }
+        guard let status = run(args: ["status", "--porcelain", "--ignore-submodules=dirty"], in: path) else { return false }
         return !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -287,6 +315,49 @@ enum GitOperations {
         }
     }
 
+    /// Check if the current branch has commits not yet pushed to its upstream.
+    static func hasUnpushedCommits(at path: String) -> Bool {
+        guard let output = run(args: ["log", "@{upstream}..HEAD", "--oneline"], in: path) else {
+            // No upstream set means everything is unpushed (if there are commits)
+            guard let commits = run(args: ["log", "--oneline", "-1"], in: path) else { return false }
+            return !commits.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Check if the current branch has commits ahead of the default branch.
+    static func hasBranchCommits(at path: String, projectPath: String) -> Bool {
+        let base = defaultBranch(at: projectPath)
+        guard let output = run(args: ["log", "\(base)..HEAD", "--oneline"], in: path) else { return false }
+        return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Check if a remote exists for this repository.
+    static func hasRemote(at path: String) -> Bool {
+        guard let output = run(args: ["remote"], in: path) else { return false }
+        return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Push the current branch to origin, setting upstream if needed.
+    static func pushCurrentBranch(at path: String) -> (success: Bool, output: String) {
+        guard let gitPath else { return (false, "git not found") }
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: gitPath)
+        process.arguments = ["-C", path, "push", "-u", "origin", "HEAD"]
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            return (process.terminationStatus == 0, output)
+        } catch {
+            return (false, error.localizedDescription)
+        }
+    }
+
     /// List existing worktrees for a project with branch and dirty status.
     static func listWorktreesWithInfo(at projectPath: String) -> [WorktreeInfo] {
         guard let output = run(args: ["worktree", "list", "--porcelain"], in: projectPath) else {
@@ -305,7 +376,9 @@ enum GitOperations {
                 if let path = currentPath {
                     let isMain = URL(fileURLWithPath: path).standardizedFileURL.path == mainPath
                     let dirty = !isMain && hasUncommittedChanges(at: path)
-                    results.append(WorktreeInfo(path: path, branch: currentBranch, isDirty: dirty, isMain: isMain))
+                    let unpushed = !isMain && hasUnpushedCommits(at: path)
+                    let branchCommits = !isMain && hasBranchCommits(at: path, projectPath: projectPath)
+                    results.append(WorktreeInfo(path: path, branch: currentBranch, isDirty: dirty, isMain: isMain, hasUnpushedCommits: unpushed, hasBranchCommits: branchCommits))
                 }
                 currentPath = String(line.dropFirst("worktree ".count))
                 currentBranch = nil
@@ -317,18 +390,20 @@ enum GitOperations {
         if let path = currentPath {
             let isMain = URL(fileURLWithPath: path).standardizedFileURL.path == mainPath
             let dirty = !isMain && hasUncommittedChanges(at: path)
-            results.append(WorktreeInfo(path: path, branch: currentBranch, isDirty: dirty, isMain: isMain))
+            let unpushed = !isMain && hasUnpushedCommits(at: path)
+            let branchCommits = !isMain && hasBranchCommits(at: path, projectPath: projectPath)
+            results.append(WorktreeInfo(path: path, branch: currentBranch, isDirty: dirty, isMain: isMain, hasUnpushedCommits: unpushed, hasBranchCommits: branchCommits))
         }
 
         return results
     }
 
-    /// Remove all worktrees that have no uncommitted changes. Returns count of pruned worktrees.
+    /// Remove all worktrees that have no uncommitted changes and no unmerged branch commits.
     @discardableResult
     static func pruneCleanWorktrees(at projectPath: String) -> Int {
         let worktrees = listWorktreesWithInfo(at: projectPath)
         var pruned = 0
-        for wt in worktrees where !wt.isMain && !wt.isDirty {
+        for wt in worktrees where !wt.isMain && !wt.isDirty && !wt.hasBranchCommits {
             let result = run(args: ["worktree", "remove", wt.path], in: projectPath)
             if result != nil {
                 pruned += 1
@@ -369,6 +444,59 @@ enum GitOperations {
     }
 
     // MARK: - Private
+
+    /// Fetch the default branch from origin. Fails silently when there is no
+    /// remote or the network is unreachable.
+    static func fetchDefaultBranch(at path: String) {
+        // Check if origin remote exists first (fast, no network)
+        guard run(args: ["remote", "get-url", "origin"], in: path) != nil else { return }
+
+        // Determine which branch to fetch
+        let branch: String
+        if let ref = run(args: ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"], in: path) {
+            // e.g. "origin/main" -> "main"
+            branch = ref.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "origin/", with: "")
+        } else {
+            branch = "main"
+        }
+
+        // Fetch with timeout — don't block worktree creation
+        runWithTimeout(args: ["fetch", "origin", branch, "--no-tags"], in: path, timeout: 5)
+    }
+
+    @discardableResult
+    private static func runWithTimeout(args: [String], in directory: String, timeout: TimeInterval) -> String? {
+        guard let gitPath else { return nil }
+        let process = Process()
+        let pipe = Pipe()
+        let errPipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: gitPath)
+        process.arguments = args
+        process.currentDirectoryURL = URL(fileURLWithPath: directory)
+        process.standardOutput = pipe
+        process.standardError = errPipe
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        let deadline = DispatchTime.now() + timeout
+        let group = DispatchGroup()
+        group.enter()
+        process.terminationHandler = { _ in group.leave() }
+
+        if group.wait(timeout: deadline) == .timedOut {
+            process.terminate()
+            logger.info("[FF] git \(args.joined(separator: " "), privacy: .public) timed out after \(timeout, privacy: .public)s")
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8)
+    }
 
     private static func sanitize(_ name: String) -> String {
         var result = name.replacingOccurrences(of: "/", with: "--")

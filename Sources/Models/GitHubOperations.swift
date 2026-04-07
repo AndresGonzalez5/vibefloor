@@ -3,7 +3,7 @@
 
 import Foundation
 
-struct GitHubRepoInfo: Sendable {
+struct GitHubRepoInfo {
     let name: String
     let url: String
     let description: String?
@@ -12,7 +12,7 @@ struct GitHubRepoInfo: Sendable {
     let openIssues: Int
 }
 
-struct GitHubPR: Sendable {
+struct GitHubPR {
     let number: Int
     let title: String
     let state: String
@@ -30,6 +30,41 @@ enum GitHubOperations {
         guard let gitPath,
               let remote = run(gitPath, args: ["remote", "get-url", "origin"], in: path) else { return false }
         return remote.contains("github.com")
+    }
+
+    /// Convert a git remote URL to a browser-openable HTTPS URL.
+    /// Handles SSH (`git@github.com:owner/repo.git`),
+    /// HTTPS (`https://github.com/owner/repo.git`),
+    /// and SSH protocol (`ssh://git@github.com/owner/repo.git`) formats.
+    static func browserURL(from remoteURL: String) -> URL? {
+        var cleaned = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasSuffix(".git") {
+            cleaned = String(cleaned.dropLast(4))
+        }
+        // SSH shorthand: git@github.com:owner/repo
+        if let atIndex = cleaned.firstIndex(of: "@"),
+           let colonIndex = cleaned.firstIndex(of: ":"),
+           colonIndex > atIndex,
+           !cleaned.hasPrefix("https://"),
+           !cleaned.hasPrefix("ssh://")
+        {
+            let host = cleaned[cleaned.index(after: atIndex) ..< colonIndex]
+            let path = cleaned[cleaned.index(after: colonIndex)...]
+            return URL(string: "https://\(host)/\(path)")
+        }
+        // ssh://git@github.com/owner/repo
+        if cleaned.hasPrefix("ssh://") {
+            cleaned = cleaned.replacingOccurrences(of: "ssh://", with: "https://")
+            if let atIndex = cleaned.firstIndex(of: "@") {
+                cleaned = "https://" + cleaned[cleaned.index(after: atIndex)...]
+            }
+            return URL(string: cleaned)
+        }
+        // Already HTTPS
+        if cleaned.hasPrefix("https://") || cleaned.hasPrefix("http://") {
+            return URL(string: cleaned)
+        }
+        return nil
     }
 
     /// Fetch repo info via gh CLI.
@@ -64,9 +99,24 @@ enum GitHubOperations {
         }
     }
 
-    /// Find a PR for a specific branch.
+    /// Find an open PR for a specific branch.
     static func prForBranch(ghPath: String, at path: String, branch: String) -> GitHubPR? {
         guard let json = run(ghPath, args: ["pr", "list", "--head", branch, "--json", "number,title,state,headRefName,url", "--limit", "1"], in: path) else { return nil }
+        guard let data = json.data(using: .utf8),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              let dict = array.first else { return nil }
+
+        guard let number = dict["number"] as? Int,
+              let title = dict["title"] as? String,
+              let state = dict["state"] as? String,
+              let branch = dict["headRefName"] as? String,
+              let url = dict["url"] as? String else { return nil }
+        return GitHubPR(number: number, title: title, state: state, branch: branch, url: url)
+    }
+
+    /// Find a merged PR for a specific branch.
+    static func mergedPRForBranch(ghPath: String, at path: String, branch: String) -> GitHubPR? {
+        guard let json = run(ghPath, args: ["pr", "list", "--head", branch, "--state", "merged", "--json", "number,title,state,headRefName,url", "--limit", "1"], in: path) else { return nil }
         guard let data = json.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
               let dict = array.first else { return nil }

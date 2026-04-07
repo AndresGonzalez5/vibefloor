@@ -8,7 +8,10 @@ private let logger = Logger(subsystem: "factoryfloor", category: "content-view")
 
 extension Notification.Name {
     static let workstreamCreated = Notification.Name("factoryfloor.workstreamCreated")
+    static let workstreamWorktreeReady = Notification.Name("factoryfloor.workstreamWorktreeReady")
+    static let workstreamCreationFailed = Notification.Name("factoryfloor.workstreamCreationFailed")
     static let projectCreated = Notification.Name("factoryfloor.projectCreated")
+    static let purgeWorkstream = Notification.Name("factoryfloor.purgeWorkstream")
 }
 
 final class ProjectList: ObservableObject {
@@ -35,8 +38,9 @@ struct ContentView: View {
     @StateObject private var updateChecker = UpdateChecker()
     @EnvironmentObject private var updater: Updater
     @State private var saveWork: DispatchWorkItem?
-    @State private var workstreamToArchive: UUID?
-    @State private var archiveWarningDirty = false
+    @State private var workstreamToRemove: UUID?
+    @State private var workstreamToPurge: UUID?
+    @State private var purgeWarningDirty = false
     @State private var removedProjectNames: [String] = []
     @State private var keyMonitorInstalled = false
 
@@ -82,23 +86,37 @@ struct ContentView: View {
                 .navigationTitle("Help")
                 .navigationSubtitle(AppConstants.appName)
         } else if let workstream = activeWorkstream, let project = activeProject {
-            TerminalContainerView(
-                workstreamID: workstream.id,
-                workingDirectory: workstream.workingDirectory(projectDirectory: project.directory),
-                projectDirectory: project.directory,
-                projectName: project.name,
-                workstreamName: workstream.name,
-                bypassPermissions: workstream.bypassPermissions
-            )
-            .id(workstream.id)
-            .navigationTitle(workstream.name)
-            .navigationSubtitle(project.name)
+            if workstream.worktreePath != nil {
+                TerminalContainerView(
+                    workstreamID: workstream.id,
+                    workingDirectory: workstream.workingDirectory(projectDirectory: project.directory),
+                    projectDirectory: project.directory,
+                    projectName: project.name,
+                    workstreamName: workstream.name,
+                    bypassPermissions: workstream.bypassPermissions
+                )
+                .id(workstream.id)
+                .navigationTitle(workstream.name)
+                .navigationSubtitle(appEnvironment.taskDescription(for: workstream.worktreePath) ?? project.name)
+            } else {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Preparing workstream...")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle(workstream.name)
+                .navigationSubtitle(appEnvironment.taskDescription(for: workstream.worktreePath) ?? project.name)
+            }
         } else if let project = activeProject,
                   let projectIndex = projects.firstIndex(where: { $0.id == project.id })
         {
             ProjectOverviewView(
                 project: $projectList.items[projectIndex],
-                onArchiveWorkstream: { wsID in confirmArchive(wsID) },
+                onSelectWorkstream: { wsID in selection = .workstream(wsID) },
+                onRemoveWorkstream: { wsID in workstreamToRemove = wsID },
+                onPurgeWorkstream: { wsID in confirmPurge(wsID) },
                 onProjectChanged: { ProjectStore.save(projects) }
             )
             .navigationTitle(project.name)
@@ -152,21 +170,35 @@ struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
             }
             .alert(
-                "Archive Workstream",
+                "Remove Workstream",
                 isPresented: Binding(
-                    get: { workstreamToArchive != nil },
-                    set: { if !$0 { workstreamToArchive = nil } }
+                    get: { workstreamToRemove != nil },
+                    set: { if !$0 { workstreamToRemove = nil } }
                 )
             ) {
-                Button("Cancel", role: .cancel) { workstreamToArchive = nil }
-                Button(archiveWarningDirty ? "Archive Anyway" : "Archive", role: .destructive) {
-                    performArchive()
+                Button("Cancel", role: .cancel) { workstreamToRemove = nil }
+                Button("Remove", role: .destructive) {
+                    performRemove()
                 }
             } message: {
-                if archiveWarningDirty {
+                Text("Ongoing terminals and Coding Agent sessions will be killed. The worktree and its files will remain on disk.")
+            }
+            .alert(
+                "Purge Workstream",
+                isPresented: Binding(
+                    get: { workstreamToPurge != nil },
+                    set: { if !$0 { workstreamToPurge = nil } }
+                )
+            ) {
+                Button("Cancel", role: .cancel) { workstreamToPurge = nil }
+                Button(purgeWarningDirty ? "Purge Anyway" : "Purge", role: .destructive) {
+                    performPurge()
+                }
+            } message: {
+                if purgeWarningDirty {
                     Text("This workstream has uncommitted changes that will be lost.")
                 } else {
-                    Text("The worktree and its branch will be removed.")
+                    Text("The worktree and its branch will be permanently deleted.")
                 }
             }
             .alert(
@@ -183,6 +215,63 @@ struct ContentView: View {
     }
 
     private var navigationView: some View {
+        navigationViewBase
+            .onChange(of: appEnvironment.missingProjectIDs) { _, missing in
+                guard !missing.isEmpty else { return }
+                logger.warning("[FF] missingProjectIDs changed: \(missing.count, privacy: .public) missing, \(projects.count, privacy: .public) total projects")
+                let names = projects.filter { missing.contains($0.id) }.map(\.name)
+                logger.warning("[FF] removing projects: \(names, privacy: .public)")
+                for id in missing {
+                    if let project = projects.first(where: { $0.id == id }) {
+                        for ws in project.workstreams {
+                            surfaceCache.removeWorkstreamSurfaces(for: ws.id)
+                            let workDir = ws.workingDirectory(projectDirectory: project.directory)
+                            pixelAgentsCache.removeEntry(for: workDir)
+                        }
+                    }
+                }
+                projects.removeAll { missing.contains($0.id) }
+                if let sel = selection, case let .project(pid) = sel, missing.contains(pid) {
+                    selection = nil
+                }
+                if let sel = selection, case .workstream = sel, activeProject == nil {
+                    selection = nil
+                }
+                ProjectStore.save(projects)
+                removedProjectNames = names
+            }
+            .onChange(of: selection) { oldValue, newValue in
+                logger.warning("[FF] selection changed: \(String(describing: oldValue), privacy: .public) -> \(String(describing: newValue), privacy: .public)")
+                if newValue == .settings || newValue == .help {
+                    selectionBeforeSettings = oldValue
+                }
+                // Don't persist settings/help as saved selection
+                if newValue != .settings && newValue != .help {
+                    newValue?.save()
+                }
+            }
+            .onKeyPress(.escape) {
+                if selection == .settings || selection == .help {
+                    selection = selectionBeforeSettings
+                    return .handled
+                }
+                return .ignored
+            }
+            .onAppear {
+                // Intercept Cmd+W at the app level to close tabs instead of the window
+                guard !keyMonitorInstalled else { return }
+                keyMonitorInstalled = true
+                NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                    if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
+                        NotificationCenter.default.post(name: .closeTerminal, object: nil)
+                        return nil // swallow the event
+                    }
+                    return event
+                }
+            }
+    }
+
+    private var navigationViewBase: some View {
         NavigationSplitView {
             ProjectSidebar(
                 projects: $projectList.items,
@@ -202,6 +291,7 @@ struct ContentView: View {
             appEnvironment.refresh()
             appEnvironment.refreshAllRepoInfo(projects: projects)
             appEnvironment.refreshPathValidity(projects: projects)
+            appEnvironment.fetchOrigin(projects: projects)
             updateChecker.check()
             // Apply saved appearance
             switch UserDefaults.standard.string(forKey: "factoryfloor.appearance") ?? "system" {
@@ -234,74 +324,55 @@ struct ContentView: View {
             ProjectStore.save(projects)
             logger.warning("[FF] workstreamCreated notification handled: \(workstream.name, privacy: .public)")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .workstreamWorktreeReady)) { notification in
+            guard let info = notification.userInfo,
+                  let workstreamID = info["workstreamID"] as? UUID,
+                  let worktreePath = info["worktreePath"] as? String else { return }
+            for pi in projects.indices {
+                if let wi = projects[pi].workstreams.firstIndex(where: { $0.id == workstreamID }) {
+                    projects[pi].workstreams[wi].worktreePath = worktreePath
+                    ProjectStore.save(projects)
+                    appEnvironment.refreshPathValidity(projects: projects)
+                    logger.warning("[FF] workstreamWorktreeReady: updated \(workstreamID, privacy: .public) with path \(worktreePath, privacy: .public)")
+                    return
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workstreamCreationFailed)) { notification in
+            guard let info = notification.userInfo,
+                  let projectID = info["projectID"] as? UUID,
+                  let workstreamID = info["workstreamID"] as? UUID,
+                  let pi = projects.firstIndex(where: { $0.id == projectID }) else { return }
+            projects[pi].workstreams.removeAll { $0.id == workstreamID }
+            if case let .workstream(selectedID) = selection, selectedID == workstreamID {
+                selection = .project(projectID)
+            }
+            ProjectStore.save(projects)
+            logger.warning("[FF] workstreamCreationFailed: removed \(workstreamID, privacy: .public)")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .projectCreated)) { notification in
             guard let project = notification.userInfo?["project"] as? Project else { return }
             projects.append(project)
             selection = .project(project.id)
             ProjectStore.save(projects)
+            appEnvironment.refreshPathValidity(projects: projects)
+            appEnvironment.refreshAllRepoInfo(projects: projects)
             logger.warning("[FF] projectCreated notification handled: \(project.name, privacy: .public)")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .purgeWorkstream)) { notification in
+            if let wsID = notification.object as? UUID {
+                confirmPurge(wsID)
+            }
         }
         .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { _ in
             appEnvironment.refreshAllRepoInfo(projects: projects)
             appEnvironment.refreshPathValidity(projects: projects)
             appEnvironment.refreshAllBranchPRs(projects: projects)
+            appEnvironment.fetchOrigin(projects: projects)
             syncWorkstreamNamesFromBranches()
         }
         .onReceive(Timer.publish(every: 6 * 60 * 60, on: .main, in: .common).autoconnect()) { _ in
             updateChecker.check()
-        }
-        .onChange(of: appEnvironment.missingProjectIDs) { _, missing in
-            guard !missing.isEmpty else { return }
-            logger.warning("[FF] missingProjectIDs changed: \(missing.count, privacy: .public) missing, \(projects.count, privacy: .public) total projects")
-            let names = projects.filter { missing.contains($0.id) }.map(\.name)
-            logger.warning("[FF] removing projects: \(names, privacy: .public)")
-            for id in missing {
-                if let project = projects.first(where: { $0.id == id }) {
-                    for ws in project.workstreams {
-                        surfaceCache.removeWorkstreamSurfaces(for: ws.id)
-                        let workDir = ws.workingDirectory(projectDirectory: project.directory)
-                        pixelAgentsCache.removeEntry(for: workDir)
-                    }
-                }
-            }
-            projects.removeAll { missing.contains($0.id) }
-            if let sel = selection, case let .project(pid) = sel, missing.contains(pid) {
-                selection = nil
-            }
-            if let sel = selection, case .workstream = sel, activeProject == nil {
-                selection = nil
-            }
-            ProjectStore.save(projects)
-            removedProjectNames = names
-        }
-        .onChange(of: selection) { oldValue, newValue in
-            logger.warning("[FF] selection changed: \(String(describing: oldValue), privacy: .public) -> \(String(describing: newValue), privacy: .public)")
-            if newValue == .settings || newValue == .help {
-                selectionBeforeSettings = oldValue
-            }
-            // Don't persist settings/help as saved selection
-            if newValue != .settings && newValue != .help {
-                newValue?.save()
-            }
-        }
-        .onKeyPress(.escape) {
-            if selection == .settings || selection == .help {
-                selection = selectionBeforeSettings
-                return .handled
-            }
-            return .ignored
-        }
-        .onAppear {
-            // Intercept Cmd+W at the app level to close tabs instead of the window
-            guard !keyMonitorInstalled else { return }
-            keyMonitorInstalled = true
-            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
-                    NotificationCenter.default.post(name: .closeTerminal, object: nil)
-                    return nil // swallow the event
-                }
-                return event
-            }
         }
     }
 
@@ -366,22 +437,30 @@ struct ContentView: View {
         }
     }
 
-    private func confirmArchive(_ wsID: UUID) {
+    private func confirmPurge(_ wsID: UUID) {
         let ws = projects.flatMap(\.workstreams).first(where: { $0.id == wsID })
         if let path = ws?.worktreePath, GitOperations.hasUncommittedChanges(at: path) {
-            archiveWarningDirty = true
+            purgeWarningDirty = true
         } else {
-            archiveWarningDirty = false
+            purgeWarningDirty = false
         }
-        workstreamToArchive = wsID
+        workstreamToPurge = wsID
     }
 
-    private func performArchive() {
-        guard let wsID = workstreamToArchive,
+    private func performRemove() {
+        guard let wsID = workstreamToRemove,
               let projectIndex = projects.firstIndex(where: { $0.workstreams.contains(where: { $0.id == wsID }) }) else { return }
-        WorkstreamArchiver.archive(wsID, in: &projects[projectIndex], surfaceCache: surfaceCache, pixelAgentsCache: pixelAgentsCache, tmuxPath: appEnvironment.toolStatus.tmux.path)
+        WorkstreamArchiver.remove(wsID, in: &projects[projectIndex], surfaceCache: surfaceCache, tmuxPath: appEnvironment.toolStatus.tmux.path)
         ProjectStore.save(projects)
-        workstreamToArchive = nil
+        workstreamToRemove = nil
+    }
+
+    private func performPurge() {
+        guard let wsID = workstreamToPurge,
+              let projectIndex = projects.firstIndex(where: { $0.workstreams.contains(where: { $0.id == wsID }) }) else { return }
+        WorkstreamArchiver.purge(wsID, in: &projects[projectIndex], surfaceCache: surfaceCache, tmuxPath: appEnvironment.toolStatus.tmux.path)
+        ProjectStore.save(projects)
+        workstreamToPurge = nil
     }
 }
 

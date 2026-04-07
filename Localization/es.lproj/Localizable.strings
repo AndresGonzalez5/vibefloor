@@ -25,11 +25,13 @@
 
 /* Alerts */
 "Remove Project" = "Eliminar proyecto";
-"Archive Workstream" = "Archivar flujo de trabajo";
-"Archive" = "Archivar";
-"Archive Anyway" = "Archivar de todos modos";
+"Remove Workstream" = "Eliminar flujo de trabajo";
+"Ongoing terminals and Coding Agent sessions will be killed. The worktree and its files will remain on disk." = "Los terminales y las sesiones del agente de código en curso se cerrarán. El árbol de trabajo y sus archivos permanecerán en el disco.";
+"Purge Workstream" = "Purgar flujo de trabajo";
+"Purge" = "Purgar";
+"Purge Anyway" = "Purgar de todos modos";
 "This workstream has uncommitted changes that will be lost." = "Este flujo de trabajo tiene cambios sin confirmar que se perderán.";
-"The worktree and its branch will be removed." = "El árbol de trabajo y su rama se eliminarán.";
+"The worktree and its branch will be permanently deleted." = "El árbol de trabajo y su rama se eliminarán permanentemente.";
 "Projects Not Found" = "Proyectos no encontrados";
 "The following projects were removed because their directories no longer exist on disk: %@" = "Los siguientes proyectos se eliminaron porque sus directorios ya no existen en el disco: %@";
 "Cancel" = "Cancelar";
@@ -64,9 +66,12 @@
 "Terminal" = "Terminal";
 "None" = "Ninguno";
 "Browser" = "Navegador";
+"GitHub" = "GitHub";
 "Coding Agent" = "Agente de código";
 "Bypass permission prompts" = "Omitir solicitudes de permisos";
 "When enabled, the coding agent will not ask for confirmation before making changes. Use with caution: the agent will be able to edit files, run commands, and make git commits without asking." = "Cuando está activado, el agente de código no pedirá confirmación antes de hacer cambios. Úsalo con precaución: el agente podrá editar archivos, ejecutar comandos y hacer commits sin preguntar.";
+"Allow writes outside worktree" = "Permitir escrituras fuera del worktree";
+"When enabled, the coding agent can modify files anywhere on disk. When disabled, writes are restricted to the worktree directory." = "Cuando está activado, el agente de código puede modificar archivos en cualquier lugar del disco. Cuando está desactivado, las escrituras se restringen al directorio del worktree.";
 "External Terminal" = "Terminal externa";
 "Requires tmux to be installed." = "Requiere tmux instalado.";
 "URL" = "URL";
@@ -78,6 +83,8 @@
 "Clean" = "Limpio";
 "Uncommitted changes" = "Cambios sin confirmar";
 "Archiving..." = "Archivando...";
+"Commits ahead" = "Commits por delante";
+"Open as workstream" = "Abrir como flujo de trabajo";
 "Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams." = "Árboles de trabajo en disco para este repositorio. La limpieza elimina los árboles de trabajo limpios y sus flujos de trabajo asociados.";
 "Prune %d clean worktree" = "Limpiar %d árbol de trabajo limpio";
 "Prune %d clean worktrees" = "Limpiar %d árboles de trabajo limpios";
@@ -99,6 +106,7 @@
 "Automatically open Factory Floor when you log in." = "Abre Factory Floor automáticamente al iniciar sesión.";
 "Detailed logging" = "Registro detallado";
 "Log setup, run, and teardown script output to files for debugging." = "Registra la salida de los scripts de configuración, ejecución y desmontaje en archivos para depuración.";
+"Open Logs Directory" = "Abrir directorio de registros";
 
 /* Settings - Environment */
 "Environment" = "Entorno";
@@ -121,7 +129,7 @@
 "Agent Teams" = "Equipos de agentes";
 "Enables experimental multi-agent coordination. Agents can spawn teammates, delegate tasks, and collaborate across workstreams." = "Activa la coordinación experimental multi-agente. Los agentes pueden crear compañeros, delegar tareas y colaborar entre flujos de trabajo.";
 "Auto-rename branch" = "Renombrar rama automáticamente";
-"The agent will rename the worktree branch to match the task on the first request (e.g., fix-login-timeout)." = "El agente renombrará la rama del árbol de trabajo para coincidir con la tarea en la primera solicitud (p. ej., fix-login-timeout).";
+"On the first request, the agent renames the branch to match the task and writes a short description visible in the sidebar." = "En la primera solicitud, el agente renombra la rama para coincidir con la tarea y escribe una breve descripción visible en la barra lateral.";
 "External Browser" = "Navegador externo";
 
 /* Settings - Advanced */
@@ -165,6 +173,12 @@
 "Opens the current workstream directory" = "Abre el directorio del flujo de trabajo actual";
 "Open in external browser" = "Abrir en navegador externo";
 "Open in external terminal" = "Abrir en terminal externo";
+"Open in External Terminal" = "Abrir en terminal externo";
+"Open on GitHub" = "Abrir en GitHub";
+"Reveal in Finder" = "Mostrar en Finder";
+"Copy project path" = "Copiar ruta del proyecto";
+"Copy branch name" = "Copiar nombre de la rama";
+"Copy worktree path" = "Copiar ruta del worktree";
 
 /* Agent tab - Claude not installed */
 "Claude Code not found" = "Claude Code no encontrado";
@@ -237,6 +251,7 @@
 /* Help */
 "Sponsor" = "Patrocinar";
 "Report a Bug" = "Reportar un error";
+"Documentation" = "Documentación";
 "Request a Feature" = "Sugerir una funcionalidad";
 "Rebuild" = "Reconstruir";
 "Rerun" = "Reejecutar";
@@ -244,3 +259,23 @@
 "Stop" = "Detener";
 
 "Restarting..." = "Reiniciando...";
+"Preparing workstream..." = "Preparando flujo de trabajo...";
+
+/* Update Banner */
+"v%@ available" = "v%@ disponible";
+"Release Notes" = "Notas de la versión";
+"Using scripts from %@" = "Usando scripts de %@";
+
+/* Quick Actions */
+"Quick Actions" = "Acciones rápidas";
+"Commit" = "Commit";
+"Push" = "Push";
+"Create PR" = "Crear PR";
+"Abandon PR" = "Abandonar PR";
+"This branch has been merged." = "Esta rama ha sido fusionada.";
+"gh CLI is not installed." = "gh CLI no está instalado.";
+"Claude Code is not installed." = "Claude Code no está instalado.";
+"Enable \"Bypass permission prompts\" in Settings." = "Activa \"Omitir permisos\" en Configuración.";
+"No GitHub remote found for this project." = "No se encontró un remoto de GitHub para este proyecto.";
+"Quick action debug" = "Depuración de acciones rápidas";
+"Show a debug panel with command output from quick actions (Create PR, Commit & Push)." = "Muestra un panel de depuración con la salida de las acciones rápidas (Crear PR, Commit y Push).";

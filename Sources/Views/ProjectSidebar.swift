@@ -23,8 +23,9 @@ struct ProjectSidebar: View {
     @State private var newProjectError = ""
     @State private var isDropTargeted = false
     @State private var projectToDelete: UUID?
-    @State private var workstreamToArchive: UUID?
-    @State private var archiveWarningDirty = false
+    @State private var workstreamToRemove: UUID?
+    @State private var workstreamToPurge: UUID?
+    @State private var purgeWarningDirty = false
     @State private var expandedProjects: Set<UUID> = SidebarState.loadExpanded()
     @State private var cachedSortedIDs: [UUID] = []
     @State private var cachedProjectIndex: [UUID: Int] = [:]
@@ -85,7 +86,8 @@ struct ProjectSidebar: View {
                         }
                     }
                 } : nil,
-                isGitRepo: GitOperations.isGitRepo(at: project.directory),
+                isGitRepo: appEnv.isGitRepo(project.directory),
+                githubURL: appEnv.githubURL(for: project.directory),
                 onAdd: { logger.warning("[FF] onAdd button tapped for project \(project.name, privacy: .public)"); addWorkstream(for: project.id) },
                 onAddWithPermissions: { addWorkstream(for: project.id, bypassPermissions: true) },
                 onAddWithoutPermissions: { addWorkstream(for: project.id, bypassPermissions: false) },
@@ -96,16 +98,24 @@ struct ProjectSidebar: View {
             if hasChildren && expandedProjects.contains(project.id) {
                 let sortedWS = project.workstreams.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
                 ForEach(sortedWS) { workstream in
+                    let branch = appEnv.branchName(for: workstream.worktreePath)
+                    let pr = branch.flatMap { appEnv.githubPR(for: project.directory, branch: $0) }
                     WorkstreamRow(
                         name: workstream.name,
-                        branchName: appEnv.branchName(for: workstream.worktreePath),
+                        branchName: branch,
                         worktreePath: workstream.worktreePath,
                         isPathValid: appEnv.isPathValid(workstream.worktreePath),
-                        hasActivePort: Self.hasPort(workstream.id),
-                        onArchive: { confirmArchive(workstream) }
+                        hasActivePort: appEnv.hasActivePort(workstream.id),
+                        githubURL: appEnv.githubURL(for: project.directory),
+                        taskDescription: appEnv.taskDescription(for: workstream.worktreePath),
+                        prTitle: pr?.title,
+                        prNumber: pr?.number,
+                        prState: pr?.state,
+                        onRemove: { workstreamToRemove = workstream.id },
+                        onPurge: { confirmPurge(workstream) }
                     )
                     .tag(SidebarSelection.workstream(workstream.id))
-                    .padding(.leading, 22)
+                    .padding(.leading, 34)
                 }
             }
         }
@@ -114,7 +124,7 @@ struct ProjectSidebar: View {
     private var bottomBar: some View {
         VStack(spacing: 4) {
             if let version = updateChecker.availableVersion {
-                UpdateBanner(version: version, updater: updater)
+                UpdateBanner(version: version, releaseNotesURL: updateChecker.releaseNotesURL, updater: updater)
             }
 
             // Credit
@@ -177,21 +187,35 @@ struct ProjectSidebar: View {
                 }
             }
             .alert(
-                "Archive Workstream",
+                "Remove Workstream",
                 isPresented: Binding(
-                    get: { workstreamToArchive != nil },
-                    set: { if !$0 { workstreamToArchive = nil } }
+                    get: { workstreamToRemove != nil },
+                    set: { if !$0 { workstreamToRemove = nil } }
                 )
             ) {
-                Button("Cancel", role: .cancel) { workstreamToArchive = nil }
-                Button(archiveWarningDirty ? "Archive Anyway" : "Archive", role: .destructive) {
-                    performArchive()
+                Button("Cancel", role: .cancel) { workstreamToRemove = nil }
+                Button("Remove", role: .destructive) {
+                    performRemove()
                 }
             } message: {
-                if archiveWarningDirty {
+                Text("Ongoing terminals and Coding Agent sessions will be killed. The worktree and its files will remain on disk.")
+            }
+            .alert(
+                "Purge Workstream",
+                isPresented: Binding(
+                    get: { workstreamToPurge != nil },
+                    set: { if !$0 { workstreamToPurge = nil } }
+                )
+            ) {
+                Button("Cancel", role: .cancel) { workstreamToPurge = nil }
+                Button(purgeWarningDirty ? "Purge Anyway" : "Purge", role: .destructive) {
+                    performPurge()
+                }
+            } message: {
+                if purgeWarningDirty {
                     Text("This workstream has uncommitted changes that will be lost.")
                 } else {
-                    Text("The worktree and its branch will be removed.")
+                    Text("The worktree and its branch will be permanently deleted.")
                 }
             }
             .alert(
@@ -305,6 +329,9 @@ struct ProjectSidebar: View {
             projects[pi].lastAccessedAt = now
             projects[pi].workstreams[wi].lastAccessedAt = now
             onProjectsChanged()
+            if sortOrder == .recent {
+                cachedSortedIDs = recomputeSortedIDs()
+            }
         }
         .onAppear {
             cachedSortedIDs = recomputeSortedIDs()
@@ -337,10 +364,6 @@ struct ProjectSidebar: View {
     @AppStorage("factoryfloor.bypassPermissions") private var defaultBypass: Bool = false
     @AppStorage("factoryfloor.symlinkEnv") private var symlinkEnv: Bool = true
 
-    private static func hasPort(_ workstreamID: UUID) -> Bool {
-        RunStateStore.loadValidated(for: workstreamID)?.detectedPorts.isEmpty == false
-    }
-
     private func addWorkstream(for projectID: UUID, bypassPermissions: Bool? = nil) {
         logger.warning("[FF] addWorkstream called for projectID=\(projectID, privacy: .public)")
         guard let index = projects.firstIndex(where: { $0.id == projectID }) else {
@@ -362,42 +385,47 @@ struct ProjectSidebar: View {
         logger.warning("[FF] addWorkstream: generated name=\(name, privacy: .public)")
 
         let bypass = bypassPermissions ?? defaultBypass
-        let workstreamID = UUID()
-        let capturedBranchPrefix = branchPrefix
-        let capturedProjectDir = project.directory
-        let capturedProjectName = project.name
+        let workstream = Workstream(name: name, worktreePath: nil, bypassPermissions: bypass)
+        expandedProjects.insert(projectID)
+        NotificationCenter.default.post(
+            name: .workstreamCreated,
+            object: nil,
+            userInfo: ["projectID": projectID, "workstream": workstream]
+        )
+        rebuildIndices()
+        logger.warning("[FF] addWorkstream: posted notification (optimistic), starting background worktree creation")
 
-        // Use AsyncSetupService: creates worktree (blocking), then runs env/symlink/deps
-        // in the background. Claude Code terminal launches immediately after worktree creation.
-        Task {
-            guard let worktreePath = await AsyncSetupService.shared.setup(
-                workstreamID: workstreamID,
-                projectPath: capturedProjectDir,
-                projectName: capturedProjectName,
+        let projectPath = project.directory
+        let projectName = project.name
+        let prefix = branchPrefix
+        let symlink = symlinkEnv
+        let workstreamID = workstream.id
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let worktreePath = GitOperations.createWorktree(
+                projectPath: projectPath,
+                projectName: projectName,
                 workstreamName: name,
-                branchPrefix: capturedBranchPrefix
-            ) else {
-                await MainActor.run {
-                    logger.warning("[FF] addWorkstream: createWorktree FAILED")
+                branchPrefix: prefix,
+                symlinkEnv: symlink
+            )
+            DispatchQueue.main.async {
+                if let worktreePath {
+                    logger.warning("[FF] addWorkstream: worktree created at \(worktreePath, privacy: .public)")
+                    NotificationCenter.default.post(
+                        name: .workstreamWorktreeReady,
+                        object: nil,
+                        userInfo: ["workstreamID": workstreamID, "worktreePath": worktreePath]
+                    )
+                } else {
+                    logger.warning("[FF] addWorkstream: createWorktree FAILED, rolling back")
+                    NotificationCenter.default.post(
+                        name: .workstreamCreationFailed,
+                        object: nil,
+                        userInfo: ["projectID": projectID, "workstreamID": workstreamID]
+                    )
                     showWorktreeError = true
                 }
-                return
-            }
-
-            await MainActor.run {
-                logger.warning("[FF] addWorkstream: worktree created at \(worktreePath, privacy: .public)")
-                let workstream = Workstream(
-                    name: name, worktreePath: worktreePath,
-                    bypassPermissions: bypass, id: workstreamID
-                )
-                expandedProjects.insert(projectID)
-                NotificationCenter.default.post(
-                    name: .workstreamCreated,
-                    object: nil,
-                    userInfo: ["projectID": projectID, "workstream": workstream]
-                )
-                rebuildIndices()
-                logger.warning("[FF] addWorkstream: done, posted notification")
             }
         }
     }
@@ -408,26 +436,39 @@ struct ProjectSidebar: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     @EnvironmentObject private var updater: Updater
 
-    private func confirmArchive(_ workstream: Workstream) {
+    private func confirmPurge(_ workstream: Workstream) {
         if let path = workstream.worktreePath, GitOperations.hasUncommittedChanges(at: path) {
-            archiveWarningDirty = true
+            purgeWarningDirty = true
         } else {
-            archiveWarningDirty = false
+            purgeWarningDirty = false
         }
-        workstreamToArchive = workstream.id
+        workstreamToPurge = workstream.id
     }
 
-    private func performArchive() {
-        guard let wsID = workstreamToArchive,
+    private func performRemove() {
+        guard let wsID = workstreamToRemove,
               let pi = projects.firstIndex(where: { $0.workstreams.contains(where: { $0.id == wsID }) }) else { return }
         let projectID = projects[pi].id
-        WorkstreamArchiver.archive(wsID, in: &projects[pi], surfaceCache: surfaceCache, pixelAgentsCache: pixelAgentsCache, tmuxPath: appEnv.toolStatus.tmux.path)
+        WorkstreamArchiver.remove(wsID, in: &projects[pi], surfaceCache: surfaceCache, tmuxPath: appEnv.toolStatus.tmux.path)
         rebuildIndices()
         if case let .workstream(id) = selection, id == wsID {
             selection = projects[pi].workstreams.first.map { .workstream($0.id) } ?? .project(projectID)
         }
         onProjectsChanged()
-        workstreamToArchive = nil
+        workstreamToRemove = nil
+    }
+
+    private func performPurge() {
+        guard let wsID = workstreamToPurge,
+              let pi = projects.firstIndex(where: { $0.workstreams.contains(where: { $0.id == wsID }) }) else { return }
+        let projectID = projects[pi].id
+        WorkstreamArchiver.purge(wsID, in: &projects[pi], surfaceCache: surfaceCache, tmuxPath: appEnv.toolStatus.tmux.path)
+        rebuildIndices()
+        if case let .workstream(id) = selection, id == wsID {
+            selection = projects[pi].workstreams.first.map { .workstream($0.id) } ?? .project(projectID)
+        }
+        onProjectsChanged()
+        workstreamToPurge = nil
     }
 
     // MARK: - Project management
@@ -552,11 +593,26 @@ private func copyTextToPasteboard(_ text: String) {
     NSPasteboard.general.setString(text, forType: .string)
 }
 
+/// Opens a directory in the user's configured terminal, falling back to Apple Terminal.
+private func openDirectoryInTerminal(_ directory: String) {
+    let terminalBundleID = UserDefaults.standard.string(forKey: "factoryfloor.defaultTerminal") ?? ""
+    let appURL: URL?
+    if !terminalBundleID.isEmpty {
+        appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: terminalBundleID)
+    } else {
+        appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal")
+    }
+    guard let appURL else { return }
+    let config = NSWorkspace.OpenConfiguration()
+    NSWorkspace.shared.open([URL(fileURLWithPath: directory)], withApplicationAt: appURL, configuration: config)
+}
+
 private struct ProjectHeaderRow: View {
     let project: Project
     let isExpanded: Bool
     let onToggle: (() -> Void)?
     let isGitRepo: Bool
+    var githubURL: URL?
     let onAdd: () -> Void
     let onAddWithPermissions: () -> Void
     let onAddWithoutPermissions: () -> Void
@@ -636,6 +692,24 @@ private struct ProjectHeaderRow: View {
         .onHover { isHovering = $0 }
         .contextMenu {
             Button {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: project.directory)
+            } label: {
+                Label("Reveal in Finder", systemImage: "folder")
+            }
+            Button {
+                openDirectoryInTerminal(project.directory)
+            } label: {
+                Label("Open in External Terminal", systemImage: "terminal")
+            }
+            if let githubURL {
+                Button {
+                    NSWorkspace.shared.open(githubURL)
+                } label: {
+                    Label("Open on GitHub", image: "github")
+                }
+            }
+            Divider()
+            Button {
                 copyTextToPasteboard(project.directory)
             } label: {
                 Label("Copy project path", systemImage: "doc.on.doc")
@@ -650,51 +724,100 @@ private struct WorkstreamRow: View {
     var worktreePath: String?
     let isPathValid: Bool
     var hasActivePort: Bool = false
-    let onArchive: () -> Void
+    var githubURL: URL?
+    var taskDescription: String?
+    var prTitle: String?
+    var prNumber: Int?
+    var prState: String?
+    let onRemove: () -> Void
+    let onPurge: () -> Void
 
     @State private var isHovering = false
 
+    /// Subtext to display below the workstream name.
+    /// Priority: PR title (#number) > branch name (only if different from workstream name)
+    private var subtitle: String? {
+        guard isPathValid else { return nil }
+        if let prTitle, let prNumber {
+            return "\(prTitle) #\(prNumber)"
+        }
+        if let taskDescription {
+            return taskDescription
+        }
+        if let branchName, branchName != name {
+            return branchName
+        }
+        return nil
+    }
+
     var body: some View {
         HStack {
-            Label {
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 4) {
-                        Text(name)
-                            .font(.system(.body))
-                            .strikethrough(!isPathValid)
-                            .foregroundStyle(isPathValid ? .primary : .secondary)
-                        if hasActivePort {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 6))
-                                .foregroundStyle(.green)
-                        }
-                    }
-                    if let branchName, isPathValid {
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.triangle.branch")
-                                .font(.system(size: 9))
-                            Text(branchName)
-                                .font(.system(size: 10))
-                        }
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+            if !isPathValid {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.system(size: 12))
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(name)
+                        .font(.system(.body))
+                        .strikethrough(!isPathValid)
+                        .foregroundStyle(isPathValid ? .primary : .secondary)
+                    if hasActivePort {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 6))
+                            .foregroundStyle(.green)
                     }
                 }
-            } icon: {
-                Image(systemName: isPathValid ? "terminal" : "exclamationmark.triangle")
-                    .foregroundStyle(isPathValid ? Color.secondary : Color.orange)
+                if let subtitle {
+                    HStack(spacing: 3) {
+                        if prState == "MERGED" {
+                            Image(systemName: "arrow.triangle.merge")
+                                .font(.system(size: 8))
+                                .foregroundStyle(.purple)
+                        }
+                        Text(subtitle)
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 10))
+                    .foregroundStyle(prState == "MERGED" ? AnyShapeStyle(.purple) : AnyShapeStyle(.tertiary))
+                }
             }
 
             Spacer()
 
-            SidebarIconButton(icon: "archivebox", action: onArchive)
-                .accessibilityLabel("Archive workstream")
+            SidebarIconButton(icon: "xmark", action: onRemove)
+                .accessibilityLabel("Remove workstream")
                 .opacity(isHovering ? 1 : 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .help(taskDescription ?? "")
         .onHover { isHovering = $0 }
         .contextMenu {
+            if let worktreePath {
+                Button {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: worktreePath)
+                } label: {
+                    Label("Reveal in Finder", systemImage: "folder")
+                }
+                Button {
+                    openDirectoryInTerminal(worktreePath)
+                } label: {
+                    Label("Open in External Terminal", systemImage: "terminal")
+                }
+            }
+            if let githubURL {
+                Button {
+                    NSWorkspace.shared.open(githubURL)
+                } label: {
+                    Label("Open on GitHub", image: "github")
+                }
+            }
+            if worktreePath != nil || githubURL != nil {
+                Divider()
+            }
             if let branchName {
                 Button {
                     copyTextToPasteboard(branchName)
@@ -708,6 +831,13 @@ private struct WorkstreamRow: View {
                 } label: {
                     Label("Copy worktree path", systemImage: "doc.on.doc")
                 }
+            }
+            Divider()
+            Button(action: onRemove) {
+                Label("Remove", systemImage: "xmark")
+            }
+            Button(role: .destructive, action: onPurge) {
+                Label("Purge", systemImage: "trash")
             }
         }
     }
@@ -757,43 +887,6 @@ private struct SidebarBottomButton: View {
                 NSCursor.pop()
             }
         }
-    }
-}
-
-private struct UpdateBanner: View {
-    let version: String
-    @ObservedObject var updater: Updater
-
-    @State private var isHovering = false
-
-    private var getURL: URL {
-        let lang = Locale.current.language.languageCode?.identifier ?? "en"
-        let path = lang == "en" ? "/get" : "/\(lang)/get"
-        return URL(string: "https://factory-floor.com\(path)")!
-    }
-
-    var body: some View {
-        Button {
-            if updater.isConfigured {
-                updater.checkForUpdates()
-            } else {
-                NSWorkspace.shared.open(getURL)
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 11))
-                Text("v\(version) available")
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 5)
-            .foregroundStyle(isHovering ? .white : .white.opacity(0.9))
-            .background(Color(nsColor: NSColor(red: 0.55, green: 0.15, blue: 0.2, alpha: 1.0)))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.borderless)
-        .onHover { isHovering = $0 }
     }
 }
 
