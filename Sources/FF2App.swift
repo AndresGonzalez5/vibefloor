@@ -278,7 +278,7 @@ struct FF2App: App {
                 Button("Toggle Sidebar") {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
-                .keyboardShortcut("s", modifiers: [.command, .control])
+                .keyboardShortcut("c", modifiers: [.command, .shift])
 
                 Divider()
 
