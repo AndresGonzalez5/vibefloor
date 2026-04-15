@@ -65,9 +65,9 @@ La interfaz aparece al instante, la creación del worktree ocurre en segundo pla
 
 #### Workstream tabs {#workstream-tabs}
 
-- **Info** (⌘I) — nombre de branch, estado del PR, documentación del proyecto
+- **Info** — nombre de branch, estado del PR, documentación del proyecto
 - **Agent** (⌘Return) — tu sesión de Claude Code
-- **Environment** (⌘E) — controles de setup y run script
+- **Environment** — controles de setup y run script
 - **Terminal** (⌘T) — terminal tabs adicionales, tantos como quieras
 - **Navegador** (⌘B) — navegador integrado con detección automática de port
 
@@ -100,7 +100,7 @@ Las quick actions ejecutan tareas puntuales de Claude desde el sidebar:
 - **Commit** — hace stage y commit con un mensaje generado por IA
 - **Push** — hace push de la branch actual al origin
 - **Create PR** — crea un pull request con título y descripción generados por IA
-- **Abandon PR** — cierra el PR
+- **Close PR** — cierra el PR
 
 Se ejecutan como llamadas `claude -p` en segundo plano. Activa **Quick action debug mode** en ajustes si quieres saber cómo se hace la salchicha. Confía en nosotros, [David](https://davidpoblador.com) pasó más tiempo del que puede admitir depurando comportamientos extraños ahí dentro.
 
@@ -116,7 +116,7 @@ Los terminals se renderizan por GPU con [Ghostty](https://ghostty.org). Son ráp
 
 - **⌘T** — nuevo terminal tab
 - **⌘W** — cerrar tab (o Ctrl+D para salir del shell)
-- **⌘1-9** — cambiar entre tabs
+- **⌘1** — Info, **⌘2** — Coding Agent, **⌘3-9** — cambiar entre tabs
 - **⌘Shift+[** / **⌘Shift+]** — recorrer tabs
 
 Puedes arrastrar archivos y texto al terminal. Porque a veces el ratón está bien, la verdad.
@@ -151,32 +151,36 @@ Factory Floor prioriza el teclado. Aquí está todo.
 | ⌘Shift+N | Nuevo proyecto |
 | ⌘, | Ajustes |
 | ⌘/ | Ayuda |
+| ⌘Option+S | Mostrar/ocultar barra lateral |
 
 #### Workstream {#workstream}
 
 | Atajo | Acción |
 |----------|--------|
+| ⌘1 | Info |
+| ⌘2 | Coding Agent |
+| ⌘3-9 | Cambiar tab |
+| ⌘Shift+[ | Tab anterior |
+| ⌘Shift+] | Tab siguiente |
 | ⌘Return | Foco en Coding Agent |
-| ⌘I | Panel de Info |
-| ⌘E | Environment |
 | ⌘T | Nuevo Terminal |
 | ⌘B | Nuevo navegador |
 | ⌘W | Cerrar tab |
+| ⌘Shift+W | Archivar workstream |
 | ⌘L | Barra de direcciones (navegador) |
-| ⌘0 | Volver al proyecto |
-| ⌘1-9 | Cambiar tab |
-| ⌘Shift+[ | Tab anterior |
-| ⌘Shift+] | Tab siguiente |
-| Ctrl+Shift+R | Reconstruir setup |
-| Ctrl+Shift+S | Iniciar/reiniciar run |
+| ⌘Shift+Return | Iniciar/reiniciar run |
 
 #### Navegación {#navigation-1}
 
 | Atajo | Acción |
 |----------|--------|
-| Ctrl+1-9 | Cambiar workstream (desde cualquier vista) |
-| ⌘Shift+O | Abrir en navegador externo |
-| ⌘Shift+E | Abrir en terminal externo |
+| ⌘[ | Workstream anterior |
+| ⌘] | Workstream siguiente |
+| ⌘↑ | Proyecto anterior |
+| ⌘↓ | Proyecto siguiente |
+| ⌘0 | Volver al proyecto |
+| ⌘Option+B | Abrir en navegador externo |
+| ⌘Option+T | Abrir en terminal externo |
 
 ---
 
@@ -199,19 +203,18 @@ Coloca un `.factoryfloor.json` en la raíz de tu proyecto para automatizar el ci
 | Hook | Cuándo se ejecuta |
 |------|-------------|
 | `setup` | Una vez, cuando se crea un workstream. Instalar dependencias, ejecutar migraciones, lo que sea. |
-| `run` | Bajo demanda desde el tab Environment (⌘E). Envuelto en `ff-run` para detección de port. |
+| `run` | Bajo demanda desde el tab Environment. Envuelto en `ff-run` para detección de port. |
 | `teardown` | Cuando se archiva o purga un workstream. Parar contenedores, limpiar. |
 
 Todos los campos son opcionales. Los scripts se ejecutan en el directorio del workstream usando tu login shell. Sí, incluso [fish](https://github.com/alltuner/factoryfloor/pull/324). No preguntes cuánto tardó eso.
 
-Factory Floor también lee `conductor.json` y `.superset/config.json` si `.factoryfloor.json` no existe. Porque la compatibilidad es de buena educación. (¿Es hora de un [estándar](https://xkcd.com/927/)?)
+Factory Floor también lee `.emdash.json`, `conductor.json` y `.superset/config.json` si `.factoryfloor.json` no existe. Porque la compatibilidad es de buena educación. (¿Es hora de un [estándar](https://xkcd.com/927/)?) Cuando se usa una configuración de compatibilidad, Factory Floor inyecta variables de entorno de compatibilidad para que los scripts funcionen sin modificación (p. ej. `CONDUCTOR_PORT`, `EMDASH_PORT`, `SUPERSET_PORT_BASE`).
 
 #### El tab Environment {#the-environment-tab}
 
 Diseño en dos paneles: **Setup** a la izquierda, **Run** a la derecha.
 
-- **Ctrl+Shift+R** — reconstruir (re-ejecuta setup)
-- **Ctrl+Shift+S** — iniciar/reiniciar el run script
+- **⌘Shift+Return** — iniciar/reiniciar el run script
 
 ### Variables de entorno {#environment-variables}
 
@@ -224,6 +227,7 @@ Cada terminal, setup script y comando run en un workstream tiene estas variables
 | `FF_PROJECT_DIR` | Ruta del repositorio principal | `/Users/you/my-app` |
 | `FF_WORKTREE_DIR` | Ruta del worktree | `~/.factoryfloor/worktrees/my-app/coral-tidal-reef` |
 | `FF_PORT` | Port determinista (40001-49999) | `42847` |
+| `FF_DEFAULT_BRANCH` | Rama por defecto (main, master, etc.) | `main` |
 
 #### Sobre FF_PORT {#about-ff_port}
 
@@ -294,7 +298,7 @@ Requiere el [gh CLI](https://cli.github.com/) con autenticación (`gh auth login
 
 #### Quick actions {#quick-actions-1}
 
-Desde el sidebar, ejecuta operaciones con un clic: **Create PR** (título y descripción generados por IA), **Push** (al origin con `-u`), o **Abandon PR** (cierra con un comentario). Porque si estás cansado de escribir "ahora haz commit, push y abre un PR" en Claude por centésima vez, no estás solo.
+Desde el sidebar, ejecuta operaciones con un clic: **Create PR** (título y descripción generados por IA), **Push** (al origin con `-u`), o **Close PR** (cierra con un comentario). Porque si estás cansado de escribir "ahora haz commit, push y abre un PR" en Claude por centésima vez, no estás solo.
 
 ### Actualizaciones {#updates}
 

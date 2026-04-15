@@ -30,11 +30,19 @@
 "Purge Workstream" = "Purga flux de treball";
 "Purge" = "Purga";
 "Purge Anyway" = "Purga igualment";
-"This workstream has uncommitted changes that will be lost." = "Aquest flux de treball té canvis sense confirmar que es perdran.";
+"uncommitted changes" = "canvis sense confirmar";
+"unpushed commits" = "commits sense pujar";
+" and " = " i ";
+"This workstream has %@ that will be lost." = "Aquest flux de treball té %@ que es perdran.";
 "The worktree and its branch will be permanently deleted." = "L'arbre de treball i la seva branca s'eliminaran permanentment.";
 "Projects Not Found" = "Projectes no trobats";
 "The following projects were removed because their directories no longer exist on disk: %@" = "Els projectes següents s'han eliminat perquè els seus directoris ja no existeixen al disc: %@";
 "Cancel" = "Cancel·la";
+"Save" = "Desa";
+"Save As..." = "Desa com a...";
+"Don't Save" = "No desis";
+"Do you want to save changes to \"%@\"?" = "Vols desar els canvis a \"%@\"?";
+"Your changes will be lost if you don't save them." = "Els canvis es perdran si no els deses.";
 "Remove" = "Elimina";
 "Worktree Creation Failed" = "Error en crear l'arbre de treball";
 "Could not create the git worktree. The branch may already exist, or there may be an ongoing merge or rebase." = "No s'ha pogut crear l'arbre de treball git. La branca pot ja existir, o pot haver-hi una fusió o un rebase en curs.";
@@ -66,6 +74,11 @@
 "Terminal" = "Terminal";
 "None" = "Cap";
 "Browser" = "Navegador";
+"Editor" = "Editor";
+"New Editor (\u2318E)" = "Nou editor (\u2318E)";
+"Open File" = "Obrir fitxer";
+"Toggle file tree" = "Commuta l'arbre de fitxers";
+"Select a file to edit" = "Selecciona un fitxer per editar";
 "GitHub" = "GitHub";
 "Coding Agent" = "Agent de codi";
 "Bypass permission prompts" = "Ometre les sol·licituds de permisos";
@@ -85,11 +98,11 @@
 "Archiving..." = "Arxivant...";
 "Commits ahead" = "Commits per endavant";
 "Open as workstream" = "Obre com a flux de treball";
-"Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams." = "Arbres de treball al disc per a aquest repositori. La neteja elimina els arbres de treball nets i els seus fluxos de treball associats.";
+"Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream." = "Arbres de treball al disc per a aquest repositori. La neteja elimina els arbres de treball nets que no estan associats a cap flux de treball.";
 "Prune %d clean worktree" = "Neteja %d arbre de treball net";
 "Prune %d clean worktrees" = "Neteja %d arbres de treball nets";
-"Remove %d worktree with no uncommitted changes? Associated workstreams will also be removed from the sidebar." = "Vols eliminar %d arbre de treball sense canvis sense confirmar? Els fluxos de treball associats també s'eliminaran de la barra lateral.";
-"Remove %d worktrees with no uncommitted changes? Associated workstreams will also be removed from the sidebar." = "Vols eliminar %d arbres de treball sense canvis sense confirmar? Els fluxos de treball associats també s'eliminaran de la barra lateral.";
+"Remove %d clean worktree with no uncommitted changes?" = "Vols eliminar %d arbre de treball net sense canvis sense confirmar?";
+"Remove %d clean worktrees with no uncommitted changes?" = "Vols eliminar %d arbres de treball nets sense canvis sense confirmar?";
 "Remove \"%@\" from the list? Files in %@ will not be deleted." = "Vols eliminar \"%@\" de la llista? Els fitxers a %@ no s'esborraran.";
 
 /* Projects */
@@ -253,10 +266,13 @@
 "Report a Bug" = "Reporta un error";
 "Documentation" = "Documentació";
 "Request a Feature" = "Suggereix una funcionalitat";
-"Rebuild" = "Reconstruir";
 "Rerun" = "Reexecutar";
 "Start" = "Iniciar";
 "Stop" = "Atura";
+
+"Running setup..." = "Executant la configuració inicial...";
+"Setup failed." = "La configuració inicial ha fallat.";
+"Continue to Agent" = "Continuar a l'Agent";
 
 "Restarting..." = "Reiniciant...";
 "Preparing workstream..." = "Preparant el flux de treball...";
@@ -271,7 +287,8 @@
 "Commit" = "Commit";
 "Push" = "Push";
 "Create PR" = "Crear PR";
-"Abandon PR" = "Abandonar PR";
+"Close PR" = "Tancar PR";
+"Open #%d" = "Obrir #%d";
 "This branch has been merged." = "Aquesta branca s'ha fusionat.";
 "gh CLI is not installed." = "gh CLI no està instal·lat.";
 "Claude Code is not installed." = "Claude Code no està instal·lat.";

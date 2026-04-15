@@ -36,7 +36,7 @@ Then:
 
 1. **Open Factory Floor** and add a project by clicking the `+` button in the sidebar, then selecting a repository directory.
 2. **Create a workstream** with `Cmd+N`. Factory Floor sets up a git worktree and launches a Claude Code agent automatically.
-3. **Start building.** Add terminals (`Cmd+T`), browsers (`Cmd+B`), or configure [run scripts](#script-configuration) to auto-detect your dev server.
+3. **Start building.** Add terminals (`Cmd+T`), browsers (`Cmd+B`), editors (`Cmd+O`), or configure [run scripts](#script-configuration) to auto-detect your dev server.
 
 ---
 
@@ -51,12 +51,29 @@ Factory Floor is a native macOS app built on [Ghostty](https://ghostty.org)'s GP
 - **Git Worktrees** &mdash; Each workstream gets its own branch and worktree. Switch between tasks without stashing.
 - **Claude Code** &mdash; Integrated AI agent with session persistence. Resume conversations across app restarts.
 - **Tmux Persistence** &mdash; Agent sessions survive app restarts via tmux on a dedicated socket.
-- **Setup & Run Scripts** &mdash; Configure setup, run, and teardown scripts per project via `.factoryfloor.json`. Environment tab with split-pane terminals, Rebuild (⌃⇧R) and Start/Rerun (⌃⇧S).
+- **Setup & Run Scripts** &mdash; Configure setup, run, and teardown scripts per project via `.factoryfloor.json`. Environment tab with split-pane terminals, Start/Rerun (⌘⇧⏎).
 - **Embedded Browser** &mdash; WKWebView tab with automatic port detection. The browser navigates to the port your run script opens.
+- **Code Editor** &mdash; Built-in Monaco editor (same engine as VS Code) embedded via WKWebView. Syntax highlighting, IntelliSense, and file tree. One file per tab, shared undo history.
 - **GitHub Integration** &mdash; Repo info, open PRs, and branch PR status via the `gh` CLI.
-- **Dynamic Tabs** &mdash; Open as many terminals and browsers as you need. Close with Cmd+W or Ctrl+D.
+- **Dynamic Tabs** &mdash; Open as many terminals, browsers, and editors as you need. Close with Cmd+W or Ctrl+D.
 - **Update Notifications** &mdash; Checks for new versions and shows a badge in the sidebar.
-- **Keyboard-first** &mdash; Every action has a shortcut. Cmd+Return for agent, Cmd+I for info, Cmd+E for environment, Cmd+T for terminal, Cmd+B for browser.
+- **Keyboard-first** &mdash; Every action has a shortcut. Cmd+1-9 for tabs, Cmd+Return for agent, Cmd+T for terminal, Cmd+B for browser, Cmd+O for editor.
+
+### Tmux Mode
+
+When tmux mode is enabled (Settings > Terminal), Factory Floor wraps Coding Agent sessions in tmux using a dedicated socket (`factoryfloor`). This keeps sessions alive across app restarts without interfering with your personal tmux setup.
+
+The tmux config strips all UI chrome (status bar, prefix key, keybindings) since Factory Floor manages the terminal directly. Sessions are still fully accessible from any external terminal:
+
+```bash
+# List active sessions
+tmux -L factoryfloor list-sessions
+
+# Attach to a session
+tmux -L factoryfloor attach-session -t <session-name>
+```
+
+Note that because keybindings are removed, you will need to detach with `tmux -L factoryfloor detach-client` from another terminal, or use the standard `kill-session` command.
 
 ### Script Configuration
 
@@ -100,26 +117,41 @@ Every workstream terminal has access to:
 | `Cmd+Shift+N` | New project |
 | `Cmd+,` | Settings |
 | `Cmd+/` | Help |
+| `Cmd+Option+S` | Toggle sidebar |
 
 #### Workstream
 
 | Shortcut | Action |
 |---|---|
+| `Cmd+1` | Info |
+| `Cmd+2` | Coding Agent |
+| `Cmd+3-9` | Switch tab |
+| `Cmd+Shift+[` / `]` | Cycle tabs |
 | `Cmd+Return` | Focus Coding Agent |
-| `Cmd+I` | Info panel |
-| `Cmd+E` | Environment |
 | `Cmd+T` | New Terminal |
 | `Cmd+B` | New Browser |
+| `Cmd+O` | New Editor |
+| `Cmd+S` | Save (Editor) |
+| `Cmd+Shift+S` | Save As (Editor) |
 | `Cmd+W` | Close tab |
+| `Cmd+Shift+W` | Archive workstream |
 | `Cmd+L` | Address bar (browser) |
+| `Cmd+Shift+Return` | Start/Rerun |
+
+#### Navigation
+
+| Shortcut | Action |
+|---|---|
+| `Cmd+[` / `]` | Cycle workstreams |
+| `Cmd+Up` / `Down` | Cycle projects |
 | `Cmd+0` | Back to project |
-| `Cmd+1-9` | Switch tab |
-| `Opt+Cmd+↑` / `↓` | Cycle workstreams |
-| `Opt+Cmd+←` / `→` | Cycle tabs |
-| `Cmd+Shift+O` | External browser |
-| `Cmd+Shift+E` | External terminal |
-| `Ctrl+Shift+R` | Rebuild setup |
-| `Ctrl+Shift+S` | Start/Rerun |
+
+#### External Apps
+
+| Shortcut | Action |
+|---|---|
+| `Cmd+Option+B` | Open in external browser |
+| `Cmd+Option+T` | Open in external terminal |
 
 ### Supported Languages
 

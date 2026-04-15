@@ -80,36 +80,44 @@ struct HelpView: View {
                         ShortcutRow(keys: "/", description: "Help")
                         ShortcutRow(keys: "N", description: "New workstream or project")
                         ShortcutRow(keys: "N", shift: true, description: "New project")
+                        ShortcutRow(keys: "S", option: true, description: "Toggle sidebar")
                     } header: {
                         ShortcutSectionHeader(title: "Global", description: "Available everywhere")
                     }
 
                     Section {
+                        ShortcutRow(keys: "1", description: "Info")
+                        ShortcutRow(keys: "2", description: "Coding Agent")
+                        ShortcutRow(keys: "3-9", description: "Switch tab")
+                        ShortcutRow(keys: "[", shift: true, description: "Previous tab")
+                        ShortcutRow(keys: "]", shift: true, description: "Next tab")
                         ShortcutRow(keys: "Return", description: "Focus Coding Agent")
-                        ShortcutRow(keys: "I", description: "Info panel")
-                        ShortcutRow(keys: "E", description: "Environment")
                         ShortcutRow(keys: "T", description: "New Terminal")
                         ShortcutRow(keys: "B", description: "New Browser")
+                        ShortcutRow(keys: "O", description: "New Editor")
+                        ShortcutRow(keys: "S", description: "Save (Editor)")
+                        ShortcutRow(keys: "S", shift: true, description: "Save As (Editor)")
                         ShortcutRow(keys: "W", description: "Close tab")
+                        ShortcutRow(keys: "W", shift: true, description: "Archive workstream")
                         ShortcutRow(keys: "L", description: "Address bar")
-                        ShortcutRow(keys: "0", description: "Back to project")
-                        ShortcutRow(keys: "1-9", description: "Switch tab")
-                        ShortcutRow(keys: "←", option: true, description: "Previous tab")
-                        ShortcutRow(keys: "→", option: true, description: "Next tab")
+                        ShortcutRow(keys: "Return", shift: true, description: "Start/Rerun")
                     } header: {
                         ShortcutSectionHeader(title: "Workstream", description: "When a workstream is active")
                     }
 
                     Section {
-                        ShortcutRow(keys: "↑", option: true, description: "Previous workstream")
-                        ShortcutRow(keys: "↓", option: true, description: "Next workstream")
+                        ShortcutRow(keys: "[", description: "Previous workstream")
+                        ShortcutRow(keys: "]", description: "Next workstream")
+                        ShortcutRow(keys: "↑", description: "Previous project")
+                        ShortcutRow(keys: "↓", description: "Next project")
+                        ShortcutRow(keys: "0", description: "Back to project")
                     } header: {
-                        ShortcutSectionHeader(title: "Navigation", description: "Works from any view in a project")
+                        ShortcutSectionHeader(title: "Navigation", description: "Move between workstreams and projects")
                     }
 
                     Section {
-                        ShortcutRow(keys: "O", shift: true, description: "Open in external browser")
-                        ShortcutRow(keys: "E", shift: true, description: "Open in external terminal")
+                        ShortcutRow(keys: "B", option: true, description: "Open in external browser")
+                        ShortcutRow(keys: "T", option: true, description: "Open in external terminal")
                     } header: {
                         ShortcutSectionHeader(title: "External Apps", description: "Opens the current workstream directory")
                     }
@@ -166,8 +174,8 @@ private struct ShortcutRow: View {
         LabeledContent(description) {
             HStack(spacing: 2) {
                 if ctrl { Image(systemName: "control") }
-                if option { Image(systemName: "option") }
                 if cmd { Image(systemName: "command") }
+                if option { Image(systemName: "option") }
                 if shift { Image(systemName: "shift") }
                 Text(keys)
             }

@@ -1,6 +1,7 @@
 // ABOUTME: Main application view composing the sidebar and terminal content area.
 // ABOUTME: Uses NavigationSplitView for the sidebar/detail pattern.
 
+import AppKit
 import OSLog
 import SwiftUI
 
@@ -22,6 +23,57 @@ final class ProjectList: ObservableObject {
     }
 }
 
+func workstreamHasUsablePath(_ workstream: Workstream, pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) -> Bool {
+    guard let worktreePath = workstream.worktreePath else { return false }
+    return pathExists(worktreePath)
+}
+
+func renderableWorkstreamID(
+    in project: Project,
+    selectedWorkstreamID: UUID?,
+    pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+) -> UUID? {
+    guard let selectedWorkstreamID else { return nil }
+    return project.workstreams.contains {
+        $0.id == selectedWorkstreamID && workstreamHasUsablePath($0, pathExists: pathExists)
+    } ? selectedWorkstreamID : nil
+}
+
+func cycledWorkstreamID(
+    in project: Project,
+    selectedWorkstreamID: UUID?,
+    direction: Int,
+    pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+) -> UUID? {
+    let sorted = project.workstreams
+        .filter { workstreamHasUsablePath($0, pathExists: pathExists) }
+        .sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+    guard !sorted.isEmpty else { return nil }
+    guard let selectedWorkstreamID,
+          let currentIndex = sorted.firstIndex(where: { $0.id == selectedWorkstreamID })
+    else {
+        return direction > 0 ? sorted.first?.id : sorted.last?.id
+    }
+    let next = (currentIndex + direction + sorted.count) % sorted.count
+    return sorted[next].id
+}
+
+func commandKeyNotification(charactersIgnoringModifiers: String?, modifierFlags: NSEvent.ModifierFlags) -> Notification.Name? {
+    guard let charactersIgnoringModifiers else { return nil }
+    let flags = modifierFlags.intersection(.deviceIndependentFlagsMask)
+    guard flags.contains(.command), !flags.contains(.option), !flags.contains(.control) else { return nil }
+    let hasShift = flags.contains(.shift)
+
+    switch (charactersIgnoringModifiers, hasShift) {
+    case ("[", false): return .prevWorkstream
+    case ("]", false): return .nextWorkstream
+    case ("[", true): return .prevTab
+    case ("]", true): return .nextTab
+    case ("w", false): return .closeTerminal
+    default: return nil
+    }
+}
+
 struct ContentView: View {
     @StateObject private var projectList = ProjectList()
     @State private var selection: SidebarSelection? = SidebarSelection.loadSaved() ?? ContentView.initialSelection()
@@ -36,12 +88,14 @@ struct ContentView: View {
     @StateObject private var pixelAgentsCache = PixelAgentsPanelCache()
     @StateObject private var appEnvironment = AppEnvironment()
     @StateObject private var updateChecker = UpdateChecker()
+    @StateObject private var activityTracker = WorkstreamActivityTracker()
     @EnvironmentObject private var updater: Updater
     @State private var saveWork: DispatchWorkItem?
     @State private var workstreamToRemove: UUID?
     @State private var workstreamToPurge: UUID?
-    @State private var purgeWarningDirty = false
+    @State private var purgeWarningMessage: String?
     @State private var removedProjectNames: [String] = []
+    @AppStorage("factoryfloor.sortOrder") private var sortOrder: ProjectSortOrder = .recent
     @State private var keyMonitorInstalled = false
 
     private static func initialSelection() -> SidebarSelection? {
@@ -86,18 +140,26 @@ struct ContentView: View {
                 .navigationTitle("Help")
                 .navigationSubtitle(AppConstants.appName)
         } else if let workstream = activeWorkstream, let project = activeProject {
-            if workstream.worktreePath != nil {
+            if let workstreamID = renderableWorkstreamID(in: project, selectedWorkstreamID: workstream.id) {
+                let scriptConfig = ScriptConfig.load(from: project.directory)
+                let initialTabState = startupWorkspaceTabState(
+                    snapshot: surfaceCache.restoreTabSnapshot(for: workstreamID),
+                    savedTab: WorkspaceStateStore.load(for: workstreamID)
+                )
                 TerminalContainerView(
-                    workstreamID: workstream.id,
+                    workstreamID: workstreamID,
                     workingDirectory: workstream.workingDirectory(projectDirectory: project.directory),
                     projectDirectory: project.directory,
                     projectName: project.name,
                     workstreamName: workstream.name,
-                    bypassPermissions: workstream.bypassPermissions
+                    bypassPermissions: workstream.bypassPermissions,
+                    isActive: true,
+                    scriptConfig: scriptConfig,
+                    initialTabState: initialTabState
                 )
-                .id(workstream.id)
-                .navigationTitle(workstream.name)
-                .navigationSubtitle(appEnvironment.taskDescription(for: workstream.worktreePath) ?? project.name)
+                .id(workstreamID)
+                .navigationTitle(appEnvironment.taskDescription(for: workstream.worktreePath) ?? workstream.name)
+                .navigationSubtitle(workstreamSubtitle(project: project, workstream: workstream))
             } else {
                 VStack(spacing: 12) {
                     ProgressView()
@@ -106,8 +168,8 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle(workstream.name)
-                .navigationSubtitle(appEnvironment.taskDescription(for: workstream.worktreePath) ?? project.name)
+                .navigationTitle(appEnvironment.taskDescription(for: workstream.worktreePath) ?? workstream.name)
+                .navigationSubtitle(workstreamSubtitle(project: project, workstream: workstream))
             }
         } else if let project = activeProject,
                   let projectIndex = projects.firstIndex(where: { $0.id == project.id })
@@ -191,12 +253,12 @@ struct ContentView: View {
                 )
             ) {
                 Button("Cancel", role: .cancel) { workstreamToPurge = nil }
-                Button(purgeWarningDirty ? "Purge Anyway" : "Purge", role: .destructive) {
+                Button(purgeWarningMessage != nil ? "Purge Anyway" : "Purge", role: .destructive) {
                     performPurge()
                 }
             } message: {
-                if purgeWarningDirty {
-                    Text("This workstream has uncommitted changes that will be lost.")
+                if let warning = purgeWarningMessage {
+                    Text(warning)
                 } else {
                     Text("The worktree and its branch will be permanently deleted.")
                 }
@@ -249,6 +311,12 @@ struct ContentView: View {
                 if newValue != .settings && newValue != .help {
                     newValue?.save()
                 }
+                // Auto-focus terminal when selecting a workstream
+                if case .workstream = newValue {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .focusAgent, object: nil)
+                    }
+                }
             }
             .onKeyPress(.escape) {
                 if selection == .settings || selection == .help {
@@ -262,8 +330,11 @@ struct ContentView: View {
                 guard !keyMonitorInstalled else { return }
                 keyMonitorInstalled = true
                 NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                    if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
-                        NotificationCenter.default.post(name: .closeTerminal, object: nil)
+                    if let notification = commandKeyNotification(
+                        charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+                        modifierFlags: event.modifierFlags
+                    ) {
+                        NotificationCenter.default.post(name: notification, object: nil)
                         return nil // swallow the event
                     }
                     return event
@@ -287,6 +358,7 @@ struct ContentView: View {
         .environmentObject(appEnvironment)
         .environmentObject(updateChecker)
         .environmentObject(updater)
+        .environmentObject(activityTracker)
         .onAppear {
             appEnvironment.refresh()
             appEnvironment.refreshAllRepoInfo(projects: projects)
@@ -313,6 +385,17 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .prevWorkstream)) { _ in
             cycleWorkstream(direction: -1)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .nextProject)) { _ in
+            cycleProject(direction: 1)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .prevProject)) { _ in
+            cycleProject(direction: -1)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .archiveWorkstream)) { _ in
+            if let wsID = selection?.workstreamID {
+                workstreamToRemove = wsID
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .workstreamCreated)) { notification in
             guard let info = notification.userInfo,
@@ -385,6 +468,14 @@ struct ContentView: View {
         }
     }
 
+    private func workstreamSubtitle(project: Project, workstream: Workstream) -> String {
+        let branch = appEnvironment.branchName(for: workstream.worktreePath)
+        if let branch {
+            return "\(project.name) · \(branch)"
+        }
+        return project.name
+    }
+
     private func openExternalTerminal() {
         let dir: String?
         if let ws = activeWorkstream, let project = activeProject {
@@ -432,27 +523,45 @@ struct ContentView: View {
     /// Only acts when a project or workstream is selected (not settings/help).
     private func cycleWorkstream(direction: Int) {
         guard let project = activeProject else { return }
-        let sorted = project.workstreams.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+
+        if selection?.workstreamID != nil || selection?.projectID != nil {
+            guard let id = cycledWorkstreamID(in: project, selectedWorkstreamID: selection?.workstreamID, direction: direction) else { return }
+            deferSelection(.workstream(id))
+        }
+    }
+
+    private func deferSelection(_ target: SidebarSelection) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+            guard selection != target else { return }
+            selection = target
+        }
+    }
+
+    /// Cycle through projects in sidebar display order.
+    private func cycleProject(direction: Int) {
+        let sorted: [Project]
+        switch sortOrder {
+        case .recent:
+            sorted = projects.sorted { $0.lastAccessedAt > $1.lastAccessedAt }
+        case .alphabetical:
+            sorted = projects.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
         guard !sorted.isEmpty else { return }
 
-        if let wsID = selection?.workstreamID,
-           let currentIndex = sorted.firstIndex(where: { $0.id == wsID })
-        {
-            let next = (currentIndex + direction + sorted.count) % sorted.count
-            selection = .workstream(sorted[next].id)
-        } else if case .project = selection {
-            // In project view: jump to first/last workstream
-            selection = .workstream(direction > 0 ? sorted.first!.id : sorted.last!.id)
+        guard let current = activeProject,
+              let currentIndex = sorted.firstIndex(where: { $0.id == current.id })
+        else {
+            // No active project: jump to first
+            selection = .project(sorted.first!.id)
+            return
         }
+        let next = (currentIndex + direction + sorted.count) % sorted.count
+        selection = .project(sorted[next].id)
     }
 
     private func confirmPurge(_ wsID: UUID) {
         let ws = projects.flatMap(\.workstreams).first(where: { $0.id == wsID })
-        if let path = ws?.worktreePath, GitOperations.hasUncommittedChanges(at: path) {
-            purgeWarningDirty = true
-        } else {
-            purgeWarningDirty = false
-        }
+        purgeWarningMessage = ws.flatMap { WorkstreamArchiver.purgeWarning(for: $0) }
         workstreamToPurge = wsID
     }
 

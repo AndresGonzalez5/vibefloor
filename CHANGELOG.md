@@ -1,5 +1,161 @@
 # Changelog
 
+## [0.1.75](https://github.com/alltuner/factoryfloor/compare/v0.1.74...v0.1.75) (2026-04-13)
+
+
+### Bug Fixes
+
+* **deps:** update dependency monaco-editor to v30.0.1 ([#434](https://github.com/alltuner/factoryfloor/issues/434)) ([972fa25](https://github.com/alltuner/factoryfloor/commit/972fa25353350dd9e484b555c50dd64894dd9587))
+* group Monaco VSCode packages in Renovate config ([#439](https://github.com/alltuner/factoryfloor/issues/439)) ([02e9569](https://github.com/alltuner/factoryfloor/commit/02e9569ad980d3c61070dd9b25da826353746b36)), closes [#436](https://github.com/alltuner/factoryfloor/issues/436)
+
+
+### Miscellaneous
+
+* **deps:** update actions/upload-pages-artifact action to v5 ([#437](https://github.com/alltuner/factoryfloor/issues/437)) ([5b2ad22](https://github.com/alltuner/factoryfloor/commit/5b2ad2242f293817aced382b3386d9b08ce26aa1))
+* **deps:** update dependency vite to v8 ([#435](https://github.com/alltuner/factoryfloor/issues/435)) ([4fac286](https://github.com/alltuner/factoryfloor/commit/4fac286452035f0e92f1f1ff9e325f9ee717a587))
+
+## [0.1.74](https://github.com/alltuner/factoryfloor/compare/v0.1.73...v0.1.74) (2026-04-13)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @codingame/monaco-vscode-standalone-typescript-language-features to v30.0.1 ([#427](https://github.com/alltuner/factoryfloor/issues/427)) ([0f8f342](https://github.com/alltuner/factoryfloor/commit/0f8f3425148fcbebc43f60fbc66a630d807425c6))
+* **deps:** update dependency @codingame/monaco-vscode-textmate-service-override to v30.0.1 ([#428](https://github.com/alltuner/factoryfloor/issues/428)) ([bdaf790](https://github.com/alltuner/factoryfloor/commit/bdaf79023b939604603c78b6a21b0ee51332b225))
+* **deps:** update dependency @codingame/monaco-vscode-theme-service-override to v30.0.1 ([#432](https://github.com/alltuner/factoryfloor/issues/432)) ([cbb8137](https://github.com/alltuner/factoryfloor/commit/cbb8137e5831b987d034287f7f3d4f678204d30f))
+
+
+### Refactoring
+
+* rebuild Sparkle changelog from CHANGELOG.md on every release ([#430](https://github.com/alltuner/factoryfloor/issues/430)) ([51d9c92](https://github.com/alltuner/factoryfloor/commit/51d9c922f2e8a5823fe95a0c46a0d058b324f53c))
+
+## [0.1.73](https://github.com/alltuner/factoryfloor/compare/v0.1.72...v0.1.73) (2026-04-13)
+
+
+### Bug Fixes
+
+* deduplicate versions and filter noise in Sparkle changelog ([#425](https://github.com/alltuner/factoryfloor/issues/425)) ([30c48d9](https://github.com/alltuner/factoryfloor/commit/30c48d985ac3005582e8257862e8df4e2114089d))
+
+## [0.1.72](https://github.com/alltuner/factoryfloor/compare/v0.1.71...v0.1.72) (2026-04-13)
+
+
+### Bug Fixes
+
+* **ci:** download appcast from previous release, not latest ([#423](https://github.com/alltuner/factoryfloor/issues/423)) ([062b328](https://github.com/alltuner/factoryfloor/commit/062b328ed43e0db770fdb8f3b67e0fe644c9f405))
+* **deps:** update dependency @codingame/monaco-vscode-standalone-html-language-features to v30.0.1 ([#420](https://github.com/alltuner/factoryfloor/issues/420)) ([20517fd](https://github.com/alltuner/factoryfloor/commit/20517fd05a4054ceca73154cf61b527a1d260a31))
+* **deps:** update dependency @codingame/monaco-vscode-standalone-json-language-features to v30.0.1 ([#421](https://github.com/alltuner/factoryfloor/issues/421)) ([821c6b6](https://github.com/alltuner/factoryfloor/commit/821c6b6c28e64f1a044a15d76a3c5a662dd7a65f))
+* DMG skyline clipped by Finder status bar ([#424](https://github.com/alltuner/factoryfloor/issues/424)) ([c087cb9](https://github.com/alltuner/factoryfloor/commit/c087cb9ede4313aaa3f0f6fcb21739cf73ffc2b3))
+
+## [0.1.71](https://github.com/alltuner/factoryfloor/compare/v0.1.70...v0.1.71) (2026-04-13)
+
+
+### Features
+
+* show cumulative changelog in update popover ([#418](https://github.com/alltuner/factoryfloor/issues/418)) ([12caa50](https://github.com/alltuner/factoryfloor/commit/12caa50d83bdcc7e585ec722fd243de1ce8b041d))
+
+## [0.1.70](https://github.com/alltuner/factoryfloor/compare/v0.1.69...v0.1.70) (2026-04-13)
+
+
+### Bug Fixes
+
+* **ci:** increase Node heap size for Monaco editor build ([#416](https://github.com/alltuner/factoryfloor/issues/416)) ([ed37bdb](https://github.com/alltuner/factoryfloor/commit/ed37bdbf2ee8df457a7a4d967b10a7ed33e24ef9))
+
+## [0.1.69](https://github.com/alltuner/factoryfloor/compare/v0.1.68...v0.1.69) (2026-04-13)
+
+
+### Bug Fixes
+
+* **ci:** build Monaco editor before xcodegen in release workflow ([#415](https://github.com/alltuner/factoryfloor/issues/415)) ([ff7907f](https://github.com/alltuner/factoryfloor/commit/ff7907fa39f33af6c8c4a289033fae4d91e4f42e))
+* **deps:** update dependency @codingame/monaco-vscode-languages-service-override to v30.0.1 ([#412](https://github.com/alltuner/factoryfloor/issues/412)) ([55acef4](https://github.com/alltuner/factoryfloor/commit/55acef4169279f00c1e07ecc04e279cdb655fac7))
+* **deps:** update dependency @codingame/monaco-vscode-standalone-css-language-features to v30.0.1 ([#413](https://github.com/alltuner/factoryfloor/issues/413)) ([522052a](https://github.com/alltuner/factoryfloor/commit/522052a7565ada24dcf416d21fb9e4cab0065516))
+
+## [0.1.68](https://github.com/alltuner/factoryfloor/compare/v0.1.67...v0.1.68) (2026-04-13)
+
+
+### Features
+
+* add activity indicators and compact sidebar layout ([#406](https://github.com/alltuner/factoryfloor/issues/406)) ([e5fcb7e](https://github.com/alltuner/factoryfloor/commit/e5fcb7ee83c61e6eed3e8aa0456c1e9610738364)), closes [#399](https://github.com/alltuner/factoryfloor/issues/399)
+* add file editor with Monaco integration ([#389](https://github.com/alltuner/factoryfloor/issues/389)) ([969d5c1](https://github.com/alltuner/factoryfloor/commit/969d5c10e6d9f0b2f5405ed48e5f1b582ca20e8f))
+* consolidate GitHub actions into contextual dropdown ([#405](https://github.com/alltuner/factoryfloor/issues/405)) ([fbfaabf](https://github.com/alltuner/factoryfloor/commit/fbfaabff259af0a4e9dd8082131b803b7016f7ee)), closes [#398](https://github.com/alltuner/factoryfloor/issues/398)
+* credit contributors in release changelog entries ([#410](https://github.com/alltuner/factoryfloor/issues/410)) ([47817e9](https://github.com/alltuner/factoryfloor/commit/47817e954a90c0bf3b59004341a9986e2d4bf9ba))
+* reorganize workspace tabs with Info as first tab ([#407](https://github.com/alltuner/factoryfloor/issues/407)) ([83cacaa](https://github.com/alltuner/factoryfloor/commit/83cacaaa6c989e27d70c8a310fb353decb88674d)), closes [#400](https://github.com/alltuner/factoryfloor/issues/400)
+
+
+### Bug Fixes
+
+* auto-focus terminal when selecting workstream from sidebar ([#402](https://github.com/alltuner/factoryfloor/issues/402)) ([b87395c](https://github.com/alltuner/factoryfloor/commit/b87395c6cff7f4f33db05a7d6f31d4d092896df3)), closes [#394](https://github.com/alltuner/factoryfloor/issues/394)
+* **deps:** update dependency @codingame/monaco-vscode-all-language-default-extensions to v30.0.1 ([#408](https://github.com/alltuner/factoryfloor/issues/408)) ([5b7a85f](https://github.com/alltuner/factoryfloor/commit/5b7a85f79ce63fae62186ac968d98adae574c4e6))
+* **deps:** update dependency @codingame/monaco-vscode-api to v30.0.1 ([#409](https://github.com/alltuner/factoryfloor/issues/409)) ([a8e7f45](https://github.com/alltuner/factoryfloor/commit/a8e7f45786c779dab7dc0b2479deaf2898b06e33))
+* rename Abandon PR to Close PR to match GitHub terminology ([#403](https://github.com/alltuner/factoryfloor/issues/403)) ([061a6c3](https://github.com/alltuner/factoryfloor/commit/061a6c3e7bff1fb708e5c8c04faee8b6727275f3)), closes [#397](https://github.com/alltuner/factoryfloor/issues/397)
+* show correct shortcut numbers on closeable tabs ([#392](https://github.com/alltuner/factoryfloor/issues/392)) ([e9d4c3f](https://github.com/alltuner/factoryfloor/commit/e9d4c3fab3f6d8f55a904f952d75f5a437319459)), closes [#387](https://github.com/alltuner/factoryfloor/issues/387)
+* use remote tracking ref for worktree creation instead of updating local main ([#404](https://github.com/alltuner/factoryfloor/issues/404)) ([5da6b98](https://github.com/alltuner/factoryfloor/commit/5da6b98d8eca3903d624e85fc49b61cc3c1686a5)), closes [#393](https://github.com/alltuner/factoryfloor/issues/393)
+* **worktrees:** avoid prune prompt for newly created workstreams ([#384](https://github.com/alltuner/factoryfloor/issues/384)) ([a7d89d1](https://github.com/alltuner/factoryfloor/commit/a7d89d14aa5d79aca09124e16675de84300db41a))
+
+
+### Miscellaneous
+
+* **deps:** update actions/checkout action to v6 ([#390](https://github.com/alltuner/factoryfloor/issues/390)) ([327844d](https://github.com/alltuner/factoryfloor/commit/327844debdff94e6128ac768da378c2c3e5fcdf6))
+
+
+### Documentation
+
+* document tmux external access for [#396](https://github.com/alltuner/factoryfloor/issues/396) ([#401](https://github.com/alltuner/factoryfloor/issues/401)) ([16af5cf](https://github.com/alltuner/factoryfloor/commit/16af5cfa5b90fb799545464521a6abbb7ae1299d))
+
+## [0.1.67](https://github.com/alltuner/factoryfloor/compare/v0.1.66...v0.1.67) (2026-04-08)
+
+
+### Features
+
+* add German (de) localization for app and website ([#383](https://github.com/alltuner/factoryfloor/issues/383)) ([20d82a8](https://github.com/alltuner/factoryfloor/commit/20d82a8bf871d281ab2abf7bfcb7d8a775a39227))
+* prioritize task description over generated name across all views ([#380](https://github.com/alltuner/factoryfloor/issues/380)) ([45e66d4](https://github.com/alltuner/factoryfloor/commit/45e66d46393ab143aa6ec6fefe60ab8b44cbed7c))
+* setup script as blocking gate, tmux restore, menu cleanup ([#382](https://github.com/alltuner/factoryfloor/issues/382)) ([15d74b1](https://github.com/alltuner/factoryfloor/commit/15d74b19c6fbbd8c593e178792d4166fb4a4c7d1))
+
+
+### Bug Fixes
+
+* remove web-browser entitlement that requires Apple approval ([#378](https://github.com/alltuner/factoryfloor/issues/378)) ([31c0578](https://github.com/alltuner/factoryfloor/commit/31c0578f862b7e49dda044be1f8b7c9a3c2d4456))
+* set manual signing and remove redundant debug entitlements ([#381](https://github.com/alltuner/factoryfloor/issues/381)) ([2881455](https://github.com/alltuner/factoryfloor/commit/28814551982b8ce72d4e6fe6cb94aa4a8a06b0c8))
+
+## [0.1.66](https://github.com/alltuner/factoryfloor/compare/v0.1.65...v0.1.66) (2026-04-08)
+
+
+### Features
+
+* add emdash config support, FF_DEFAULT_BRANCH, and compatibility env var aliases ([#367](https://github.com/alltuner/factoryfloor/issues/367)) ([1bd820c](https://github.com/alltuner/factoryfloor/commit/1bd820c20e85f04b20c649764ce3f2670c590233))
+* add setting to restrict agent filesystem writes to worktree ([#358](https://github.com/alltuner/factoryfloor/issues/358)) ([188d1ec](https://github.com/alltuner/factoryfloor/commit/188d1ecc1bf80fe6f7b201dcb2b6a66a7b204a13))
+* redesign workstream info page with native macOS grouped form ([#360](https://github.com/alltuner/factoryfloor/issues/360)) ([6ed3ac9](https://github.com/alltuner/factoryfloor/commit/6ed3ac951944ec612e6afaeb21b7f7c3d97cda2f))
+* show workstream description tooltip on sidebar hover ([#350](https://github.com/alltuner/factoryfloor/issues/350)) ([a89d090](https://github.com/alltuner/factoryfloor/commit/a89d090e42d35786840de2d211693dddbb47a71a))
+* sync terminal color scheme with system dark/light mode ([#362](https://github.com/alltuner/factoryfloor/issues/362)) ([a6dd299](https://github.com/alltuner/factoryfloor/commit/a6dd299c2fc3280d95847df51846fbd8447bae57)), closes [#359](https://github.com/alltuner/factoryfloor/issues/359)
+* update main branch and clean up after purging a workstream ([#369](https://github.com/alltuner/factoryfloor/issues/369)) ([f20b13c](https://github.com/alltuner/factoryfloor/commit/f20b13c14f5aed4776cb6315c51bcccd9ea21aeb))
+
+
+### Bug Fixes
+
+* **browser:** enable passkey support in embedded browser ([#366](https://github.com/alltuner/factoryfloor/issues/366)) ([e940ffa](https://github.com/alltuner/factoryfloor/commit/e940ffac87aa5df41142e19edf05873312a7516c))
+* keep workstream views alive across rapid Cmd+[/] switching ([#372](https://github.com/alltuner/factoryfloor/issues/372)) ([48642ab](https://github.com/alltuner/factoryfloor/commit/48642ab80d7cbd348d59e12025e507bb4d1e8120))
+* preserve run terminal visibility across workstream switching ([#375](https://github.com/alltuner/factoryfloor/issues/375)) ([2a9d37b](https://github.com/alltuner/factoryfloor/commit/2a9d37b05458076bea9e9449d28d2b58832ee8f0))
+* revert ZStack-all-workstreams to single active TerminalContainerView ([#374](https://github.com/alltuner/factoryfloor/issues/374)) ([e68cb0e](https://github.com/alltuner/factoryfloor/commit/e68cb0e2c08845fcb521809e14dabd45a049047f))
+* separate debug entitlements to fix ad-hoc signed builds ([#368](https://github.com/alltuner/factoryfloor/issues/368)) ([c155ca4](https://github.com/alltuner/factoryfloor/commit/c155ca4d5a101476452fa3c26b1fa7967782096b))
+* toolbar duplication and SourceKit-LSP false positives in worktrees ([#373](https://github.com/alltuner/factoryfloor/issues/373)) ([3bae95b](https://github.com/alltuner/factoryfloor/commit/3bae95b2b6ab81b06ec8fe4a28a44bd1980b2233))
+* update stale keyboard shortcut references across UI and docs ([#371](https://github.com/alltuner/factoryfloor/issues/371)) ([911d311](https://github.com/alltuner/factoryfloor/commit/911d31173ee51c842234415d704678b5d7674893))
+* **website:** improve footer and nav responsiveness ([#357](https://github.com/alltuner/factoryfloor/issues/357)) ([d96557f](https://github.com/alltuner/factoryfloor/commit/d96557f2e839722a33b8e18f2d96f7591852f929))
+
+
+### Refactoring
+
+* revamp keyboard shortcuts to follow macOS conventions ([#365](https://github.com/alltuner/factoryfloor/issues/365)) ([c18ef6f](https://github.com/alltuner/factoryfloor/commit/c18ef6f3ec0c1b36a06d92f12541eaaa0545dd17))
+
+
+### Performance
+
+* instant workstream switching ([#377](https://github.com/alltuner/factoryfloor/issues/377)) ([3f987a9](https://github.com/alltuner/factoryfloor/commit/3f987a94cc22c20004eaf84bba58522f3a042fcf))
+
+
+### Documentation
+
+* add architecture and security review, updated for v0.1.65 ([#355](https://github.com/alltuner/factoryfloor/issues/355)) ([46013da](https://github.com/alltuner/factoryfloor/commit/46013da22f1782587ff8fb1544a3b428d7b40051))
+* add Corner Office and mobile app design docs ([#361](https://github.com/alltuner/factoryfloor/issues/361)) ([e6285a9](https://github.com/alltuner/factoryfloor/commit/e6285a9790442c3b8ec5eb8a7ddf80103d345c5e))
+* add translation contribution guide and sponsor page updates ([#356](https://github.com/alltuner/factoryfloor/issues/356)) ([67e4add](https://github.com/alltuner/factoryfloor/commit/67e4addc4faefd733b7d0dba4b25aa6952afc043))
+
 ## [0.1.65](https://github.com/alltuner/factoryfloor/compare/v0.1.64...v0.1.65) (2026-04-03)
 
 

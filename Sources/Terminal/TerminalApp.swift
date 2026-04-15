@@ -78,6 +78,18 @@ private func handleTerminalAction(
     case GHOSTTY_ACTION_RING_BELL:
         sendDesktopNotification(title: AppConstants.appName, body: "Terminal bell", suppressWhenActive: true)
         return true
+    case GHOSTTY_ACTION_SHOW_CHILD_EXITED:
+        let exitCode = action.action.child_exited.exit_code
+        guard let view = TerminalView.view(for: target.target.surface),
+              let wsID = view.workstreamID else { return false }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .terminalChildExited,
+                object: wsID,
+                userInfo: ["exitCode": Int32(exitCode), "surfaceView": view]
+            )
+        }
+        return true
     default:
         return false
     }
@@ -253,12 +265,12 @@ final class TerminalApp {
         appearanceObserver = NSApplication.shared.observe(
             \.effectiveAppearance,
             options: [.new, .initial]
-        ) { [weak self] nsApp, _ in
-            let scheme: ghostty_color_scheme_e = nsApp.effectiveAppearance.isDark
-                ? GHOSTTY_COLOR_SCHEME_DARK
-                : GHOSTTY_COLOR_SCHEME_LIGHT
+        ) { [weak self] _, _ in
             DispatchQueue.main.async {
                 guard let app = self?.app else { return }
+                let scheme: ghostty_color_scheme_e = NSApplication.shared.effectiveAppearance.isDark
+                    ? GHOSTTY_COLOR_SCHEME_DARK
+                    : GHOSTTY_COLOR_SCHEME_LIGHT
                 ghostty_app_set_color_scheme(app, scheme)
                 for (ptr, _) in TerminalView.surfaceRegistry {
                     ghostty_surface_set_color_scheme(ptr, scheme)

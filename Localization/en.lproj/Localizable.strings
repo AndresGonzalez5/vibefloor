@@ -30,11 +30,19 @@
 "Purge Workstream" = "Purge Workstream";
 "Purge" = "Purge";
 "Purge Anyway" = "Purge Anyway";
-"This workstream has uncommitted changes that will be lost." = "This workstream has uncommitted changes that will be lost.";
+"uncommitted changes" = "uncommitted changes";
+"unpushed commits" = "unpushed commits";
+" and " = " and ";
+"This workstream has %@ that will be lost." = "This workstream has %@ that will be lost.";
 "The worktree and its branch will be permanently deleted." = "The worktree and its branch will be permanently deleted.";
 "Projects Not Found" = "Projects Not Found";
 "The following projects were removed because their directories no longer exist on disk: %@" = "The following projects were removed because their directories no longer exist on disk: %@";
 "Cancel" = "Cancel";
+"Save" = "Save";
+"Save As..." = "Save As...";
+"Don't Save" = "Don't Save";
+"Do you want to save changes to \"%@\"?" = "Do you want to save changes to \"%@\"?";
+"Your changes will be lost if you don't save them." = "Your changes will be lost if you don't save them.";
 "Remove" = "Remove";
 "Worktree Creation Failed" = "Worktree Creation Failed";
 "Could not create the git worktree. The branch may already exist, or there may be an ongoing merge or rebase." = "Could not create the git worktree. The branch may already exist, or there may be an ongoing merge or rebase.";
@@ -66,6 +74,11 @@
 "Terminal" = "Terminal";
 "None" = "None";
 "Browser" = "Browser";
+"Editor" = "Editor";
+"New Editor (\u2318E)" = "New Editor (\u2318E)";
+"Open File" = "Open File";
+"Toggle file tree" = "Toggle file tree";
+"Select a file to edit" = "Select a file to edit";
 "GitHub" = "GitHub";
 "Coding Agent" = "Coding Agent";
 "Bypass permission prompts" = "Bypass permission prompts";
@@ -85,11 +98,11 @@
 "Archiving..." = "Archiving...";
 "Commits ahead" = "Commits ahead";
 "Open as workstream" = "Open as workstream";
-"Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams." = "Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams.";
+"Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream." = "Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream.";
 "Prune %d clean worktree" = "Prune %d clean worktree";
 "Prune %d clean worktrees" = "Prune %d clean worktrees";
-"Remove %d worktree with no uncommitted changes? Associated workstreams will also be removed from the sidebar." = "Remove %d worktree with no uncommitted changes? Associated workstreams will also be removed from the sidebar.";
-"Remove %d worktrees with no uncommitted changes? Associated workstreams will also be removed from the sidebar." = "Remove %d worktrees with no uncommitted changes? Associated workstreams will also be removed from the sidebar.";
+"Remove %d clean worktree with no uncommitted changes?" = "Remove %d clean worktree with no uncommitted changes?";
+"Remove %d clean worktrees with no uncommitted changes?" = "Remove %d clean worktrees with no uncommitted changes?";
 "Remove \"%@\" from the list? Files in %@ will not be deleted." = "Remove \"%@\" from the list? Files in %@ will not be deleted.";
 
 /* Projects */
@@ -253,10 +266,13 @@
 "Report a Bug" = "Report a Bug";
 "Documentation" = "Documentation";
 "Request a Feature" = "Request a Feature";
-"Rebuild" = "Rebuild";
 "Rerun" = "Rerun";
 "Start" = "Start";
 "Stop" = "Stop";
+
+"Running setup..." = "Running setup...";
+"Setup failed." = "Setup failed.";
+"Continue to Agent" = "Continue to Agent";
 
 "Restarting..." = "Restarting...";
 "Preparing workstream..." = "Preparing workstream...";
@@ -271,7 +287,8 @@
 "Commit" = "Commit";
 "Push" = "Push";
 "Create PR" = "Create PR";
-"Abandon PR" = "Abandon PR";
+"Close PR" = "Close PR";
+"Open #%d" = "Open #%d";
 "This branch has been merged." = "This branch has been merged.";
 "gh CLI is not installed." = "gh CLI is not installed.";
 "Claude Code is not installed." = "Claude Code is not installed.";

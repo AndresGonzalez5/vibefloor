@@ -65,9 +65,9 @@ La interfície apareix a l'instant, la creació del worktree passa en segon pla.
 
 #### Workstream tabs {#workstream-tabs}
 
-- **Info** (⌘I) — nom de branch, estat de PR, documentació del projecte
+- **Info** — nom de branch, estat de PR, documentació del projecte
 - **Agent** (⌘Return) — la teva sessió de Claude Code
-- **Environment** (⌘E) — controls de setup i run script
+- **Environment** — controls de setup i run script
 - **Terminal** (⌘T) — terminal tabs addicionals, tants com vulguis
 - **Navegador** (⌘B) — navegador integrat amb detecció automàtica de port
 
@@ -100,7 +100,7 @@ Les quick actions executen tasques puntuals de Claude des del sidebar:
 - **Commit** — prepara i fa commit amb un missatge generat per IA
 - **Push** — fa push de la branch actual a l'origin
 - **Create PR** — crea una pull request amb títol i descripció generats per IA
-- **Abandon PR** — tanca la PR
+- **Close PR** — tanca la PR
 
 S'executen com a crides `claude -p` en segon pla. Activa **Quick action debug mode** a la configuració si vols saber com es fa l'embotit. Confia en nosaltres, en [David](https://davidpoblador.com) va passar més temps del que pot admetre depurant comportaments estranys allà dins.
 
@@ -116,7 +116,7 @@ Els terminals es renderitzen per GPU via [Ghostty](https://ghostty.org). Són r�
 
 - **⌘T** — nou terminal tab
 - **⌘W** — tanca tab (o Ctrl+D per sortir del shell)
-- **⌘1-9** — canvia entre tabs
+- **⌘1** — Info, **⌘2** — Coding Agent, **⌘3-9** — canvia entre tabs
 - **⌘Shift+[** / **⌘Shift+]** — cicla entre tabs
 
 Pots arrossegar fitxers i text sobre el terminal. Perquè de vegades el ratolí està bé, la veritat.
@@ -151,32 +151,36 @@ Factory Floor prioritza el teclat. Aquí tens tot.
 | ⌘Shift+N | Nou projecte |
 | ⌘, | Configuració |
 | ⌘/ | Ajuda |
+| ⌘Option+S | Commuta barra lateral |
 
 #### Workstream {#workstream}
 
 | Drecera | Acció |
 |----------|--------|
+| ⌘1 | Info |
+| ⌘2 | Coding Agent |
+| ⌘3-9 | Canvia de tab |
+| ⌘Shift+[ | Tab anterior |
+| ⌘Shift+] | Tab següent |
 | ⌘Return | Focus Coding Agent |
-| ⌘I | Panell Info |
-| ⌘E | Environment |
 | ⌘T | Nou Terminal |
 | ⌘B | Nou navegador |
 | ⌘W | Tanca tab |
+| ⌘Shift+W | Arxiva workstream |
 | ⌘L | Barra d'adreces (navegador) |
-| ⌘0 | Torna al projecte |
-| ⌘1-9 | Canvia de tab |
-| ⌘Shift+[ | Tab anterior |
-| ⌘Shift+] | Tab següent |
-| Ctrl+Shift+R | Reconstrueix setup |
-| Ctrl+Shift+S | Inicia/reinicia run |
+| ⌘Shift+Return | Inicia/reinicia run |
 
 #### Navegació {#navigation-1}
 
 | Drecera | Acció |
 |----------|--------|
-| Ctrl+1-9 | Canvia de workstream (des de qualsevol vista) |
-| ⌘Shift+O | Obre al navegador extern |
-| ⌘Shift+E | Obre al terminal extern |
+| ⌘[ | Workstream anterior |
+| ⌘] | Workstream següent |
+| ⌘↑ | Projecte anterior |
+| ⌘↓ | Projecte següent |
+| ⌘0 | Torna al projecte |
+| ⌘Option+B | Obre al navegador extern |
+| ⌘Option+T | Obre al terminal extern |
 
 ---
 
@@ -199,19 +203,18 @@ Posa un `.factoryfloor.json` a l'arrel del teu projecte per automatitzar el cicl
 | Hook | Quan s'executa |
 |------|-------------|
 | `setup` | Un cop, quan es crea un workstream. Instal·la dependències, executa migracions, el que sigui. |
-| `run` | Sota demanda des del tab Environment (⌘E). Embolcallat amb `ff-run` per a port detection. |
+| `run` | Sota demanda des del tab Environment. Embolcallat amb `ff-run` per a port detection. |
 | `teardown` | Quan un workstream s'arxiva o es purga. Atura contenidors, neteja. |
 
 Tots els camps són opcionals. Els scripts s'executen al directori del workstream usant el teu shell de login. Sí, fins i tot [fish](https://github.com/alltuner/factoryfloor/pull/324). No preguntis quant de temps va costar.
 
-Factory Floor també llegeix `conductor.json` i `.superset/config.json` si `.factoryfloor.json` no existeix. Perquè la compatibilitat és de bona educació. (Hora d'un [estàndard](https://xkcd.com/927/)?)
+Factory Floor també llegeix `.emdash.json`, `conductor.json` i `.superset/config.json` si `.factoryfloor.json` no existeix. Perquè la compatibilitat és de bona educació. (Hora d'un [estàndard](https://xkcd.com/927/)?) Quan s'usa una configuració de compatibilitat, Factory Floor injecta variables d'entorn de compatibilitat perquè els scripts funcionin sense modificació (p. ex. `CONDUCTOR_PORT`, `EMDASH_PORT`, `SUPERSET_PORT_BASE`).
 
 #### El tab Environment {#the-environment-tab}
 
 Disposició en panell dividit: **Setup** a l'esquerra, **Run** a la dreta.
 
-- **Ctrl+Shift+R** — reconstrueix (reexecuta setup)
-- **Ctrl+Shift+S** — inicia/reinicia el run script
+- **⌘Shift+Return** — inicia/reinicia el run script
 
 ### Variables d'entorn {#environment-variables}
 
@@ -224,6 +227,7 @@ Cada terminal, setup script, i comanda run d'un workstream té aquestes variable
 | `FF_PROJECT_DIR` | Ruta del repositori principal | `/Users/you/my-app` |
 | `FF_WORKTREE_DIR` | Ruta del worktree | `~/.factoryfloor/worktrees/my-app/coral-tidal-reef` |
 | `FF_PORT` | Port determinista (40001-49999) | `42847` |
+| `FF_DEFAULT_BRANCH` | Branca per defecte (main, master, etc.) | `main` |
 
 #### Sobre FF_PORT {#about-ff_port}
 
@@ -294,7 +298,7 @@ Requereix el [gh CLI](https://cli.github.com/) amb autenticació (`gh auth login
 
 #### Quick actions {#quick-actions-1}
 
-Des del sidebar, executa operacions d'un sol clic: **Create PR** (títol i descripció generats per IA), **Push** (a l'origin amb `-u`), o **Abandon PR** (tanca amb un comentari). Perquè si estàs cansat d'escriure "ara fes commit, push, i obre una PR" a Claude per centèsima vegada, no ets l'únic.
+Des del sidebar, executa operacions d'un sol clic: **Create PR** (títol i descripció generats per IA), **Push** (a l'origin amb `-u`), o **Close PR** (tanca amb un comentari). Perquè si estàs cansat d'escriure "ara fes commit, push, i obre una PR" a Claude per centèsima vegada, no ets l'únic.
 
 ### Actualitzacions {#updates}
 

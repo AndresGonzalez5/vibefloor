@@ -157,6 +157,9 @@ enum GitOperations {
             ? workstreamName
             : "\(branchPrefix)/\(workstreamName)"
 
+        // Fetch the default branch so worktrees start from the latest remote ref
+        fetchDefaultBranch(at: projectPath)
+
         let baseBranch = defaultBranch(at: projectPath)
 
         // Create parent directories
@@ -398,12 +401,22 @@ enum GitOperations {
         return results
     }
 
-    /// Remove all worktrees that have no uncommitted changes and no unmerged branch commits.
+    /// Remove clean worktrees (no uncommitted changes and no unmerged branch commits).
+    /// When `onlyPaths` is provided, only those worktree paths are considered.
     @discardableResult
-    static func pruneCleanWorktrees(at projectPath: String) -> Int {
+    static func pruneCleanWorktrees(at projectPath: String, onlyPaths: Set<String>? = nil) -> Int {
         let worktrees = listWorktreesWithInfo(at: projectPath)
+        let allowedPaths = onlyPaths.map { paths in
+            Set(paths.map { path in
+                URL(fileURLWithPath: path).standardizedFileURL.path
+            })
+        }
         var pruned = 0
         for wt in worktrees where !wt.isMain && !wt.isDirty && !wt.hasBranchCommits {
+            let standardizedPath = URL(fileURLWithPath: wt.path).standardizedFileURL.path
+            if let allowedPaths, !allowedPaths.contains(standardizedPath) {
+                continue
+            }
             let result = run(args: ["worktree", "remove", wt.path], in: projectPath)
             if result != nil {
                 pruned += 1
@@ -441,6 +454,91 @@ enum GitOperations {
         }
 
         return commonURL.deletingLastPathComponent().standardizedFileURL.path
+    }
+
+    /// Return the current branch name, or nil if detached or not a repo.
+    static func currentBranch(at path: String) -> String? {
+        guard let raw = run(args: ["rev-parse", "--abbrev-ref", "HEAD"], in: path)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        return raw == "HEAD" ? nil : raw
+    }
+
+    /// Delete a local branch by name.
+    static func deleteLocalBranch(at path: String, branchName: String) {
+        _ = run(args: ["branch", "-D", branchName], in: path)
+    }
+
+    /// Fetch the default branch from origin, fast-forward the local ref to match,
+    /// and reset the working tree if it is clean. Fails silently when there is no
+    /// remote, the network is unreachable, or the working tree has local changes.
+    static func updateDefaultBranch(at path: String) {
+        guard run(args: ["remote", "get-url", "origin"], in: path) != nil else { return }
+
+        let branch: String
+        if let ref = run(args: ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"], in: path) {
+            branch = ref.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "origin/", with: "")
+        } else if run(args: ["rev-parse", "--verify", "refs/heads/main"], in: path) != nil {
+            branch = "main"
+        } else if run(args: ["rev-parse", "--verify", "refs/heads/master"], in: path) != nil {
+            branch = "master"
+        } else {
+            return
+        }
+
+        // Fetch with timeout so we don't block the UI
+        guard runWithTimeout(args: ["fetch", "origin", branch, "--no-tags"], in: path, timeout: 5) != nil else {
+            return
+        }
+
+        // Move the local ref to match origin
+        guard run(args: ["update-ref", "refs/heads/\(branch)", "refs/remotes/origin/\(branch)"], in: path) != nil else {
+            return
+        }
+
+        // Reset the working tree only if it is clean
+        if !hasUncommittedChanges(at: path) {
+            _ = run(args: ["reset", "--hard", "--quiet"], in: path)
+            logger.info("[FF] Updated \(branch, privacy: .public) to latest")
+        } else {
+            logger.info("[FF] Updated \(branch, privacy: .public) ref but working tree has local changes, skipping reset")
+        }
+    }
+
+    /// Per-file git status for the file tree (modified, untracked, ignored).
+    /// Returns an empty dictionary on failure so the tree degrades gracefully.
+    static func fileStatuses(at path: String) -> [String: FileGitStatus] {
+        guard let output = runWithTimeout(
+            args: ["status", "--porcelain", "--ignored", "--ignore-submodules=dirty"],
+            in: path,
+            timeout: 3
+        ) else {
+            return [:]
+        }
+
+        var result: [String: FileGitStatus] = [:]
+        for line in output.components(separatedBy: "\n") {
+            guard line.count >= 4 else { continue }
+            let xy = String(line.prefix(2))
+            var filePath = String(line.dropFirst(3))
+
+            if xy == "!!" {
+                // Ignored — strip trailing slash for directories
+                if filePath.hasSuffix("/") { filePath = String(filePath.dropLast()) }
+                result[filePath] = .ignored
+            } else if xy == "??" {
+                result[filePath] = .untracked
+            } else {
+                // Handle renames/copies: "R  old -> new" or "C  old -> new"
+                if let arrowRange = filePath.range(of: " -> ") {
+                    let newPath = String(filePath[arrowRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    result[newPath] = .modified
+                } else {
+                    result[filePath] = .modified
+                }
+            }
+        }
+        return result
     }
 
     // MARK: - Private

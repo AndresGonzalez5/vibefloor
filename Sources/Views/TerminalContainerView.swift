@@ -16,8 +16,10 @@ extension Notification.Name {
     static let closeTerminal = Notification.Name("factoryfloor.closeTerminal")
     static let nextTab = Notification.Name("factoryfloor.nextTab")
     static let prevTab = Notification.Name("factoryfloor.prevTab")
-    static let toggleEnvironment = Notification.Name("factoryfloor.toggleEnvironment")
     static let terminalTitleChanged = Notification.Name("factoryfloor.terminalTitleChanged")
+    static let toggleEditor = Notification.Name("factoryfloor.toggleEditor")
+    static let saveEditor = Notification.Name("factoryfloor.saveEditor")
+    static let saveEditorAs = Notification.Name("factoryfloor.saveEditorAs")
 }
 
 enum RestorableWorkspaceTab: String, Codable {
@@ -29,22 +31,50 @@ enum RestorableWorkspaceTab: String, Codable {
         switch activeTab {
         case .agent:
             self = .agent
-        case .environment:
-            self = .environment
-        case .info, .terminal, .browser:
+        case .info, .terminal, .browser, .editor:
             self = .info
         }
     }
 
-    func workspaceTab(hasEnvironmentTab: Bool) -> WorkspaceTab {
+    func workspaceTab() -> WorkspaceTab {
         switch self {
-        case .info:
+        case .info, .environment:
             return .info
         case .agent:
             return .agent
-        case .environment:
-            return hasEnvironmentTab ? .environment : .info
         }
+    }
+}
+
+enum SetupStateStore {
+    private static let userDefaultsKey = "factoryfloor.setupCompleted"
+
+    static func isCompleted(for workstreamID: UUID) -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+              let saved = try? JSONDecoder().decode(Set<String>.self, from: data)
+        else { return false }
+        return saved.contains(workstreamID.uuidString)
+    }
+
+    static func markCompleted(for workstreamID: UUID) {
+        var saved: Set<String> = []
+        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+           let existing = try? JSONDecoder().decode(Set<String>.self, from: data)
+        {
+            saved = existing
+        }
+        saved.insert(workstreamID.uuidString)
+        guard let data = try? JSONEncoder().encode(saved) else { return }
+        UserDefaults.standard.set(data, forKey: userDefaultsKey)
+    }
+
+    static func remove(for workstreamID: UUID) {
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+              var saved = try? JSONDecoder().decode(Set<String>.self, from: data)
+        else { return }
+        saved.remove(workstreamID.uuidString)
+        guard let encoded = try? JSONEncoder().encode(saved) else { return }
+        UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
     }
 }
 
@@ -92,14 +122,14 @@ func reorderedCustomTabs(_ tabs: [WorkspaceTab], dragging draggedTab: WorkspaceT
 enum WorkspaceTab: Hashable {
     case info
     case agent
-    case environment
     case terminal(UUID)
     case browser(UUID)
+    case editor(UUID)
 
     var isCloseable: Bool {
         switch self {
-        case .info, .agent, .environment: return false
-        case .terminal, .browser: return true
+        case .info, .agent: return false
+        case .terminal, .browser, .editor: return true
         }
     }
 }
@@ -109,12 +139,16 @@ struct WorkspaceTabSnapshot {
     var tabs: [WorkspaceTab]
     var terminalCount: Int
     var browserCount: Int
+    var editorCount: Int
     var activeTab: WorkspaceTab
     var browserTitles: [UUID: String]
     var terminalTitles: [UUID: String]
+    var editorFilePaths: [UUID: String]
+    var runStarted: Bool
+    var runStoppedManually: Bool
 
     /// Returns a copy with dead terminal tabs removed.
-    /// Browser tabs are kept regardless (they don't use terminal surfaces).
+    /// Browser and editor tabs are kept regardless (they don't use terminal surfaces).
     func reconciled(liveSurfaceIDs: Set<UUID>) -> WorkspaceTabSnapshot {
         let filteredTabs = tabs.filter { tab in
             if case let .terminal(id) = tab {
@@ -127,11 +161,72 @@ struct WorkspaceTabSnapshot {
             tabs: filteredTabs,
             terminalCount: terminalCount,
             browserCount: browserCount,
+            editorCount: editorCount,
             activeTab: resolvedActiveTab,
             browserTitles: browserTitles,
-            terminalTitles: terminalTitles
+            terminalTitles: terminalTitles,
+            editorFilePaths: editorFilePaths,
+            runStarted: runStarted,
+            runStoppedManually: runStoppedManually
         )
     }
+}
+
+func startupWorkspaceTabState(snapshot: WorkspaceTabSnapshot?, savedTab: RestorableWorkspaceTab?) -> WorkspaceTabSnapshot {
+    if let snapshot {
+        // Filter out any persisted environment tabs from before the merge
+        let filteredTabs = snapshot.tabs.filter { tab in
+            if case .info = tab { return true }
+            if case .agent = tab { return true }
+            if case .terminal = tab { return true }
+            if case .browser = tab { return true }
+            return false
+        }
+        var cleaned = snapshot
+        cleaned.tabs = filteredTabs
+        if !cleaned.tabs.contains(cleaned.activeTab) {
+            cleaned.activeTab = .info
+        }
+        return cleaned
+    }
+
+    let tabs: [WorkspaceTab] = [.info, .agent]
+    return WorkspaceTabSnapshot(
+        tabs: tabs,
+        terminalCount: 0,
+        browserCount: 0,
+        editorCount: 0,
+        activeTab: (savedTab ?? .info).workspaceTab(),
+        browserTitles: [:],
+        terminalTitles: [:],
+        editorFilePaths: [:],
+        runStarted: false,
+        runStoppedManually: false
+    )
+}
+
+func workspaceEnvironmentVariables(
+    workstreamID: UUID,
+    projectName: String,
+    workstreamName: String,
+    projectDirectory: String,
+    workingDirectory: String,
+    port: Int,
+    agentTeams: Bool,
+    defaultBranch: String,
+    scriptSource: String?
+) -> [String: String] {
+    WorkstreamEnvironment.variables(
+        workstreamID: workstreamID,
+        projectName: projectName,
+        workstreamName: workstreamName,
+        projectDirectory: projectDirectory,
+        workingDirectory: workingDirectory,
+        port: port,
+        agentTeams: agentTeams,
+        defaultBranch: defaultBranch,
+        scriptSource: scriptSource
+    )
 }
 
 enum TerminalSessionMode: Equatable {
@@ -152,6 +247,13 @@ enum TerminalSessionMode: Equatable {
     }
 }
 
+enum SetupGateState: Equatable {
+    case notNeeded
+    case running
+    case failed
+    case completed
+}
+
 struct TerminalContainerView: View {
     let workstreamID: UUID
     let workingDirectory: String
@@ -159,6 +261,7 @@ struct TerminalContainerView: View {
     let projectName: String
     let workstreamName: String
     let bypassPermissions: Bool
+    let isActive: Bool
 
     @EnvironmentObject var surfaceCache: TerminalSurfaceCache
     @EnvironmentObject var appEnv: AppEnvironment
@@ -168,25 +271,61 @@ struct TerminalContainerView: View {
     @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
     @AppStorage("factoryfloor.allowOutsideWorktree") private var allowOutsideWorktree: Bool = false
     @AppStorage("factoryfloor.quickActionDebug") private var quickActionDebug: Bool = false
+    @AppStorage("factoryfloor.editorTabActive") private var editorTabActive: Bool = false
+    @AppStorage("factoryfloor.editorFileDirty") private var editorFileDirty: Bool = false
     @State private var activeTab: WorkspaceTab = .info
     @State private var tabs: [WorkspaceTab] = [.info, .agent]
     @State private var terminalCount = 0
     @State private var browserCount = 0
+    @State private var editorCount = 0
     @State private var scriptConfig: ScriptConfig = .empty
     @State private var browserTitles: [UUID: String] = [:]
     @State private var terminalTitles: [UUID: String] = [:]
+    @State private var editorFilePaths: [UUID: String] = [:]
+    @State private var editorDirtyState: [UUID: Bool] = [:]
+    @State private var editorBridge: MonacoEditorBridge?
+    @State private var fileTree: [FileNode] = []
+    @State private var gitFileStatuses = GitFileStatusProvider()
+    @State private var directoryWatcher: DirectoryWatcher?
+    @State private var refreshGeneration = 0
+    @State private var refreshDebounceTask: Task<Void, Never>?
     @State private var cachedClaudeCommand: String?
     @State private var draggedCustomTab: WorkspaceTab?
     @StateObject private var portDetector: PortDetector
     @State private var runStoppedManually = false
     @State private var runStarted = false
-    init(workstreamID: UUID, workingDirectory: String, projectDirectory: String, projectName: String, workstreamName: String, bypassPermissions: Bool) {
+    @State private var workspaceStarted = false
+    @State private var defaultBranch = "main"
+    @State private var setupGateState: SetupGateState = .notNeeded
+    init(
+        workstreamID: UUID,
+        workingDirectory: String,
+        projectDirectory: String,
+        projectName: String,
+        workstreamName: String,
+        bypassPermissions: Bool,
+        isActive: Bool,
+        scriptConfig: ScriptConfig = .empty,
+        initialTabState: WorkspaceTabSnapshot = startupWorkspaceTabState(snapshot: nil, savedTab: nil)
+    ) {
         self.workstreamID = workstreamID
         self.workingDirectory = workingDirectory
         self.projectDirectory = projectDirectory
         self.projectName = projectName
         self.workstreamName = workstreamName
         self.bypassPermissions = bypassPermissions
+        self.isActive = isActive
+        _activeTab = State(initialValue: initialTabState.activeTab)
+        _tabs = State(initialValue: initialTabState.tabs)
+        _terminalCount = State(initialValue: initialTabState.terminalCount)
+        _browserCount = State(initialValue: initialTabState.browserCount)
+        _scriptConfig = State(initialValue: scriptConfig)
+        _editorCount = State(initialValue: initialTabState.editorCount)
+        _browserTitles = State(initialValue: initialTabState.browserTitles)
+        _terminalTitles = State(initialValue: initialTabState.terminalTitles)
+        _editorFilePaths = State(initialValue: initialTabState.editorFilePaths)
+        _runStoppedManually = State(initialValue: initialTabState.runStoppedManually)
+        _runStarted = State(initialValue: initialTabState.runStarted)
         _portDetector = StateObject(wrappedValue: PortDetector(workstreamID: workstreamID))
     }
 
@@ -194,18 +333,34 @@ struct TerminalContainerView: View {
         workstreamID
     }
 
+    private var setupGateID: UUID {
+        derivedUUID(from: workstreamID, salt: "setup-gate")
+    }
+
     private var quickActionRunner: QuickActionRunner {
         surfaceCache.quickActionRunner(for: workstreamID)
     }
 
+    private var isEditorTabActive: Bool {
+        if case .editor = activeTab { return true }
+        return false
+    }
+
+    private var isActiveEditorDirty: Bool {
+        if case let .editor(id) = activeTab { return editorDirtyState[id] == true }
+        return false
+    }
+
     /// Surface IDs that should be rendering for the active tab.
-    /// Returns nil for the environment tab (env surface IDs are managed internally).
     private var visibleSurfaceIDs: Set<UUID>? {
         switch activeTab {
-        case .agent: return [claudeID]
+        case .agent:
+            if setupGateState == .running || setupGateState == .failed {
+                return [setupGateID]
+            }
+            return [claudeID]
         case let .terminal(id): return [id]
-        case .info, .browser: return []
-        case .environment: return nil
+        case .info, .browser, .editor: return []
         }
     }
 
@@ -332,7 +487,7 @@ struct TerminalContainerView: View {
 
     private var tabBar: some View {
         HStack(spacing: 0) {
-            // Fixed tabs (Info, Agent, Environment)
+            // Fixed tabs (Info, Agent)
             ForEach(fixedTabs, id: \.self) { tab in
                 tabButton(for: tab)
             }
@@ -344,9 +499,18 @@ struct TerminalContainerView: View {
                     activeTab: activeTab,
                     tabButton: { tab in tabButton(for: tab) }
                 )
+                .layoutPriority(-1)
             }
 
             Spacer()
+
+            // Quick actions to add tabs
+            HStack(spacing: 2) {
+                TabBarActionButton(icon: "terminal", shortcut: "\u{2318}T", tooltip: "New Terminal (\u{2318}T)", action: addTerminal)
+                TabBarActionButton(icon: "globe", shortcut: "\u{2318}B", tooltip: "New Browser (\u{2318}B)", action: addBrowser)
+                TabBarActionButton(icon: "doc.text", shortcut: "\u{2318}O", tooltip: "New Editor (\u{2318}O)", action: openEditor)
+            }
+            .fixedSize()
 
             if let pr = branchPR, let url = URL(string: pr.url) {
                 let prColor: Color = pr.state == "MERGED" ? .purple : .green
@@ -374,6 +538,11 @@ struct TerminalContainerView: View {
         .background(.bar)
     }
 
+    private func isEditorDirty(_ tab: WorkspaceTab) -> Bool {
+        if case let .editor(id) = tab { return editorDirtyState[id] == true }
+        return false
+    }
+
     @ViewBuilder
     private func tabButton(for tab: WorkspaceTab) -> some View {
         let shortcut = tabShortcut(tab) ?? closeableTabShortcut(tab)
@@ -383,6 +552,7 @@ struct TerminalContainerView: View {
             icon: tabIcon(tab),
             shortcut: shortcut,
             isActive: activeTab == tab,
+            isDirty: isEditorDirty(tab),
             onSelect: { activeTab = tab },
             onClose: tab.isCloseable ? { closeTab(tab) } : nil
         )
@@ -411,10 +581,19 @@ struct TerminalContainerView: View {
                 workingDirectory: workingDirectory,
                 projectName: projectName,
                 projectDirectory: projectDirectory,
-                scriptConfig: scriptConfig
+                scriptConfig: scriptConfig,
+                useTmux: useTmux,
+                environmentVars: terminalEnvVars,
+                runStoppedManually: $runStoppedManually,
+                runStarted: $runStarted,
+                sessionMode: sessionMode
             )
         case .agent:
-            if sessionMode == .waitingForTools || appEnv.isDetecting {
+            if setupGateState == .running {
+                setupGateRunningView
+            } else if setupGateState == .failed {
+                setupGateFailedView
+            } else if sessionMode == .waitingForTools || appEnv.isDetecting {
                 terminalLoadingView(message: "Checking terminal tools...")
             } else if appEnv.toolStatus.claude.path == nil {
                 VStack(spacing: 16) {
@@ -441,22 +620,6 @@ struct TerminalContainerView: View {
             } else {
                 terminalLoadingView(message: "Preparing Coding Agent...")
             }
-        case .environment:
-            if sessionMode == .waitingForTools {
-                terminalLoadingView(message: "Checking terminal tools...")
-            } else {
-                EnvironmentTabView(
-                    workstreamID: workstreamID,
-                    workingDirectory: workingDirectory,
-                    projectName: projectName,
-                    workstreamName: workstreamName,
-                    scriptConfig: scriptConfig,
-                    useTmux: useTmux,
-                    environmentVars: terminalEnvVars,
-                    runStoppedManually: $runStoppedManually,
-                    runStarted: $runStarted
-                )
-            }
         case let .terminal(id):
             SingleTerminalView(
                 surfaceID: id,
@@ -467,6 +630,36 @@ struct TerminalContainerView: View {
         case let .browser(id):
             BrowserView(defaultURL: browserDefaultURL, tabID: id, webView: surfaceCache.webView(for: id))
                 .id(id)
+        case let .editor(id):
+            if let bridge = editorBridge {
+                EditorView(
+                    workingDirectory: workingDirectory,
+                    fileTree: fileTree,
+                    gitStatus: gitFileStatuses,
+                    initialFilePath: editorFilePaths[id],
+                    bridge: bridge,
+                    modelId: id.uuidString,
+                    isDirtyState: Binding(
+                        get: { editorDirtyState[id] ?? false },
+                        set: { editorDirtyState[id] = $0 }
+                    ),
+                    onFileChanged: { path in
+                        if let path {
+                            editorFilePaths[id] = path
+                        } else {
+                            editorFilePaths.removeValue(forKey: id)
+                        }
+                        saveTabSnapshot()
+                    },
+                    onExpandFolder: { path in
+                        expandFileTreeFolder(path)
+                    }
+                )
+                .id(id)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
     }
 
@@ -479,16 +672,34 @@ struct TerminalContainerView: View {
             .onChange(of: workstreamName) { rebuildClaudeCommand() }
             .onChange(of: appEnv.isDetecting) {
                 rebuildClaudeCommand()
-                preloadSurfaces()
+                if isActive { preloadSurfaces() }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in activeTab = .info }
-            .onReceive(NotificationCenter.default.publisher(for: .focusAgent)) { _ in activeTab = .agent }
-            .onReceive(NotificationCenter.default.publisher(for: .toggleEnvironment)) { _ in
-                if tabs.contains(.environment) { activeTab = .environment }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleInfo)) { _ in
+                guard isActive else { return }
+                activeTab = .info
             }
-            .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in addTerminal() }
-            .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in addBrowser() }
+            .onReceive(NotificationCenter.default.publisher(for: .focusAgent)) { _ in
+                guard isActive else { return }
+                activeTab = .agent
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .rerunScript)) { _ in
+                guard isActive else { return }
+                activeTab = .info
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleTerminal)) { _ in
+                guard isActive else { return }
+                addTerminal()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
+                guard isActive else { return }
+                addBrowser()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleEditor)) { _ in
+                guard isActive else { return }
+                openEditor()
+            }
             .onReceive(NotificationCenter.default.publisher(for: .closeTerminal)) { _ in
+                guard isActive else { return }
                 if activeTab.isCloseable { closeTab(activeTab) }
             }
     }
@@ -503,50 +714,44 @@ struct TerminalContainerView: View {
             Divider()
             PixelAgentsPanelView(projectDirectory: workingDirectory)
         }
+        .task(id: workstreamID) {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !Task.isCancelled else { return }
+            let branch = await Task.detached {
+                GitOperations.defaultBranch(at: projectDirectory)
+            }.value
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                startWorkspace(defaultBranch: branch)
+            }
+        }
         .onAppear {
-            quickActionRunner.onSuccess = { action in
-                appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
-                if let branch = appEnv.branchName(for: workingDirectory) {
-                    if action == .abandonPR {
-                        appEnv.clearBranchPR(for: projectDirectory, branch: branch)
-                    }
-                    if action == .createPR || action == .abandonPR {
-                        appEnv.refreshGitHubInfo(for: projectDirectory, branch: branch)
-                    }
-                }
+            if isActive {
+                editorTabActive = isEditorTabActive
+                editorFileDirty = isActiveEditorDirty
             }
-            appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
-            cachedClaudeCommand = buildClaudeCommand()
-            scriptConfig = ScriptConfig.load(from: projectDirectory)
-            surfaceCache.respawnableIDs.insert(claudeID)
-            if let snapshot = surfaceCache.restoreTabSnapshot(for: workstreamID) {
-                tabs = snapshot.tabs
-                terminalCount = snapshot.terminalCount
-                browserCount = snapshot.browserCount
-                activeTab = snapshot.activeTab
-                browserTitles = snapshot.browserTitles
-                terminalTitles = snapshot.terminalTitles
-                if scriptConfig.hasAnyScript && !tabs.contains(.environment) {
-                    tabs.insert(.environment, at: 2)
-                }
-            } else {
-                if scriptConfig.hasAnyScript && !tabs.contains(.environment) {
-                    tabs.insert(.environment, at: 2)
-                }
-                activeTab = restoredActiveTab()
+            if tabs.contains(where: { if case .editor = $0 { return true } else { return false } }) {
+                startFileTreeWatcherIfNeeded()
             }
-            preloadSurfaces()
-            surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
         }
         .onDisappear {
+            if isActive {
+                editorTabActive = false
+                editorFileDirty = false
+            }
+            guard workspaceStarted else { return }
             surfaceCache.saveTabSnapshot(for: workstreamID, snapshot: currentTabSnapshot())
         }
         .onChange(of: activeTab) {
+            guard isActive else { return }
+            editorTabActive = isEditorTabActive
+            editorFileDirty = isActiveEditorDirty
             surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
             WorkspaceStateStore.save(RestorableWorkspaceTab(activeTab: activeTab), for: workstreamID)
             appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
         }
         .onReceive(NotificationCenter.default.publisher(for: .terminalActivity)) { notification in
+            guard isActive else { return }
             guard let wsID = notification.object as? UUID, wsID == workstreamID else { return }
             appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
         }
@@ -555,14 +760,34 @@ struct TerminalContainerView: View {
     var body: some View {
         mainContent
             .onReceive(NotificationCenter.default.publisher(for: .switchByNumber)) { notification in
+                guard isActive else { return }
                 guard let n = notification.object as? Int, n >= 1 else { return }
-                // Cmd+1-9 maps to closeable tabs (terminals and browsers)
-                let customTabs = tabs.filter(\.isCloseable)
-                guard n <= customTabs.count else { return }
-                activeTab = customTabs[n - 1]
+                // Cmd+1-9 maps to all tabs in display order
+                guard n <= tabs.count else { return }
+                activeTab = tabs[n - 1]
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .nextTab)) { _ in
+                guard isActive else { return }
+                guard let currentIndex = tabs.firstIndex(of: activeTab) else { return }
+                activeTab = tabs[(currentIndex + 1) % tabs.count]
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .prevTab)) { _ in
+                guard isActive else { return }
+                guard let currentIndex = tabs.firstIndex(of: activeTab) else { return }
+                activeTab = tabs[(currentIndex - 1 + tabs.count) % tabs.count]
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .terminalChildExited)) { notification in
+                guard let surfaceID = notification.object as? UUID, surfaceID == setupGateID,
+                      let exitCode = notification.userInfo?["exitCode"] as? Int32
+                else { return }
+                handleSetupChildExited(exitCode: exitCode)
             }
             .onReceive(NotificationCenter.default.publisher(for: .terminalTabExited)) { notification in
                 guard let surfaceID = notification.object as? UUID else { return }
+                if surfaceID == setupGateID, setupGateState == .failed {
+                    launchAgentAfterSetup()
+                    return
+                }
                 if let tab = tabs.first(where: {
                     if case let .terminal(id) = $0 { return id == surfaceID }
                     return false
@@ -579,6 +804,7 @@ struct TerminalContainerView: View {
                 terminalTitles[surfaceID] = notification.userInfo?["title"] as? String
             }
             .onReceive(NotificationCenter.default.publisher(for: .openExternalBrowser)) { _ in
+                guard isActive else { return }
                 guard let url = URL(string: browserDefaultURL) else { return }
                 if defaultBrowser.isEmpty {
                     NSWorkspace.shared.open(url)
@@ -588,42 +814,40 @@ struct TerminalContainerView: View {
                     NSWorkspace.shared.open(url)
                 }
             }
-            .navigationSubtitle(portSubtitle)
             .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    if let githubURL = appEnv.githubURL(for: projectDirectory) {
-                        Button {
-                            NSWorkspace.shared.open(githubURL)
-                        } label: {
-                            Label(NSLocalizedString("GitHub", comment: ""), image: "github")
-                                .labelStyle(.iconOnly)
+                if isActive {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        if let githubURL = appEnv.githubURL(for: projectDirectory) {
+                            Button {
+                                NSWorkspace.shared.open(githubURL)
+                            } label: {
+                                Label(NSLocalizedString("GitHub", comment: ""), image: "github")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .help("Open on GitHub")
                         }
-                        .help("Open on GitHub")
-                    }
 
-                    Button(action: addTerminal) {
-                        Label(NSLocalizedString("Terminal", comment: ""), systemImage: "terminal")
-                            .labelStyle(.titleAndIcon)
+                        GitHubActionMenu(
+                            runner: quickActionRunner,
+                            claudePath: appEnv.toolStatus.claude.path,
+                            ghPath: appEnv.toolStatus.gh.path,
+                            workingDirectory: workingDirectory,
+                            branchName: appEnv.branchName(for: workingDirectory),
+                            bypassPermissions: bypassPermissions,
+                            worktreeState: appEnv.worktreeState(for: workingDirectory),
+                            hasGitHubRemote: appEnv.hasGitHubRemote(projectDirectory),
+                            branchPR: branchPR
+                        )
                     }
-                    .help("New Terminal (\u{2318}T)")
-
-                    Button(action: addBrowser) {
-                        Label(NSLocalizedString("Browser", comment: ""), systemImage: "globe")
-                            .labelStyle(.titleAndIcon)
-                    }
-                    .help("New Browser (\u{2318}B)")
-
-                    QuickActionButtons(
-                        runner: quickActionRunner,
-                        claudePath: appEnv.toolStatus.claude.path,
-                        ghPath: appEnv.toolStatus.gh.path,
-                        workingDirectory: workingDirectory,
-                        branchName: appEnv.branchName(for: workingDirectory),
-                        bypassPermissions: bypassPermissions,
-                        worktreeState: appEnv.worktreeState(for: workingDirectory),
-                        hasGitHubRemote: appEnv.hasGitHubRemote(projectDirectory),
-                        prState: branchPR?.state
-                    )
+                }
+            }
+            .onChange(of: isActive) { _, active in
+                editorTabActive = active && isEditorTabActive
+                editorFileDirty = active && isActiveEditorDirty
+                if active {
+                    surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
+                } else {
+                    surfaceCache.saveTabSnapshot(for: workstreamID, snapshot: currentTabSnapshot())
                 }
             }
     }
@@ -641,13 +865,16 @@ struct TerminalContainerView: View {
         switch tab {
         case .info: return NSLocalizedString("Info", comment: "")
         case .agent: return NSLocalizedString("Agent", comment: "")
-        case .environment: return NSLocalizedString("Environment", comment: "")
         case .terminal:
             return nil
         case let .browser(id):
             guard !useCompactTabs else { return nil }
             guard let title = browserTitles[id], !title.isEmpty else { return nil }
             return title.count > 20 ? String(title.prefix(20)) + "..." : title
+        case let .editor(id):
+            guard let path = editorFilePaths[id] else { return nil }
+            let name = (path as NSString).lastPathComponent
+            return name.count > 20 ? String(name.prefix(20)) + "..." : name
         }
     }
 
@@ -655,38 +882,34 @@ struct TerminalContainerView: View {
         switch tab {
         case .info: return "info.circle"
         case .agent: return "sparkle"
-        case .environment: return "gearshape.2"
         case .terminal: return "terminal"
         case .browser: return "globe"
+        case .editor: return "doc.text"
         }
     }
 
     private func closeableTabShortcut(_ tab: WorkspaceTab) -> String? {
         guard tab.isCloseable,
-              let idx = tabs.filter(\.isCloseable).firstIndex(of: tab),
+              let idx = tabs.firstIndex(of: tab),
               idx < 9 else { return nil }
         return "\(idx + 1)"
     }
 
     private func tabShortcut(_ tab: WorkspaceTab) -> String? {
         switch tab {
-        case .info: return "I"
         case .agent: return "\u{21A9}"
-        case .environment: return "E"
         default: return nil
         }
     }
 
     private func tabDragIdentifier(_ tab: WorkspaceTab) -> String {
         switch tab {
-        case let .terminal(id), let .browser(id):
+        case let .terminal(id), let .browser(id), let .editor(id):
             return id.uuidString
         case .info:
             return "info"
         case .agent:
             return "agent"
-        case .environment:
-            return "environment"
         }
     }
 
@@ -708,7 +931,153 @@ struct TerminalContainerView: View {
         saveTabSnapshot()
     }
 
+    private func openEditor() {
+        addEditor()
+    }
+
+    private func addEditor(filePath: String? = nil) {
+        // Create bridge before adding the tab — never during body evaluation
+        createEditorBridgeIfNeeded()
+        editorCount += 1
+        let id = derivedUUID(from: workstreamID, salt: "editor-\(editorCount)")
+        if let filePath {
+            editorFilePaths[id] = filePath
+        }
+        let tab = WorkspaceTab.editor(id)
+        tabs.append(tab)
+        activeTab = tab
+        startFileTreeWatcherIfNeeded()
+        saveTabSnapshot()
+    }
+
+    private func startFileTreeWatcherIfNeeded() {
+        guard directoryWatcher == nil else { return }
+        refreshFileTree()
+        directoryWatcher = DirectoryWatcher(path: workingDirectory) { [self] in
+            debounceRefreshFileTree()
+        }
+    }
+
+    private func debounceRefreshFileTree() {
+        refreshDebounceTask?.cancel()
+        refreshDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            refreshFileTree()
+        }
+    }
+
+    private func refreshFileTree() {
+        refreshGeneration += 1
+        let gen = refreshGeneration
+        let currentTree = fileTree
+        DispatchQueue.global(qos: .userInitiated).async {
+            let tree: [FileNode]
+            if currentTree.isEmpty {
+                tree = FileNode.buildShallowTree(rootPath: workingDirectory)
+            } else {
+                tree = FileNode.refreshLoadedNodes(in: currentTree, rootPath: workingDirectory)
+            }
+            let statuses = GitOperations.fileStatuses(at: workingDirectory)
+            DispatchQueue.main.async {
+                guard gen == refreshGeneration else { return }
+                fileTree = tree
+                gitFileStatuses = GitFileStatusProvider(fileStatuses: statuses)
+            }
+        }
+    }
+
+    private func expandFileTreeFolder(_ relativePath: String) {
+        if let node = FileNode.findNode(atPath: relativePath, in: fileTree), node.isLoaded { return }
+        let gen = refreshGeneration
+        let root = workingDirectory
+        DispatchQueue.global(qos: .userInitiated).async {
+            let children = FileNode.loadChildren(atRelativePath: relativePath, rootPath: root)
+            DispatchQueue.main.async {
+                guard gen == refreshGeneration else { return }
+                fileTree = FileNode.insertChildren(children, atPath: relativePath, in: fileTree)
+            }
+        }
+    }
+
+    private func stopFileTreeWatcherIfUnneeded() {
+        let hasEditorTabs = tabs.contains { if case .editor = $0 { return true } else { return false } }
+        if !hasEditorTabs {
+            refreshGeneration += 1
+            directoryWatcher?.stop()
+            directoryWatcher = nil
+            fileTree = []
+            gitFileStatuses = GitFileStatusProvider()
+            // Keep editorBridge alive — the WebView is expensive to recreate (~17 MB JS)
+        }
+    }
+
+    private func createEditorBridgeIfNeeded() {
+        guard editorBridge == nil else { return }
+        let bridge = MonacoEditorBridge()
+        bridge.onContentChanged = { [self] modelId, dirty in
+            if let uuid = UUID(uuidString: modelId) {
+                editorDirtyState[uuid] = dirty
+                if case .editor(uuid) = activeTab {
+                    editorFileDirty = dirty
+                }
+            }
+        }
+        editorBridge = bridge
+    }
+
     private func closeTab(_ tab: WorkspaceTab) {
+        if case let .editor(id) = tab, editorDirtyState[id] == true {
+            confirmCloseEditor(tab: tab, id: id)
+            return
+        }
+        forceCloseTab(tab)
+    }
+
+    private func confirmCloseEditor(tab: WorkspaceTab, id: UUID) {
+        let fileName = (editorFilePaths[id] as? NSString)?.lastPathComponent ?? "file"
+        let alert = NSAlert()
+        alert.messageText = String(
+            format: NSLocalizedString("Do you want to save changes to \"%@\"?", comment: ""),
+            fileName
+        )
+        alert.informativeText = NSLocalizedString("Your changes will be lost if you don't save them.", comment: "")
+        alert.addButton(withTitle: NSLocalizedString("Save", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Don't Save", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        alert.alertStyle = .warning
+
+        let response = alert.runModal()
+        switch response {
+        case .alertFirstButtonReturn:
+            // Save then close — async to wait for bridge.getContent()
+            Task {
+                if let bridge = editorBridge,
+                   let relativePath = editorFilePaths[id]
+                {
+                    let fullPath = (workingDirectory as NSString)
+                        .appendingPathComponent(relativePath)
+                    guard let content = await bridge.getContent(modelId: id.uuidString) else { return }
+                    do {
+                        try content.write(toFile: fullPath, atomically: true, encoding: .utf8)
+                    } catch {
+                        let errorAlert = NSAlert(error: error)
+                        errorAlert.runModal()
+                        return
+                    }
+                }
+                forceCloseTab(tab)
+            }
+        case .alertSecondButtonReturn:
+            // Don't save, just close
+            forceCloseTab(tab)
+        default:
+            // Cancel — do nothing
+            break
+        }
+    }
+
+    private func forceCloseTab(_ tab: WorkspaceTab) {
         guard let index = tabs.firstIndex(of: tab) else { return }
         tabs.remove(at: index)
         // Clean up cached views
@@ -717,9 +1086,14 @@ struct TerminalContainerView: View {
             surfaceCache.removeSurface(for: id)
         case let .browser(id):
             surfaceCache.removeWebView(for: id)
+        case let .editor(id):
+            editorFilePaths.removeValue(forKey: id)
+            editorDirtyState.removeValue(forKey: id)
+            editorBridge?.closeModel(modelId: id.uuidString)
         default:
             break
         }
+        stopFileTreeWatcherIfUnneeded()
         // Switch to previous tab or agent
         if activeTab == tab {
             let newIndex = min(index, tabs.count - 1)
@@ -733,9 +1107,13 @@ struct TerminalContainerView: View {
             tabs: tabs,
             terminalCount: terminalCount,
             browserCount: browserCount,
+            editorCount: editorCount,
             activeTab: activeTab,
             browserTitles: browserTitles,
-            terminalTitles: terminalTitles
+            terminalTitles: terminalTitles,
+            editorFilePaths: editorFilePaths,
+            runStarted: runStarted,
+            runStoppedManually: runStoppedManually
         )
     }
 
@@ -749,10 +1127,35 @@ struct TerminalContainerView: View {
         draggedCustomTab = nil
     }
 
-    private func restoredActiveTab() -> WorkspaceTab {
-        let hasEnvironmentTab = scriptConfig.hasAnyScript
-        guard let savedTab = WorkspaceStateStore.load(for: workstreamID) else { return .info }
-        return savedTab.workspaceTab(hasEnvironmentTab: hasEnvironmentTab)
+    @MainActor
+    private func startWorkspace(defaultBranch: String) {
+        workspaceStarted = true
+        self.defaultBranch = defaultBranch
+        quickActionRunner.onSuccess = { action in
+            appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
+            if let branch = appEnv.branchName(for: workingDirectory) {
+                if action == .closePR {
+                    appEnv.clearBranchPR(for: projectDirectory, branch: branch)
+                }
+                if action == .createPR || action == .closePR {
+                    appEnv.refreshGitHubInfo(for: projectDirectory, branch: branch)
+                }
+            }
+        }
+        appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
+        cachedClaudeCommand = buildClaudeCommand()
+        if scriptConfig.setup != nil, !SetupStateStore.isCompleted(for: workstreamID) {
+            setupGateState = .running
+        } else {
+            setupGateState = .notNeeded
+            surfaceCache.respawnableIDs.insert(claudeID)
+        }
+        preloadSurfaces()
+        // Eagerly create the Monaco bridge so it's ready when the user opens
+        // an editor tab. The WKWebView is created lazily when MonacoEditorView
+        // enters the tree (it needs a real container to avoid 0x0 initialization).
+        createEditorBridgeIfNeeded()
+        surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
     }
 
     /// Pre-create terminal surfaces so they start running before their tab is visible.
@@ -760,38 +1163,35 @@ struct TerminalContainerView: View {
         guard sessionMode != .waitingForTools else { return }
         guard let app = TerminalApp.shared.app else { return }
 
-        // Agent surface
-        if let claudeCommand = cachedClaudeCommand {
-            _ = surfaceCache.surface(
-                for: claudeID,
-                app: app,
-                workingDirectory: workingDirectory,
-                command: claudeCommand,
-                environmentVars: envVars
-            )
-        }
-
-        // Environment script surfaces
-        if let setup = scriptConfig.setup {
-            let setupID = derivedUUID(from: workstreamID, salt: "env-setup-0")
-            let cmd = buildEnvironmentCommand(script: setup, role: "setup")
-            _ = surfaceCache.surface(
-                for: setupID,
-                app: app,
-                workingDirectory: workingDirectory,
-                command: cmd,
-                environmentVars: terminalEnvVars
-            )
+        if setupGateState == .running {
+            // Setup gate: only preload setup surface, agent waits.
+            if let cmd = buildSetupGateCommand() {
+                _ = surfaceCache.surface(
+                    for: setupGateID,
+                    app: app,
+                    workingDirectory: workingDirectory,
+                    command: cmd,
+                    environmentVars: terminalEnvVars,
+                    waitAfterCommand: false
+                )
+            }
+        } else {
+            // Agent surface
+            if let cmd = cachedClaudeCommand {
+                _ = surfaceCache.surface(
+                    for: claudeID,
+                    app: app,
+                    workingDirectory: workingDirectory,
+                    command: cmd,
+                    environmentVars: envVars
+                )
+            }
         }
     }
 
-    private func buildEnvironmentCommand(script: String, role: String) -> String {
-        let command = scriptCommand(script: script, role: role)
-        if useTmux, let tmuxPath = appEnv.toolStatus.tmux.path {
-            let session = TmuxSession.sessionName(project: projectName, workstream: workstreamName, role: role)
-            return TmuxSession.wrapCommand(tmuxPath: tmuxPath, sessionName: session, command: command, environmentVars: terminalEnvVars)
-        }
-        return command
+    private func buildSetupGateCommand() -> String? {
+        guard let setup = scriptConfig.setup else { return nil }
+        return scriptCommand(script: setup, role: "setup")
     }
 
     /// Env vars for plain terminal tabs. Clears tmux vars to prevent inheritance.
@@ -803,15 +1203,88 @@ struct TerminalContainerView: View {
     }
 
     private var envVars: [String: String] {
-        WorkstreamEnvironment.variables(
+        workspaceEnvironmentVariables(
             workstreamID: workstreamID,
             projectName: projectName,
             workstreamName: workstreamName,
             projectDirectory: projectDirectory,
             workingDirectory: workingDirectory,
             port: workstreamPort,
-            agentTeams: agentTeams
+            agentTeams: agentTeams,
+            defaultBranch: defaultBranch,
+            scriptSource: scriptConfig.source
         )
+    }
+
+    private var setupGateRunningView: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Running setup...")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.bar)
+            Divider()
+            SingleTerminalView(
+                surfaceID: setupGateID,
+                workingDirectory: workingDirectory,
+                command: buildSetupGateCommand() ?? "",
+                isFocused: true,
+                environmentVars: terminalEnvVars
+            )
+        }
+    }
+
+    private var setupGateFailedView: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.yellow)
+                    .font(.system(size: 11))
+                Text("Setup failed.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Continue to Agent") {
+                    launchAgentAfterSetup()
+                }
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.bar)
+            Divider()
+            SingleTerminalView(
+                surfaceID: setupGateID,
+                workingDirectory: workingDirectory,
+                command: buildSetupGateCommand() ?? "",
+                isFocused: false,
+                environmentVars: terminalEnvVars
+            )
+        }
+    }
+
+    private func handleSetupChildExited(exitCode: Int32) {
+        guard setupGateState == .running else { return }
+        if exitCode == 0 {
+            launchAgentAfterSetup()
+        } else {
+            setupGateState = .failed
+        }
+    }
+
+    private func launchAgentAfterSetup() {
+        SetupStateStore.markCompleted(for: workstreamID)
+        surfaceCache.removeSurface(for: setupGateID)
+        setupGateState = .completed
+        surfaceCache.respawnableIDs.insert(claudeID)
+        preloadSurfaces()
+        surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
     }
 
     private func terminalLoadingView(message: String) -> some View {
@@ -834,6 +1307,7 @@ private struct WorkspaceTabButton: View {
     let icon: String
     var shortcut: String? = nil
     let isActive: Bool
+    var isDirty: Bool = false
     let onSelect: () -> Void
     var onClose: (() -> Void)?
 
@@ -841,6 +1315,11 @@ private struct WorkspaceTabButton: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            if isDirty {
+                Circle()
+                    .fill(Color.primary.opacity(0.6))
+                    .frame(width: 6, height: 6)
+            }
             Image(systemName: icon)
                 .font(.system(size: 11))
             if let label {
@@ -875,6 +1354,34 @@ private struct WorkspaceTabButton: View {
     }
 }
 
+private struct TabBarActionButton: View {
+    let icon: String
+    let shortcut: String
+    let tooltip: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(shortcut)
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+            }
+            .foregroundStyle(isHovering ? .primary : .tertiary)
+            .padding(.horizontal, 6)
+            .frame(minHeight: 24)
+            .background(isHovering ? Color.primary.opacity(0.08) : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+        }
+        .buttonStyle(.borderless)
+        .onHover { isHovering = $0 }
+        .help(tooltip)
+    }
+}
+
 private struct WorkspaceTabDropDelegate: DropDelegate {
     let onDropTab: () -> Void
 
@@ -888,7 +1395,7 @@ private struct WorkspaceTabDropDelegate: DropDelegate {
     }
 }
 
-private struct QuickActionButtons: View {
+private struct GitHubActionMenu: View {
     @ObservedObject var runner: QuickActionRunner
     let claudePath: String?
     let ghPath: String?
@@ -897,38 +1404,73 @@ private struct QuickActionButtons: View {
     let bypassPermissions: Bool
     let worktreeState: WorktreeState
     let hasGitHubRemote: Bool
-    let prState: String?
+    let branchPR: GitHubPR?
+
+    private var prState: String? {
+        branchPR?.state
+    }
 
     private var hasOpenPR: Bool {
         prState == "OPEN"
     }
 
-    private func isVisible(_ action: QuickAction) -> Bool {
-        switch action {
-        case .commit:
-            return worktreeState.hasUncommittedChanges
-        case .push:
-            return worktreeState.hasUnpushedCommits && worktreeState.hasRemote
-        case .createPR:
-            return hasGitHubRemote && worktreeState.hasBranchCommits && prState == nil
-        case .abandonPR:
-            return hasOpenPR
-        }
+    private var isMerged: Bool {
+        prState == "MERGED"
     }
 
-    private func disabledReason(for action: QuickAction) -> String? {
-        if action.usesLLM {
-            if claudePath == nil {
-                return NSLocalizedString("Claude Code is not installed.", comment: "")
+    /// The most relevant next action to move the workflow forward.
+    private var primaryAction: PrimaryAction? {
+        if isMerged {
+            return nil
+        }
+        if hasOpenPR {
+            if worktreeState.hasUncommittedChanges {
+                return .quickAction(.commit)
             }
-            if !bypassPermissions {
-                return NSLocalizedString("Enable \"Bypass permission prompts\" in Settings.", comment: "")
+            if worktreeState.hasUnpushedCommits, worktreeState.hasRemote {
+                return .quickAction(.push)
+            }
+            if let pr = branchPR {
+                return .openPR(pr)
             }
         }
-        if action == .abandonPR, ghPath == nil {
-            return NSLocalizedString("gh CLI is not installed.", comment: "")
+        if prState == nil, hasGitHubRemote, worktreeState.hasBranchCommits {
+            return .quickAction(.createPR)
+        }
+        if worktreeState.hasUncommittedChanges {
+            return .quickAction(.commit)
+        }
+        if worktreeState.hasUnpushedCommits, worktreeState.hasRemote {
+            return .quickAction(.push)
         }
         return nil
+    }
+
+    /// Secondary actions shown in the dropdown, excluding the primary.
+    private var secondaryActions: [PrimaryAction] {
+        guard let primary = primaryAction else { return [] }
+        var actions: [PrimaryAction] = []
+
+        if worktreeState.hasUncommittedChanges {
+            actions.append(.quickAction(.commit))
+        }
+        if worktreeState.hasUnpushedCommits, worktreeState.hasRemote {
+            actions.append(.quickAction(.push))
+        }
+        if prState == nil, hasGitHubRemote, worktreeState.hasBranchCommits {
+            actions.append(.quickAction(.createPR))
+        }
+        if let pr = branchPR, hasOpenPR {
+            actions.append(.openPR(pr))
+            actions.append(.quickAction(.closePR))
+        }
+
+        return actions.filter { $0 != primary }
+    }
+
+    private var isRunning: Bool {
+        if case .running = runner.state { return true }
+        return false
     }
 
     private func isRunningAction(_ action: QuickAction) -> Bool {
@@ -944,18 +1486,19 @@ private struct QuickActionButtons: View {
         }
     }
 
-    var body: some View {
-        ForEach(QuickAction.allCases) { action in
-            if isVisible(action) {
-                QuickActionButton(
-                    action: action,
-                    isRunning: isRunningAction(action),
-                    resultState: resultState(for: action),
-                    disabledReason: disabledReason(for: action),
-                    onRun: { runAction(action) }
-                )
+    private func disabledReason(for action: QuickAction) -> String? {
+        if action.usesLLM {
+            if claudePath == nil {
+                return NSLocalizedString("Claude Code is not installed.", comment: "")
+            }
+            if !bypassPermissions {
+                return NSLocalizedString("Enable \"Bypass permission prompts\" in Settings.", comment: "")
             }
         }
+        if action == .closePR, ghPath == nil {
+            return NSLocalizedString("gh CLI is not installed.", comment: "")
+        }
+        return nil
     }
 
     private func runAction(_ action: QuickAction) {
@@ -968,40 +1511,116 @@ private struct QuickActionButtons: View {
             branchName: branchName
         )
     }
-}
 
-private struct QuickActionButton: View {
-    let action: QuickAction
-    let isRunning: Bool
-    let resultState: QuickActionState?
-    let disabledReason: String?
-    let onRun: () -> Void
-
-    private var isDisabled: Bool {
-        disabledReason != nil || isRunning
+    private func executePrimary(_ action: PrimaryAction) {
+        guard !isRunning else { return }
+        switch action {
+        case let .quickAction(qa):
+            runAction(qa)
+        case let .openPR(pr):
+            if let url = URL(string: pr.url) {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 
-    var body: some View {
-        Button(action: onRun) {
-            if isRunning {
+    @ViewBuilder
+    private func label(for action: PrimaryAction) -> some View {
+        switch action {
+        case let .quickAction(qa):
+            if isRunningAction(qa) {
                 ProgressView()
                     .controlSize(.mini)
-            } else if case .succeeded = resultState {
-                Label(action.label, systemImage: "checkmark.circle.fill")
+            } else if case .succeeded = resultState(for: qa) {
+                Label(qa.label, systemImage: "checkmark.circle.fill")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.green)
-            } else if case .failed = resultState {
-                Label(action.label, systemImage: "xmark.circle.fill")
+            } else if case .failed = resultState(for: qa) {
+                Label(qa.label, systemImage: "xmark.circle.fill")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.red)
             } else {
-                Label(action.label, systemImage: action.icon)
+                Label(qa.label, systemImage: qa.icon)
                     .labelStyle(.titleAndIcon)
             }
+        case let .openPR(pr):
+            Label(
+                String(format: NSLocalizedString("Open #%d", comment: ""), pr.number),
+                systemImage: "arrow.up.forward"
+            )
+            .labelStyle(.titleAndIcon)
         }
-        .disabled(isDisabled)
-        .help(disabledReason ?? action.label)
-        .accessibilityLabel(action.label)
+    }
+
+    var body: some View {
+        if let primary = primaryAction {
+            let secondary = secondaryActions
+            if secondary.isEmpty {
+                Button { executePrimary(primary) } label: { label(for: primary) }
+                    .disabled(isRunning || primaryDisabled(primary))
+                    .help(primaryHelp(primary))
+            } else {
+                Menu {
+                    ForEach(secondary) { action in
+                        switch action {
+                        case let .quickAction(qa):
+                            Button { runAction(qa) } label: {
+                                Label(qa.label, systemImage: qa.icon)
+                            }
+                            .disabled(isRunning || disabledReason(for: qa) != nil)
+                        case let .openPR(pr):
+                            Button {
+                                if let url = URL(string: pr.url) {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            } label: {
+                                Label(
+                                    String(format: NSLocalizedString("Open #%d", comment: ""), pr.number),
+                                    systemImage: "arrow.up.forward"
+                                )
+                            }
+                        }
+                    }
+                } label: {
+                    label(for: primary)
+                } primaryAction: {
+                    executePrimary(primary)
+                }
+                .disabled(isRunning)
+                .menuIndicator(.hidden)
+                .help(primaryHelp(primary))
+            }
+        }
+    }
+
+    private func primaryDisabled(_ action: PrimaryAction) -> Bool {
+        if case let .quickAction(qa) = action {
+            return disabledReason(for: qa) != nil
+        }
+        return false
+    }
+
+    private func primaryHelp(_ action: PrimaryAction) -> String {
+        if case let .quickAction(qa) = action {
+            return disabledReason(for: qa) ?? qa.label
+        }
+        if case let .openPR(pr) = action {
+            return pr.title
+        }
+        return ""
+    }
+}
+
+/// Represents either a quick action or opening a PR in the browser.
+private enum PrimaryAction: Equatable, Identifiable {
+    case quickAction(QuickAction)
+    case openPR(GitHubPR)
+
+    var id: String {
+        switch self {
+        case let .quickAction(qa): return qa.id
+        case let .openPR(pr): return "openPR-\(pr.number)"
+        }
     }
 }
 
@@ -1217,7 +1836,7 @@ private struct TerminalSurfaceView: NSViewRepresentable {
         }
 
         if isFocused {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.async {
                 terminalView.window?.makeFirstResponder(terminalView)
             }
         }
@@ -1330,6 +1949,7 @@ final class TerminalSurfaceCache: ObservableObject {
         let command: String?
         let initialInput: String?
         let environmentVars: [String: String]
+        let waitAfterCommand: Bool
     }
 
     init() {
@@ -1354,15 +1974,15 @@ final class TerminalSurfaceCache: ObservableObject {
         }
     }
 
-    func surface(for id: UUID, app: ghostty_app_t, workingDirectory: String, command: String? = nil, initialInput: String? = nil, environmentVars: [String: String] = [:]) -> TerminalView {
+    func surface(for id: UUID, app: ghostty_app_t, workingDirectory: String, command: String? = nil, initialInput: String? = nil, environmentVars: [String: String] = [:], waitAfterCommand: Bool = true) -> TerminalView {
         if let existing = surfaces[id] {
             existing.workstreamID = id
             return existing
         }
-        let view = TerminalView(app: app, workingDirectory: workingDirectory, command: command, initialInput: initialInput, environmentVars: environmentVars)
+        let view = TerminalView(app: app, workingDirectory: workingDirectory, command: command, initialInput: initialInput, environmentVars: environmentVars, waitAfterCommand: waitAfterCommand)
         view.workstreamID = id
         surfaces[id] = view
-        surfaceParams[id] = SurfaceParams(workingDirectory: workingDirectory, command: command, initialInput: initialInput, environmentVars: environmentVars)
+        surfaceParams[id] = SurfaceParams(workingDirectory: workingDirectory, command: command, initialInput: initialInput, environmentVars: environmentVars, waitAfterCommand: waitAfterCommand)
         if view.surface == nil {
             logger.error("Surface creation failed for \(id) command=\(command ?? "<shell>")")
             failedSurfaces[id] = command ?? "(default shell)"
@@ -1382,7 +2002,7 @@ final class TerminalSurfaceCache: ObservableObject {
             view.destroy()
         }
         failedSurfaces.removeValue(forKey: id)
-        let view = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars)
+        let view = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars, waitAfterCommand: params.waitAfterCommand)
         view.workstreamID = id
         surfaces[id] = view
         if view.surface == nil {
@@ -1432,7 +2052,7 @@ final class TerminalSurfaceCache: ObservableObject {
         removeSurface(for: workstreamID)
         // Build a set of all possible derived IDs and remove matches
         var derivedIDs = Set<UUID>()
-        for prefix in ["terminal", "browser", "env-setup", "env-run"] {
+        for prefix in ["terminal", "browser", "editor", "env-setup", "env-run"] {
             for i in 0 ... 99 {
                 derivedIDs.insert(derivedUUID(from: workstreamID, salt: "\(prefix)-\(i)"))
             }
@@ -1476,7 +2096,7 @@ final class TerminalSurfaceCache: ObservableObject {
 
             respawning.insert(id)
             surfaces.removeValue(forKey: id)
-            let newView = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars)
+            let newView = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars, waitAfterCommand: params.waitAfterCommand)
             newView.workstreamID = id
             surfaces[id] = newView
             respawning.remove(id)

@@ -12,6 +12,7 @@
 ./scripts/dev.sh release --run      # release build and run
 ./scripts/dev.sh clean              # clean build artifacts
 ./scripts/release.sh [version]      # release build: sign, notarize, create DMG
+./scripts/build-editor.sh           # rebuild Monaco editor bundle (auto-run by dev.sh)
 ```
 
 ### After code changes
@@ -89,9 +90,11 @@ Breaking changes: add `!` after the type or include `BREAKING CHANGE:` in the fo
 ### Key directories
 - `Sources/Models/` - Data models, git operations, tmux, name generator, app constants
 - `Sources/Terminal/` - Ghostty integration (TerminalApp singleton, TerminalView NSView)
-- `Sources/Views/` - SwiftUI views (sidebar, settings, project overview, workspace, browser)
+- `Sources/Views/` - SwiftUI views (sidebar, settings, project overview, workspace, browser, editor)
 - `Localization/` - lproj directories with Localizable.strings
 - `Resources/` - Entitlements, bridging header, Assets.xcassets, CLI script
+- `Resources/MonacoEditor/` - Built Monaco editor bundle (gitignored, built by `scripts/build-editor.sh`)
+- `editor/` - Monaco editor Vite project (source for `Resources/MonacoEditor/`). Built with bun.
 - `ghostty/` - Git submodule (do not modify, pinned to stable release tag)
 - `website/` - Hugo + Tailwind CSS site for factory-floor.com. **Do not use `.AllTranslations`** in Hugo templates; it returns duplicates because localized contentDirs are nested inside the English `content/` dir. Use a hardcoded language code list instead (see `footer.html` or `docs.html` for the pattern).
 - `scripts/` - Release and build automation
@@ -107,7 +110,7 @@ Breaking changes: add `!` after the type or include `BREAKING CHANGE:` in the fo
 
 ### Workstream lifecycle
 1. Creating a workstream: generates name, runs `git worktree add`, symlinks .env (if enabled)
-2. Workspace view: Agent tab always present, terminals/browsers added on demand
+2. Workspace view: Info (Cmd+1) and Agent (Cmd+2) tabs always present; terminals/browsers added on demand
 3. Tmux mode: wraps Coding Agent only in `tmux new-session -A` on socket `-L factoryfloor`
 4. Terminal tabs: close on shell exit (Ctrl+D). Agent respawns.
 5. Archiving: runs teardown script, then `git worktree remove` + `tmux kill-session`
@@ -117,6 +120,8 @@ Scripts are loaded from `.factoryfloor.json` in the project directory:
 ```json
 { "setup": "cmd", "run": "cmd", "teardown": "cmd" }
 ```
+Falls back to `.emdash.json`, `conductor.json`, or `.superset/config.json` if not found.
+When using a fallback config, compatibility env vars are injected (e.g. `CONDUCTOR_*`, `EMDASH_*`, `SUPERSET_*`).
 
 ### Port detection
 Run scripts are wrapped in the `ff-run` launcher binary (bundled at `Contents/Helpers/ff-run`).
@@ -153,8 +158,8 @@ All user-facing strings MUST use localization. Never hardcode strings directly i
 - **SwiftUI Text/Button/Label**: Use string literals directly (e.g., `Text("Cancel")`). SwiftUI automatically treats these as `LocalizedStringKey`.
 - **AppKit APIs** (NSOpenPanel, NSAlert, etc.): Use `NSLocalizedString("string", comment: "")`.
 - **String interpolation with Images**: Split into `Text` concatenation. E.g., `(Text("Press ") + Text(Image(systemName: "command")) + Text(" N"))`.
-- **Every new user-facing string** must be added to all 4 locale files.
-- Current locales: English (en), Catalan (ca), Spanish (es), Swedish (sv).
+- **Every new user-facing string** must be added to all 5 locale files.
+- Current locales: English (en), Catalan (ca), German (de), Spanish (es), Swedish (sv).
 
 ## Keyboard Shortcuts
 When adding, removing, or changing keyboard shortcuts:
@@ -165,19 +170,26 @@ When adding, removing, or changing keyboard shortcuts:
 5. Update website shortcuts section
 
 Current shortcuts:
+- **Cmd+1**: Info
+- **Cmd+2**: Coding Agent
+- **Cmd+3-9**: Switch tab (all tabs in display order)
+- **Cmd+Shift+[/]**: Cycle tabs
 - **Cmd+Return**: Focus Coding Agent
-- **Cmd+I**: Info panel
-- **Cmd+E**: Environment
 - **Cmd+T**: New Terminal
 - **Cmd+B**: New Browser
+- **Cmd+O**: New Editor
+- **Cmd+S**: Save (Editor)
+- **Cmd+Shift+S**: Save As (Editor)
 - **Cmd+W**: Close tab
+- **Cmd+Shift+W**: Archive workstream
 - **Cmd+L**: Address bar (browser)
+- **Cmd+Shift+Return**: Start/Rerun
+- **Cmd+[/]**: Cycle workstreams
+- **Cmd+Up/Down**: Cycle projects
 - **Cmd+0**: Back to project
-- **Cmd+1-9**: Switch tab (custom tabs only; Info=Cmd+I, Agent=Cmd+Return)
-- **Opt+Cmd+Up/Down**: Cycle workstreams (works from any view in a project)
-- **Opt+Cmd+Left/Right**: Cycle tabs
-- **Cmd+Shift+O**: External browser
-- **Cmd+Shift+E**: External terminal
+- **Cmd+Option+S**: Toggle sidebar
+- **Cmd+Option+B**: External browser
+- **Cmd+Option+T**: External terminal
 - **Cmd+/**: Help
 
 ## Naming

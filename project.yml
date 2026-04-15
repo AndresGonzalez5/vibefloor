@@ -18,6 +18,7 @@ settings:
       - "-Wno-incomplete-umbrella"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
     CODE_SIGNING_REQUIRED: "NO"
 
 
@@ -40,8 +41,8 @@ targets:
       path: FactoryFloor/Info.plist
       properties:
         CFBundleDisplayName: $(PRODUCT_NAME)
-        CFBundleVersion: "0.1.65" # x-release-please-version
-        CFBundleShortVersionString: "0.1.65" # x-release-please-version
+        CFBundleVersion: "0.1.75" # x-release-please-version
+        CFBundleShortVersionString: "0.1.75" # x-release-please-version
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSMainStoryboardFile: ""
         NSPrincipalClass: NSApplication
@@ -92,6 +93,10 @@ targets:
         buildPhase: resources
       - path: Localization/sv.lproj/InfoPlist.strings
         buildPhase: resources
+      - path: Localization/de.lproj/Localizable.strings
+        buildPhase: resources
+      - path: Localization/de.lproj/InfoPlist.strings
+        buildPhase: resources
       - path: Resources/Scripts/ff
         buildPhase: resources
       - path: Resources/Scripts/ff-hook
@@ -107,21 +112,9 @@ targets:
       - path: ghostty/zig-out/share/ghostty
         type: folder
         buildPhase: resources
-    preBuildScripts:
-      - script: |
-          set -e
-          cd "${PROJECT_DIR}/pixel-agents"
-          if [ -f package.json ]; then
-            npm run build --silent
-            rsync -a --delete dist/ "${PROJECT_DIR}/Resources/PixelAgents/"
-            cp -r public/assets "${PROJECT_DIR}/Resources/PixelAgents/"
-            # WKWebView file:// requires no crossorigin and no type="module"
-            # Add defer so script runs after DOM is parsed
-            sed -i '' 's/ crossorigin//g; s/type="module" /defer /g' "${PROJECT_DIR}/Resources/PixelAgents/index.html"
-          fi
-        name: Build Pixel Agents
-        outputFiles:
-          - $(PROJECT_DIR)/Resources/PixelAgents/index.html
+      - path: Resources/MonacoEditor
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_MODULE_NAME: FactoryFloor
@@ -167,6 +160,33 @@ targets:
         product: Sentry
       - package: Sparkle
         product: Sparkle
+    preBuildScripts:
+      - script: |
+          set -e
+          cd "${PROJECT_DIR}/pixel-agents"
+          if [ -f package.json ]; then
+            npm run build --silent
+            rsync -a --delete dist/ "${PROJECT_DIR}/Resources/PixelAgents/"
+            cp -r public/assets "${PROJECT_DIR}/Resources/PixelAgents/"
+            # WKWebView file:// requires no crossorigin and no type="module"
+            # Add defer so script runs after DOM is parsed
+            sed -i '' 's/ crossorigin//g; s/type="module" /defer /g' "${PROJECT_DIR}/Resources/PixelAgents/index.html"
+          fi
+        name: Build Pixel Agents
+        outputFiles:
+          - $(PROJECT_DIR)/Resources/PixelAgents/index.html
+      - script: |
+          set -e
+          "${PROJECT_DIR}/scripts/build-editor.sh"
+        name: Build Monaco Editor
+        inputFiles:
+          - $(PROJECT_DIR)/editor/package.json
+          - $(PROJECT_DIR)/editor/bun.lock
+          - $(PROJECT_DIR)/editor/src/main.js
+          - $(PROJECT_DIR)/editor/index.html
+          - $(PROJECT_DIR)/editor/vite.config.js
+        outputFiles:
+          - $(PROJECT_DIR)/Resources/MonacoEditor/index.html
     postBuildScripts:
       - script: |
           set -e

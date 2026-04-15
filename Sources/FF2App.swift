@@ -31,6 +31,9 @@ extension Notification.Name {
     static let openExternalTerminal = Notification.Name("factoryfloor.openExternalTerminal")
     static let nextWorkstream = Notification.Name("factoryfloor.nextWorkstream")
     static let prevWorkstream = Notification.Name("factoryfloor.prevWorkstream")
+    static let nextProject = Notification.Name("factoryfloor.nextProject")
+    static let prevProject = Notification.Name("factoryfloor.prevProject")
+    static let archiveWorkstream = Notification.Name("factoryfloor.archiveWorkstream")
 }
 
 @MainActor
@@ -41,12 +44,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidFinishLaunching(_: Notification) {
+        guard !isRunningXCTest() else { return }
+
         // Debug settings should not persist across launches
         UserDefaults.standard.set(false, forKey: "factoryfloor.quickActionDebug")
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         Self.requestNotificationAuthorization(using: center)
+
+        // Contextual shortcuts via key monitor (avoids cluttering the menu bar)
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  let chars = event.charactersIgnoringModifiers
+            else { return event }
+            if let digit = chars.first?.wholeNumberValue, (1 ... 9).contains(digit) {
+                NotificationCenter.default.post(name: .switchByNumber, object: digit)
+                return nil
+            }
+            if chars == "l" {
+                NotificationCenter.default.post(name: .focusAddressBar, object: nil)
+                return nil
+            }
+            return event
+        }
     }
 
     nonisolated static func handleNotificationAuthorizationResult(
@@ -104,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationWillTerminate(_: Notification) {
+        guard !isRunningXCTest() else { return }
         HookEventReceiver.shared.stop()
         let tmuxPath = ToolStatus.detect().tmux.path
         if let tmuxPath {
@@ -137,9 +159,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 struct FF2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var updater = Updater()
+    @AppStorage("factoryfloor.editorTabActive") private var isEditorActive = false
+    @AppStorage("factoryfloor.editorFileDirty") private var isEditorDirty = false
     @State private var pendingURLDirectory: String?
 
     init() {
+        guard !isRunningXCTest() else { return }
+
         // Start the hook event receiver and wire it to the router
         HookEventReceiver.shared.onEvent = { projectDir, event in
             HookEventRouter.shared.route(projectDir: projectDir, event: event)
@@ -200,43 +226,47 @@ struct FF2App: App {
 
     var body: some Scene {
         Window(AppConstants.appName, id: "main") {
-            ContentView()
-                .environmentObject(updater)
-                .onAppear {
-                    Telemetry.shared.trackLaunch()
-                    if let dir = Self.launchDirectory {
-                        DispatchQueue.main.async {
-                            NotificationCenter.default.post(name: .openDirectory, object: dir)
+            if isRunningXCTest() {
+                EmptyView()
+            } else {
+                ContentView()
+                    .environmentObject(updater)
+                    .onAppear {
+                        Telemetry.shared.trackLaunch()
+                        if let dir = Self.launchDirectory {
+                            DispatchQueue.main.async {
+                                NotificationCenter.default.post(name: .openDirectory, object: dir)
+                            }
                         }
                     }
-                }
-                .onOpenURL { url in
-                    guard url.scheme == AppConstants.urlScheme else { return }
-                    let path = url.path
-                    guard !path.isEmpty else { return }
-                    var isDir: ObjCBool = false
-                    guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { return }
-                    pendingURLDirectory = path
-                }
-                .alert(
-                    Text("Open Directory"),
-                    isPresented: Binding(
-                        get: { pendingURLDirectory != nil },
-                        set: { if !$0 { pendingURLDirectory = nil } }
-                    )
-                ) {
-                    Button("Allow") {
-                        if let path = pendingURLDirectory {
-                            NotificationCenter.default.post(name: .openDirectory, object: path)
+                    .onOpenURL { url in
+                        guard url.scheme == AppConstants.urlScheme else { return }
+                        let path = url.path
+                        guard !path.isEmpty else { return }
+                        var isDir: ObjCBool = false
+                        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { return }
+                        pendingURLDirectory = path
+                    }
+                    .alert(
+                        Text("Open Directory"),
+                        isPresented: Binding(
+                            get: { pendingURLDirectory != nil },
+                            set: { if !$0 { pendingURLDirectory = nil } }
+                        )
+                    ) {
+                        Button("Allow") {
+                            if let path = pendingURLDirectory {
+                                NotificationCenter.default.post(name: .openDirectory, object: path)
+                            }
+                            pendingURLDirectory = nil
                         }
-                        pendingURLDirectory = nil
+                        Button("Cancel", role: .cancel) {
+                            pendingURLDirectory = nil
+                        }
+                    } message: {
+                        Text("An external application wants to open \(pendingURLDirectory ?? "") in \(AppConstants.appName).")
                     }
-                    Button("Cancel", role: .cancel) {
-                        pendingURLDirectory = nil
-                    }
-                } message: {
-                    Text("An external application wants to open \(pendingURLDirectory ?? "") in \(AppConstants.appName).")
-                }
+            }
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -255,6 +285,20 @@ struct FF2App: App {
                     NotificationCenter.default.post(name: .addProject, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
+            }
+            CommandGroup(replacing: .saveItem) {
+                if isEditorActive {
+                    Button("Save") {
+                        NotificationCenter.default.post(name: .saveEditor, object: nil)
+                    }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(!isEditorDirty)
+
+                    Button("Save As...") {
+                        NotificationCenter.default.post(name: .saveEditorAs, object: nil)
+                    }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                }
             }
             // Cmd+,: toggle settings
             CommandGroup(after: .appSettings) {
@@ -278,46 +322,41 @@ struct FF2App: App {
                 Button("Toggle Sidebar") {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
-
-                Divider()
-
-                Button("Toggle Info") {
-                    NotificationCenter.default.post(name: .toggleInfo, object: nil)
+                .keyboardShortcut("s", modifiers: [.command, .option])
+            }
+            // Tabs
+            CommandGroup(after: .toolbar) {
+                Button("Coding Agent") {
+                    NotificationCenter.default.post(name: .focusAgent, object: nil)
                 }
-                .keyboardShortcut("i", modifiers: .command)
+                .keyboardShortcut(.return, modifiers: .command)
 
-                Button("Environment") {
-                    NotificationCenter.default.post(name: .toggleEnvironment, object: nil)
-                }
-                .keyboardShortcut("e", modifiers: .command)
-
-                Button("Rebuild Setup") {
-                    NotificationCenter.default.post(name: .rebuildSetup, object: nil)
-                }
-                .keyboardShortcut("r", modifiers: [.control, .shift])
-
-                Button("Start/Rerun") {
-                    NotificationCenter.default.post(name: .rerunScript, object: nil)
-                }
-                .keyboardShortcut("s", modifiers: [.control, .shift])
-
-                Divider()
-
-                Button("Toggle Terminal") {
+                Button("New Terminal") {
                     NotificationCenter.default.post(name: .toggleTerminal, object: nil)
                 }
                 .keyboardShortcut("t", modifiers: .command)
 
-                Button("Toggle Browser") {
+                Button("New Browser") {
                     NotificationCenter.default.post(name: .toggleBrowser, object: nil)
                 }
                 .keyboardShortcut("b", modifiers: .command)
+
+                Button("New Editor") {
+                    NotificationCenter.default.post(name: .toggleEditor, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: .command)
 
                 Button("Toggle Pixel Agents") {
                     NotificationCenter.default.post(name: .togglePixelAgents, object: nil)
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Button("Start/Rerun") {
+                    NotificationCenter.default.post(name: .rerunScript, object: nil)
+                }
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+
+                Divider()
 
                 Button("Next Tab") {
                     NotificationCenter.default.post(name: .nextTab, object: nil)
@@ -329,43 +368,51 @@ struct FF2App: App {
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
 
-                Button("Address Bar") {
-                    NotificationCenter.default.post(name: .focusAddressBar, object: nil)
+                Button("Back to Project") {
+                    NotificationCenter.default.post(name: .switchToProject, object: nil)
                 }
-                .keyboardShortcut("l", modifiers: .command)
+                .keyboardShortcut("0", modifiers: .command)
 
-                Button("Focus Agent") {
-                    NotificationCenter.default.post(name: .focusAgent, object: nil)
-                }
-                .keyboardShortcut(.return, modifiers: .command)
+                Divider()
 
-                Button("Open in External Browser") {
-                    NotificationCenter.default.post(name: .openExternalBrowser, object: nil)
-                }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
-
-                Button("Open in External Terminal") {
-                    NotificationCenter.default.post(name: .openExternalTerminal, object: nil)
-                }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
-            }
-            // Contextual shortcuts (in menu but minimal labels)
-            CommandGroup(after: .toolbar) {
-                Button("Back to Project") { NotificationCenter.default.post(name: .switchToProject, object: nil) }
-                    .keyboardShortcut("0", modifiers: .command)
-                ForEach(1 ... 9, id: \.self) { n in
-                    Button("Switch to Tab \(n)") { NotificationCenter.default.post(name: .switchByNumber, object: n) }
-                        .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
-                }
                 Button("Next Workstream") {
                     NotificationCenter.default.post(name: .nextWorkstream, object: nil)
                 }
-                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                .keyboardShortcut("]", modifiers: .command)
 
                 Button("Previous Workstream") {
                     NotificationCenter.default.post(name: .prevWorkstream, object: nil)
                 }
-                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                .keyboardShortcut("[", modifiers: .command)
+
+                Button("Next Project") {
+                    NotificationCenter.default.post(name: .nextProject, object: nil)
+                }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+
+                Button("Previous Project") {
+                    NotificationCenter.default.post(name: .prevProject, object: nil)
+                }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+
+                Divider()
+
+                Button("Open in External Browser") {
+                    NotificationCenter.default.post(name: .openExternalBrowser, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: [.command, .option])
+
+                Button("Open in External Terminal") {
+                    NotificationCenter.default.post(name: .openExternalTerminal, object: nil)
+                }
+                .keyboardShortcut("t", modifiers: [.command, .option])
+
+                Divider()
+
+                Button("Archive Workstream") {
+                    NotificationCenter.default.post(name: .archiveWorkstream, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
             }
         }
     }

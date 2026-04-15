@@ -30,11 +30,19 @@
 "Purge Workstream" = "Rensa arbetsflöde";
 "Purge" = "Rensa";
 "Purge Anyway" = "Rensa ändå";
-"This workstream has uncommitted changes that will be lost." = "Detta arbetsflöde har osparade ändringar som kommer att gå förlorade.";
+"uncommitted changes" = "osparade ändringar";
+"unpushed commits" = "opublicerade commits";
+" and " = " och ";
+"This workstream has %@ that will be lost." = "Detta arbetsflöde har %@ som kommer att gå förlorade.";
 "The worktree and its branch will be permanently deleted." = "Arbetsträdet och dess gren kommer att raderas permanent.";
 "Projects Not Found" = "Projekt hittades inte";
 "The following projects were removed because their directories no longer exist on disk: %@" = "Följande projekt togs bort eftersom deras kataloger inte längre finns på disken: %@";
 "Cancel" = "Avbryt";
+"Save" = "Spara";
+"Save As..." = "Spara som …";
+"Don't Save" = "Spara inte";
+"Do you want to save changes to \"%@\"?" = "Vill du spara ändringarna i \"%@\"?";
+"Your changes will be lost if you don't save them." = "Dina ändringar går förlorade om du inte sparar dem.";
 "Remove" = "Ta bort";
 "Worktree Creation Failed" = "Kunde inte skapa arbetsträd";
 "Could not create the git worktree. The branch may already exist, or there may be an ongoing merge or rebase." = "Kunde inte skapa git-arbetsträdet. Grenen kanske redan finns, eller så pågår en sammanslagning eller rebase.";
@@ -66,6 +74,11 @@
 "Terminal" = "Terminal";
 "None" = "Ingen";
 "Browser" = "Webbläsare";
+"Editor" = "Redigerare";
+"New Editor (\u2318E)" = "Ny redigerare (\u2318E)";
+"Open File" = "Öppna fil";
+"Toggle file tree" = "Visa/dölj filträd";
+"Select a file to edit" = "Välj en fil att redigera";
 "GitHub" = "GitHub";
 "Coding Agent" = "Kodningsagent";
 "Bypass permission prompts" = "Hoppa över behörighetsförfrågningar";
@@ -85,11 +98,11 @@
 "Archiving..." = "Arkiverar...";
 "Commits ahead" = "Commits före";
 "Open as workstream" = "Öppna som arbetsflöde";
-"Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams." = "Arbetsträd på disk för detta repository. Rensning tar bort rena arbetsträd och deras associerade arbetsflöden.";
+"Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream." = "Arbetsträd på disk för detta repository. Rensning tar bort rena arbetsträd som inte är associerade med ett arbetsflöde.";
 "Prune %d clean worktree" = "Rensa %d rent arbetsträd";
 "Prune %d clean worktrees" = "Rensa %d rena arbetsträd";
-"Remove %d worktree with no uncommitted changes? Associated workstreams will also be removed from the sidebar." = "Ta bort %d arbetsträd utan osparade ändringar? Associerade arbetsflöden kommer också att tas bort från sidofältet.";
-"Remove %d worktrees with no uncommitted changes? Associated workstreams will also be removed from the sidebar." = "Ta bort %d arbetsträd utan osparade ändringar? Associerade arbetsflöden kommer också att tas bort från sidofältet.";
+"Remove %d clean worktree with no uncommitted changes?" = "Ta bort %d rent arbetsträd utan osparade ändringar?";
+"Remove %d clean worktrees with no uncommitted changes?" = "Ta bort %d rena arbetsträd utan osparade ändringar?";
 "Remove \"%@\" from the list? Files in %@ will not be deleted." = "Ta bort \"%@\" från listan? Filer i %@ kommer inte att raderas.";
 
 /* Projects */
@@ -253,10 +266,13 @@
 "Report a Bug" = "Rapportera en bugg";
 "Documentation" = "Dokumentation";
 "Request a Feature" = "Föreslå en funktion";
-"Rebuild" = "Bygg om";
 "Rerun" = "Kör igen";
 "Start" = "Starta";
 "Stop" = "Stoppa";
+
+"Running setup..." = "Kör konfiguration...";
+"Setup failed." = "Konfigurationen misslyckades.";
+"Continue to Agent" = "Fortsätt till Agenten";
 
 "Restarting..." = "Startar om...";
 "Preparing workstream..." = "Förbereder arbetsflöde...";
@@ -271,7 +287,8 @@
 "Commit" = "Commit";
 "Push" = "Push";
 "Create PR" = "Skapa PR";
-"Abandon PR" = "Överge PR";
+"Close PR" = "Stäng PR";
+"Open #%d" = "Öppna #%d";
 "This branch has been merged." = "Denna gren har mergats.";
 "gh CLI is not installed." = "gh CLI är inte installerat.";
 "Claude Code is not installed." = "Claude Code är inte installerat.";

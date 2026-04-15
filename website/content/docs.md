@@ -65,11 +65,12 @@ The UI shows up instantly — worktree creation happens in the background.
 
 #### Workstream tabs
 
-- **Info** (⌘I) — branch name, PR status, project docs
+- **Info** — branch name, PR status, project docs
 - **Agent** (⌘Return) — your Claude Code session
-- **Environment** (⌘E) — setup and run script controls
+- **Environment** — setup and run script controls
 - **Terminal** (⌘T) — additional terminal tabs, as many as you want
 - **Browser** (⌘B) — embedded browser with auto-port detection
+- **Editor** (⌘O) — built-in Monaco code editor with syntax highlighting and IntelliSense
 
 #### Branch auto-rename
 
@@ -100,7 +101,7 @@ Quick actions run one-shot Claude tasks from the sidebar:
 - **Commit** — stages and commits with an AI-generated message
 - **Push** — pushes the current branch to origin
 - **Create PR** — creates a pull request with AI-generated title and description
-- **Abandon PR** — closes the PR
+- **Close PR** — closes the PR
 
 These run as background `claude -p` calls. Enable **Quick action debug mode** in settings if you want to know how the sausage is made. Trust us, [David](https://davidpoblador.com) spent more time than he can admit debugging weird behaviors in there.
 
@@ -108,7 +109,7 @@ These run as background `claude -p` calls. Enable **Quick action debug mode** in
 
 ## Your Workspace
 
-Terminals, browsers, and shortcuts — the tools inside each workstream.
+Terminals, browsers, editors, and shortcuts — the tools inside each workstream.
 
 ### Terminals
 
@@ -116,7 +117,7 @@ Terminals are GPU-rendered via [Ghostty](https://ghostty.org). They're fast.
 
 - **⌘T** — new terminal tab
 - **⌘W** — close tab (or Ctrl+D to exit the shell)
-- **⌘1-9** — switch between tabs
+- **⌘1** — Info, **⌘2** — Coding Agent, **⌘3-9** — switch between tabs
 - **⌘Shift+[** / **⌘Shift+]** — cycle through tabs
 
 You can drag files and text onto the terminal. Because sometimes the mouse is fine, actually.
@@ -139,6 +140,11 @@ When your run script starts a dev server, Factory Floor detects the listening po
 
 The browser shows a connection error page with a retry button if the server isn't ready yet. It'll auto-navigate once the port is detected.
 
+### The Editor
+
+Each workstream can have editor tabs (⌘O). The editor is Monaco — the same engine that powers VS Code.
+
+
 ### Keyboard Shortcuts
 
 Factory Floor is keyboard-first. Here's everything.
@@ -151,32 +157,39 @@ Factory Floor is keyboard-first. Here's everything.
 | ⌘Shift+N | New project |
 | ⌘, | Settings |
 | ⌘/ | Help |
+| ⌘Option+S | Toggle sidebar |
 
 #### Workstream
 
 | Shortcut | Action |
 |----------|--------|
-| ⌘Return | Focus Coding Agent |
-| ⌘I | Info panel |
-| ⌘E | Environment |
-| ⌘T | New Terminal |
-| ⌘B | New Browser |
-| ⌘W | Close tab |
-| ⌘L | Address bar (browser) |
-| ⌘0 | Back to project |
-| ⌘1-9 | Switch tab |
+| ⌘1 | Info |
+| ⌘2 | Coding Agent |
+| ⌘3-9 | Switch tab |
 | ⌘Shift+[ | Previous tab |
 | ⌘Shift+] | Next tab |
-| Ctrl+Shift+R | Rebuild setup |
-| Ctrl+Shift+S | Start/restart run |
+| ⌘Return | Focus Coding Agent |
+| ⌘T | New Terminal |
+| ⌘B | New Browser |
+| ⌘O | New Editor |
+| ⌘S | Save (Editor) |
+| ⌘Shift+S | Save As (Editor) |
+| ⌘W | Close tab |
+| ⌘Shift+W | Archive workstream |
+| ⌘L | Address bar (browser) |
+| ⌘Shift+Return | Start/Rerun |
 
 #### Navigation
 
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+1-9 | Switch workstream (from any view) |
-| ⌘Shift+O | Open in external browser |
-| ⌘Shift+E | Open in external terminal |
+| ⌘[ | Previous workstream |
+| ⌘] | Next workstream |
+| ⌘↑ | Previous project |
+| ⌘↓ | Next project |
+| ⌘0 | Back to project |
+| ⌘Option+B | Open in external browser |
+| ⌘Option+T | Open in external terminal |
 
 ---
 
@@ -199,19 +212,18 @@ Drop a `.factoryfloor.json` in your project root to automate the workstream life
 | Hook | When it runs |
 |------|-------------|
 | `setup` | Once, when a workstream is created. Install dependencies, run migrations, whatever. |
-| `run` | On demand via the Environment tab (⌘E). Wrapped in `ff-run` for port detection. |
+| `run` | On demand via the Environment tab. Wrapped in `ff-run` for port detection. |
 | `teardown` | When a workstream is archived or purged. Stop containers, clean up. |
 
 All fields are optional. Scripts run in the workstream directory using your login shell. Yes, even [fish](https://github.com/alltuner/factoryfloor/pull/324). Don't ask how long that took.
 
-Factory Floor also reads `conductor.json` and `.superset/config.json` if `.factoryfloor.json` doesn't exist. Because compatibility is polite. (Time for a [standard](https://xkcd.com/927/)?)
+Factory Floor also reads `.emdash.json`, `conductor.json`, and `.superset/config.json` if `.factoryfloor.json` doesn't exist. Because compatibility is polite. (Time for a [standard](https://xkcd.com/927/)?) When using a fallback config, Factory Floor injects compatibility environment variables so scripts work without modification (e.g. `CONDUCTOR_PORT`, `EMDASH_PORT`, `SUPERSET_PORT_BASE`).
 
 #### The Environment tab
 
 Split-pane layout: **Setup** on the left, **Run** on the right.
 
-- **Ctrl+Shift+R** — rebuild (reruns setup)
-- **Ctrl+Shift+S** — start/restart the run script
+- **⌘Shift+Return** — start/restart the run script
 
 ### Environment Variables
 
@@ -224,6 +236,7 @@ Every terminal, setup script, and run command in a workstream has these variable
 | `FF_PROJECT_DIR` | Main repository path | `/Users/you/my-app` |
 | `FF_WORKTREE_DIR` | Worktree path | `~/.factoryfloor/worktrees/my-app/coral-tidal-reef` |
 | `FF_PORT` | Deterministic port (40001-49999) | `42847` |
+| `FF_DEFAULT_BRANCH` | Default branch (main, master, etc.) | `main` |
 
 #### About FF_PORT
 
@@ -294,7 +307,7 @@ Requires the [gh CLI](https://cli.github.com/) with authentication (`gh auth log
 
 #### Quick actions
 
-From the sidebar, run one-click operations: **Create PR** (AI-generated title and description), **Push** (to origin with `-u`), or **Abandon PR** (closes with a comment). Because if you're tired of typing "now commit, push, and open a PR" into Claude for the hundredth time, you're not alone.
+From the sidebar, run one-click operations: **Create PR** (AI-generated title and description), **Push** (to origin with `-u`), or **Close PR** (closes with a comment). Because if you're tired of typing "now commit, push, and open a PR" into Claude for the hundredth time, you're not alone.
 
 ### Updates
 
@@ -314,9 +327,9 @@ Enable **Bleeding edge updates** in Settings > Advanced for pre-release builds. 
 
 ## Enterprise Features 😉
 
-### Code Editor
+### Full IDE
 
-Nope. No syntax highlighting, no autocomplete, no minimap. Our nonexistent VCs have not been pushing any corporate agenda. We intend to have you using the tools you already love: [Zed](https://zed.dev), [VS Code](https://code.visualstudio.com), whatever. Factory Floor gives you a coding agent, a browser, and a worktree. Besides, who's writing code anymore?
+Nope. There's a built-in editor (⌘O) for quick looks and small edits — but we're not building an IDE. For serious editing sessions, you should be using the tools you already love: [Zed](https://zed.dev), [VS Code](https://code.visualstudio.com), whatever. Factory Floor gives you a coding agent, a browser, a worktree, and just enough editor to not have to leave. Besides, who's writing code anymore?
 
 ### Merge Viewer
 

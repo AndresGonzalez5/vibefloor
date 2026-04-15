@@ -3,6 +3,9 @@
 *.xcworkspace
 FactoryFloor/Info.plist
 
+# SourceKit-LSP build server config (generated per-worktree with absolute paths)
+buildServer.json
+
 # Xcode build artifacts
 build/
 DerivedData/
@@ -12,8 +15,12 @@ DerivedData/
 ghostty/zig-out/
 ghostty/.zig-cache/
 
-# Node dependencies (installed via bun in CI)
+# Monaco editor build output (rebuild with scripts/build-editor.sh)
+Resources/MonacoEditor/
+
+# Node dependencies
 node_modules/
+editor/node_modules/
 
 # Python
 __pycache__/

@@ -65,9 +65,9 @@ Gränssnittet dyker upp direkt, worktree-skapandet sker i bakgrunden.
 
 #### Workstream tabs {#workstream-tabs}
 
-- **Info** (⌘I) — branch-namn, PR-status, projektdokumentation
+- **Info** — branch-namn, PR-status, projektdokumentation
 - **Agent** (⌘Return) — din Claude Code-session
-- **Environment** (⌘E) — setup- och run-scriptkontroller
+- **Environment** — setup- och run-scriptkontroller
 - **Terminal** (⌘T) — ytterligare terminal tabs, så många du vill
 - **Browser** (⌘B) — inbäddad browser med automatisk port-detection
 
@@ -100,7 +100,7 @@ Quick actions kör engångs-Claude-uppgifter från sidebar:
 - **Commit** — stagear och committar med ett AI-genererat meddelande
 - **Push** — pushar nuvarande branch till origin
 - **Create PR** — skapar en pull request med AI-genererad titel och beskrivning
-- **Abandon PR** — stänger PRn
+- **Close PR** — stänger PRn
 
 Dessa körs som bakgrunds-`claude -p`-anrop. Aktivera **Quick action debug mode** i inställningarna om du vill veta hur korven görs. Lita på oss, [David](https://davidpoblador.com) lade ner mer tid än han vill erkänna på att debugga konstiga beteenden där inne.
 
@@ -116,7 +116,7 @@ Terminals är GPU-renderade via [Ghostty](https://ghostty.org). De är snabba.
 
 - **⌘T** — ny terminal tab
 - **⌘W** — stäng tab (eller Ctrl+D för att avsluta shell)
-- **⌘1-9** — växla mellan tabs
+- **⌘1** — Info, **⌘2** — Coding Agent, **⌘3-9** — växla mellan tabs
 - **⌘Shift+[** / **⌘Shift+]** — bläddra genom tabs
 
 Du kan dra filer och text till terminal. För ibland är musen helt okej, faktiskt.
@@ -151,32 +151,36 @@ Factory Floor är tangentbord-först. Här är allt.
 | ⌘Shift+N | Nytt projekt |
 | ⌘, | Inställningar |
 | ⌘/ | Hjälp |
+| ⌘Option+S | Visa/dölj sidopanel |
 
 #### Workstream {#workstream}
 
 | Genväg | Åtgärd |
 |----------|--------|
+| ⌘1 | Info |
+| ⌘2 | Coding Agent |
+| ⌘3-9 | Byt tab |
+| ⌘Shift+[ | Föregående tab |
+| ⌘Shift+] | Nästa tab |
 | ⌘Return | Fokusera Coding Agent |
-| ⌘I | Info-panel |
-| ⌘E | Environment |
 | ⌘T | Ny Terminal |
 | ⌘B | Ny Browser |
 | ⌘W | Stäng tab |
+| ⌘Shift+W | Arkivera workstream |
 | ⌘L | Adressfält (browser) |
-| ⌘0 | Tillbaka till projekt |
-| ⌘1-9 | Byt tab |
-| ⌘Shift+[ | Föregående tab |
-| ⌘Shift+] | Nästa tab |
-| Ctrl+Shift+R | Bygg om setup |
-| Ctrl+Shift+S | Starta/starta om run |
+| ⌘Shift+Return | Starta/starta om run |
 
 #### Navigering {#navigation-1}
 
 | Genväg | Åtgärd |
 |----------|--------|
-| Ctrl+1-9 | Byt workstream (från valfri vy) |
-| ⌘Shift+O | Öppna i extern browser |
-| ⌘Shift+E | Öppna i extern terminal |
+| ⌘[ | Föregående workstream |
+| ⌘] | Nästa workstream |
+| ⌘↑ | Föregående projekt |
+| ⌘↓ | Nästa projekt |
+| ⌘0 | Tillbaka till projekt |
+| ⌘Option+B | Öppna i extern browser |
+| ⌘Option+T | Öppna i extern terminal |
 
 ---
 
@@ -199,19 +203,18 @@ Lägg en `.factoryfloor.json` i projektets rotkatalog för att automatisera work
 | Hook | När det körs |
 |------|-------------|
 | `setup` | En gång, när en workstream skapas. Installera beroenden, kör migreringar, vad som helst. |
-| `run` | På begäran via Environment-tabben (⌘E). Kapslad i `ff-run` för port detection. |
+| `run` | På begäran via Environment-tabben. Kapslad i `ff-run` för port detection. |
 | `teardown` | När en workstream arkiveras eller rensas. Stoppa containrar, städa upp. |
 
 Alla fält är valfria. Script körs i workstream-katalogen med ditt login shell. Ja, även [fish](https://github.com/alltuner/factoryfloor/pull/324). Fråga inte hur lång tid det tog.
 
-Factory Floor läser också `conductor.json` och `.superset/config.json` om `.factoryfloor.json` inte finns. För kompatibilitet är artigt. (Dags för en [standard](https://xkcd.com/927/)?)
+Factory Floor läser också `.emdash.json`, `conductor.json` och `.superset/config.json` om `.factoryfloor.json` inte finns. För kompatibilitet är artigt. (Dags för en [standard](https://xkcd.com/927/)?) Vid fallback-konfiguration injicerar Factory Floor kompatibla miljövariabler så att script fungerar utan ändring (t.ex. `CONDUCTOR_PORT`, `EMDASH_PORT`, `SUPERSET_PORT_BASE`).
 
 #### Environment-tabben {#the-environment-tab}
 
 Delad layout: **Setup** till vänster, **Run** till höger.
 
-- **Ctrl+Shift+R** — bygg om (kör om setup)
-- **Ctrl+Shift+S** — starta/starta om run-scriptet
+- **⌘Shift+Return** — starta/starta om run-scriptet
 
 ### Miljövariabler {#environment-variables}
 
@@ -224,6 +227,7 @@ Varje terminal, setup-script och run-kommando i en workstream har dessa variable
 | `FF_PROJECT_DIR` | Huvudrepots sökväg | `/Users/you/my-app` |
 | `FF_WORKTREE_DIR` | Worktree-sökväg | `~/.factoryfloor/worktrees/my-app/coral-tidal-reef` |
 | `FF_PORT` | Deterministisk port (40001-49999) | `42847` |
+| `FF_DEFAULT_BRANCH` | Standardgren (main, master, etc.) | `main` |
 
 #### Om FF_PORT {#about-ff_port}
 
@@ -294,7 +298,7 @@ Kräver [gh CLI](https://cli.github.com/) med autentisering (`gh auth login`).
 
 #### Quick actions {#quick-actions-1}
 
-Från sidebar, kör ett-klicks-operationer: **Create PR** (AI-genererad titel och beskrivning), **Push** (till origin med `-u`), eller **Abandon PR** (stänger med en kommentar). För om du är trött på att skriva "now commit, push, and open a PR" till Claude för hundrade gången, är du inte ensam.
+Från sidebar, kör ett-klicks-operationer: **Create PR** (AI-genererad titel och beskrivning), **Push** (till origin med `-u`), eller **Close PR** (stänger med en kommentar). För om du är trött på att skriva "now commit, push, and open a PR" till Claude för hundrade gången, är du inte ensam.
 
 ### Uppdateringar {#updates}
 

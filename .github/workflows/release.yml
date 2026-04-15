@@ -54,6 +54,8 @@ jobs:
         with:
           version: 0.15.2
 
+      - uses: oven-sh/setup-bun@v2
+
       - uses: astral-sh/setup-uv@v7
 
       - name: Cache SPM packages
@@ -83,6 +85,9 @@ jobs:
         uses: jozefizso/setup-sparkle@v2
         with:
           version: ${{ env.SPARKLE_VERSION }}
+
+      - name: Build Monaco editor
+        run: ./scripts/build-editor.sh
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -187,10 +192,10 @@ jobs:
           create-dmg \
             --volname "$APP_NAME" \
             --background "Resources/dmg-background@2x.png" \
-            --window-size 660 400 \
+            --window-size 660 500 \
             --icon-size 128 \
-            --icon "${APP_NAME}.app" 170 180 \
-            --app-drop-link 490 180 \
+            --icon "${APP_NAME}.app" 170 190 \
+            --app-drop-link 490 190 \
             --no-internet-enable \
             "build/release/$DMG_NAME" \
             "$DMG_STAGING" || true
@@ -255,16 +260,13 @@ jobs:
             exit 1
           fi
 
-          # Extract current version's changelog section and convert to HTML
-          RELEASE_NOTES=$(python3 -c "
-          import re, sys
-          text = open('CHANGELOG.md').read()
-          # Match from '## [version]' to the next '## [' or end of file
-          pattern = r'## \[${VERSION}\].*?\n(.*?)(?=\n## \[|\Z)'
-          m = re.search(pattern, text, re.DOTALL)
-          if m:
-              print(m.group(1).strip())
-          " | uvx --with markdown python3 -c "import sys, markdown; print(markdown.markdown(sys.stdin.read()))")
+          # Download existing appcast from previous release to merge with (preserves items
+          # for the Homebrew update popover). Cannot use --latest because release-please
+          # already created the current (empty) release.
+          PREV_TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 10 --json tagName --jq "[.[] | select(.tagName != \"$TAG_NAME\")][0].tagName")
+          if [ -n "$PREV_TAG" ]; then
+            gh release download "$PREV_TAG" --repo "$GITHUB_REPOSITORY" --pattern "appcast.xml" --output existing-appcast.xml || true
+          fi
 
           DMG_URL="https://github.com/alltuner/factoryfloor/releases/download/v${VERSION}/${DMG_NAME}"
           python3 scripts/generate_appcast.py \
@@ -272,7 +274,8 @@ jobs:
             --signature "$SIGNATURE" \
             --dmg-path "build/release/$DMG_NAME" \
             --dmg-url "$DMG_URL" \
-            --release-notes "$RELEASE_NOTES" \
+            --changelog CHANGELOG.md \
+            --existing existing-appcast.xml \
             --output appcast.xml
 
       - name: Upload to release

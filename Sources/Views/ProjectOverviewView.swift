@@ -152,22 +152,26 @@ struct ProjectOverviewView: View {
                     if project.workstreams.isEmpty {
                         HStack {
                             Spacer()
-                            VStack(spacing: 8) {
-                                Text("No workstreams yet")
-                                    .foregroundStyle(.secondary)
-                                (Text("Press ") + Text(Image(systemName: "command")) + Text(" N ") + Text("to create one."))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
+                            Text("No workstreams yet")
+                                .foregroundStyle(.secondary)
                             Spacer()
                         }
                         .padding(.vertical, 8)
                     } else {
                         let sorted = sortedWorkstreams(project.workstreams)
-                        ForEach(Array(sorted.enumerated()), id: \.element.id) { index, workstream in
+                        ForEach(sorted) { workstream in
+                            let branch = appEnv.branchName(for: workstream.worktreePath)
+                            let pr = branch.flatMap { appEnv.githubPR(for: project.directory, branch: $0) }
                             WorkstreamRow(
                                 workstream: workstream,
-                                shortcutNumber: index < 9 ? index + 1 : nil,
+                                isPathValid: appEnv.isPathValid(workstream.worktreePath),
+                                hasActivePort: appEnv.hasActivePort(workstream.id),
+                                taskDescription: appEnv.taskDescription(for: workstream.worktreePath),
+                                branchName: branch,
+                                prTitle: pr?.title,
+                                prNumber: pr?.number,
+                                prState: pr?.state,
+                                prURL: pr?.url,
                                 onSelect: { onSelectWorkstream(workstream.id) },
                                 onRemove: { onRemoveWorkstream(workstream.id) },
                                 onPurge: { onPurgeWorkstream(workstream.id) }
@@ -175,8 +179,17 @@ struct ProjectOverviewView: View {
                         }
                     }
                 } header: {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text("Workstreams")
+                        if !project.workstreams.isEmpty {
+                            Text("\(project.workstreams.count)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Color.primary.opacity(0.08))
+                                .clipShape(Capsule())
+                        }
                         Spacer()
                         if project.workstreams.count > 1 {
                             Picker("", selection: $workstreamSortOrder) {
@@ -187,9 +200,6 @@ struct ProjectOverviewView: View {
                             .pickerStyle(.segmented)
                             .frame(width: 120)
                         }
-                        Text("\(project.workstreams.count)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -201,7 +211,7 @@ struct ProjectOverviewView: View {
                             WorktreeInfoRow(
                                 worktree: wt,
                                 projectDirectory: project.directory,
-                                isWorkstream: workstreamPaths.contains(wt.path),
+                                isWorkstream: workstreamPaths.contains(Self.standardizedPath(wt.path)),
                                 onAdopt: { adoptWorktree(wt) }
                             )
                         }
@@ -234,7 +244,7 @@ struct ProjectOverviewView: View {
                                 .foregroundStyle(.secondary)
                         }
                     } footer: {
-                        Text("Worktrees on disk for this repository. Pruning removes clean worktrees and their associated workstreams.")
+                        Text("Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream.")
                     }
                 }
             }
@@ -303,16 +313,27 @@ struct ProjectOverviewView: View {
             Button("Cancel", role: .cancel) {}
             Button("Prune", role: .destructive) { pruneWorktrees() }
         } message: {
-            Text(String(format: NSLocalizedString(prunableCount == 1 ? "Remove %d worktree with no uncommitted changes? Associated workstreams will also be removed from the sidebar." : "Remove %d worktrees with no uncommitted changes? Associated workstreams will also be removed from the sidebar.", comment: ""), prunableCount))
+            Text(String(format: NSLocalizedString(prunableCount == 1 ? "Remove %d clean worktree with no uncommitted changes?" : "Remove %d clean worktrees with no uncommitted changes?", comment: ""), prunableCount))
         }
     }
 
     private var workstreamPaths: Set<String> {
-        Set(project.workstreams.compactMap(\.worktreePath))
+        Set(project.workstreams.compactMap(\.worktreePath).map(Self.standardizedPath))
+    }
+
+    private var prunableWorktrees: [WorktreeInfo] {
+        return worktrees.filter { worktree in
+            guard !worktree.isMain && !worktree.isDirty && !worktree.hasBranchCommits else { return false }
+            return !workstreamPaths.contains(Self.standardizedPath(worktree.path))
+        }
+    }
+
+    private var prunablePaths: Set<String> {
+        Set(prunableWorktrees.map(\.path).map(Self.standardizedPath))
     }
 
     private var prunableCount: Int {
-        worktrees.filter { !$0.isMain && !$0.isDirty && !$0.hasBranchCommits }.count
+        prunableWorktrees.count
     }
 
     private func loadRepoDetail() {
@@ -367,10 +388,10 @@ struct ProjectOverviewView: View {
     private func pruneWorktrees() {
         isPruning = true
         let dir = project.directory
-        let prunablePaths = Set(worktrees.filter { !$0.isMain && !$0.isDirty && !$0.hasBranchCommits }.map(\.path))
+        let pathsToPrune = prunablePaths
         Task.detached {
-            GitOperations.pruneCleanWorktrees(at: dir)
-            await applyPrunedWorktrees(prunablePaths)
+            GitOperations.pruneCleanWorktrees(at: dir, onlyPaths: pathsToPrune)
+            await applyPrunedWorktrees(pathsToPrune)
         }
     }
 
@@ -388,11 +409,15 @@ struct ProjectOverviewView: View {
     private func applyPrunedWorktrees(_ prunablePaths: Set<String>) {
         project.workstreams.removeAll { ws in
             guard let path = ws.worktreePath else { return false }
-            return prunablePaths.contains(path)
+            return prunablePaths.contains(Self.standardizedPath(path))
         }
         onProjectChanged()
         isPruning = false
         refreshWorktrees()
+    }
+
+    private static func standardizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.path
     }
 }
 
@@ -488,39 +513,87 @@ private struct WorktreeInfoRow: View {
 
 private struct WorkstreamRow: View {
     let workstream: Workstream
-    var shortcutNumber: Int?
+    var isPathValid: Bool = true
+    var hasActivePort: Bool = false
+    var taskDescription: String?
+    var branchName: String?
+    var prTitle: String?
+    var prNumber: Int?
+    var prState: String?
+    var prURL: String?
     let onSelect: () -> Void
     let onRemove: () -> Void
     let onPurge: () -> Void
 
     @State private var isHovering = false
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
+    /// The most descriptive label we have for this workstream.
+    private var headline: String {
+        if let prTitle { return prTitle }
+        if let taskDescription { return taskDescription }
+        return workstream.name
+    }
+
+    /// Whether the headline came from a description/PR (true) or is just the generated name (false).
+    private var hasRichHeadline: Bool {
+        prTitle != nil || taskDescription != nil
+    }
+
+    /// Secondary line: branch name when we have a rich headline, otherwise nil.
+    private var subtitle: String? {
+        guard isPathValid else { return nil }
+        if hasRichHeadline {
+            return branchName ?? workstream.name
+        }
+        if let branchName, branchName != workstream.name {
+            return branchName
+        }
+        return nil
+    }
+
     var body: some View {
         Button(action: onSelect) {
-            HStack {
-                Image(systemName: "terminal")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(workstream.name)
-                        .font(.system(.body, design: .monospaced))
-                    if let path = workstream.worktreePath {
-                        Text(path.abbreviatedPath)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        if !isPathValid {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                                .font(.system(size: 11))
+                        }
+                        Text(headline)
+                            .font(.system(hasRichHeadline ? .body : .body, design: hasRichHeadline ? .default : .monospaced))
+                            .strikethrough(!isPathValid)
+                            .foregroundStyle(isPathValid ? .primary : .secondary)
+                            .lineLimit(1)
+                        if hasActivePort {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 6))
+                                .foregroundStyle(.green)
+                        }
+                        if let prNumber, let prState {
+                            PRBadge(number: prNumber, state: prState, url: prURL)
+                        }
+                    }
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
                 .frame(minHeight: 36, alignment: .leading)
                 Spacer()
-                if let n = shortcutNumber {
-                    Text("\(Image(systemName: "control"))\(n)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .padding(.trailing, 4)
-                }
-                Button(action: {
-                    onRemove()
-                }) {
+                Text(Self.relativeFormatter.localizedString(for: workstream.lastAccessedAt, relativeTo: Date()))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Button(action: onRemove) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -541,6 +614,27 @@ private struct WorkstreamRow: View {
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
         .contextMenu {
+            if let worktreePath = workstream.worktreePath {
+                Button {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: worktreePath)
+                } label: {
+                    Label("Reveal in Finder", systemImage: "folder")
+                }
+                Button {
+                    openDirectoryInTerminal(worktreePath)
+                } label: {
+                    Label("Open in External Terminal", systemImage: "terminal")
+                }
+                Divider()
+            }
+            if let branchName {
+                Button {
+                    copyTextToPasteboard(branchName)
+                } label: {
+                    Label("Copy branch name", systemImage: "arrow.triangle.branch")
+                }
+            }
+            Divider()
             Button(action: onRemove) {
                 Label("Remove", systemImage: "xmark")
             }
@@ -701,3 +795,39 @@ private struct FileChangeRow: View {
     }
 }
 
+private struct PRBadge: View {
+    let number: Int
+    let state: String
+    var url: String?
+
+    private var color: Color {
+        switch state {
+        case "MERGED": return .purple
+        case "CLOSED": return .red
+        default: return .green
+        }
+    }
+
+    private var icon: String {
+        switch state {
+        case "MERGED": return "arrow.triangle.merge"
+        default: return "arrow.triangle.pull"
+        }
+    }
+
+    var body: some View {
+        let label = HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 9))
+            Text(verbatim: "#\(number)")
+                .font(.system(size: 11))
+        }
+        .foregroundStyle(color)
+
+        if let url, let dest = URL(string: url) {
+            Link(destination: dest) { label }
+        } else {
+            label
+        }
+    }
+}

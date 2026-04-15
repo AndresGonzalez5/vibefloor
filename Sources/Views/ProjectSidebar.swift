@@ -7,6 +7,22 @@ import UniformTypeIdentifiers
 
 private let logger = Logger(subsystem: "factoryfloor", category: "sidebar")
 
+func expandedProjectIDs(afterSelecting selection: SidebarSelection?, current: Set<UUID>, projectIDByWorkstreamID: [UUID: UUID]) -> Set<UUID> {
+    guard let selection else { return current }
+    var expanded = current
+    switch selection {
+    case let .project(projectID):
+        expanded.insert(projectID)
+    case let .workstream(workstreamID):
+        if let projectID = projectIDByWorkstreamID[workstreamID] {
+            expanded.insert(projectID)
+        }
+    case .settings, .help:
+        break
+    }
+    return expanded
+}
+
 extension Notification.Name {
     static let addProject = Notification.Name("factoryfloor.addProject")
     static let addNew = Notification.Name("factoryfloor.addNew")
@@ -25,7 +41,7 @@ struct ProjectSidebar: View {
     @State private var projectToDelete: UUID?
     @State private var workstreamToRemove: UUID?
     @State private var workstreamToPurge: UUID?
-    @State private var purgeWarningDirty = false
+    @State private var purgeWarningMessage: String?
     @State private var expandedProjects: Set<UUID> = SidebarState.loadExpanded()
     @State private var cachedSortedIDs: [UUID] = []
     @State private var cachedProjectIndex: [UUID: Int] = [:]
@@ -68,6 +84,29 @@ struct ProjectSidebar: View {
         )
     }
 
+    private func projectIDByWorkstreamIDSnapshot() -> [UUID: UUID] {
+        Dictionary(
+            uniqueKeysWithValues: cachedWorkstreamIndex.compactMap { workstreamID, index in
+                guard projects.indices.contains(index.0) else { return nil }
+                return (workstreamID, projects[index.0].id)
+            }
+        )
+    }
+
+    private func deferSelectionExpansion(_ selected: SidebarSelection, projectIDByWorkstreamID: [UUID: UUID], scrollProxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard selection == selected else { return }
+            expandedProjects = expandedProjectIDs(
+                afterSelecting: selected,
+                current: expandedProjects,
+                projectIDByWorkstreamID: projectIDByWorkstreamID
+            )
+            withAnimation {
+                scrollProxy.scrollTo(selected, anchor: .center)
+            }
+        }
+    }
+
     private func projectRows() -> some View {
         ForEach(cachedSortedIDs, id: \.self) { projectID in
             let projectBind = projectBinding(for: projectID)
@@ -105,6 +144,7 @@ struct ProjectSidebar: View {
                         branchName: branch,
                         worktreePath: workstream.worktreePath,
                         isPathValid: appEnv.isPathValid(workstream.worktreePath),
+                        isActive: activityTracker.isActive(workstream.id),
                         hasActivePort: appEnv.hasActivePort(workstream.id),
                         githubURL: appEnv.githubURL(for: project.directory),
                         taskDescription: appEnv.taskDescription(for: workstream.worktreePath),
@@ -115,7 +155,7 @@ struct ProjectSidebar: View {
                         onPurge: { confirmPurge(workstream) }
                     )
                     .tag(SidebarSelection.workstream(workstream.id))
-                    .padding(.leading, 34)
+                    .padding(.leading, 28)
                 }
             }
         }
@@ -124,7 +164,11 @@ struct ProjectSidebar: View {
     private var bottomBar: some View {
         VStack(spacing: 4) {
             if let version = updateChecker.availableVersion {
-                UpdateBanner(version: version, releaseNotesURL: updateChecker.releaseNotesURL, updater: updater)
+                UpdateBanner(
+                    version: version,
+                    pendingReleases: updateChecker.pendingReleases,
+                    updater: updater
+                )
             }
 
             // Credit
@@ -208,12 +252,12 @@ struct ProjectSidebar: View {
                 )
             ) {
                 Button("Cancel", role: .cancel) { workstreamToPurge = nil }
-                Button(purgeWarningDirty ? "Purge Anyway" : "Purge", role: .destructive) {
+                Button(purgeWarningMessage != nil ? "Purge Anyway" : "Purge", role: .destructive) {
                     performPurge()
                 }
             } message: {
-                if purgeWarningDirty {
-                    Text("This workstream has uncommitted changes that will be lost.")
+                if let warning = purgeWarningMessage {
+                    Text(warning)
                 } else {
                     Text("The worktree and its branch will be permanently deleted.")
                 }
@@ -304,17 +348,7 @@ struct ProjectSidebar: View {
                     }
                     .onChange(of: selection) { _, sel in
                         guard let sel else { return }
-                        if case let .project(pid) = sel {
-                            expandedProjects.insert(pid)
-                        }
-                        if case let .workstream(wsID) = sel,
-                           let (pi, _) = cachedWorkstreamIndex[wsID]
-                        {
-                            expandedProjects.insert(projects[pi].id)
-                        }
-                        withAnimation {
-                            scrollProxy.scrollTo(sel, anchor: .center)
-                        }
+                        deferSelectionExpansion(sel, projectIDByWorkstreamID: projectIDByWorkstreamIDSnapshot(), scrollProxy: scrollProxy)
                     }
                 } // ScrollViewReader
 
@@ -435,13 +469,10 @@ struct ProjectSidebar: View {
     @EnvironmentObject private var appEnv: AppEnvironment
     @EnvironmentObject private var updateChecker: UpdateChecker
     @EnvironmentObject private var updater: Updater
+    @EnvironmentObject private var activityTracker: WorkstreamActivityTracker
 
     private func confirmPurge(_ workstream: Workstream) {
-        if let path = workstream.worktreePath, GitOperations.hasUncommittedChanges(at: path) {
-            purgeWarningDirty = true
-        } else {
-            purgeWarningDirty = false
-        }
+        purgeWarningMessage = WorkstreamArchiver.purgeWarning(for: workstream)
         workstreamToPurge = workstream.id
     }
 
@@ -588,13 +619,13 @@ extension FileManager {
     }
 }
 
-private func copyTextToPasteboard(_ text: String) {
+func copyTextToPasteboard(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
 }
 
 /// Opens a directory in the user's configured terminal, falling back to Apple Terminal.
-private func openDirectoryInTerminal(_ directory: String) {
+func openDirectoryInTerminal(_ directory: String) {
     let terminalBundleID = UserDefaults.standard.string(forKey: "factoryfloor.defaultTerminal") ?? ""
     let appURL: URL?
     if !terminalBundleID.isEmpty {
@@ -643,16 +674,16 @@ private struct ProjectHeaderRow: View {
             }
             .frame(width: 22)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
                     Text(project.name)
-                        .font(.system(.body, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
 
                     if !project.workstreams.isEmpty {
                         Text("\(project.workstreams.count)")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 5)
+                            .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(.quaternary)
                             .clipShape(Capsule())
@@ -661,7 +692,7 @@ private struct ProjectHeaderRow: View {
                 }
 
                 Text(project.directory.abbreviatedPath)
-                    .font(.caption)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -687,7 +718,7 @@ private struct ProjectHeaderRow: View {
             .opacity(isHovering ? 1 : 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 2)
+        .padding(.vertical, 1)
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
         .contextMenu {
@@ -723,6 +754,7 @@ private struct WorkstreamRow: View {
     var branchName: String?
     var worktreePath: String?
     let isPathValid: Bool
+    var isActive: Bool = false
     var hasActivePort: Bool = false
     var githubURL: URL?
     var taskDescription: String?
@@ -734,15 +766,20 @@ private struct WorkstreamRow: View {
 
     @State private var isHovering = false
 
-    /// Subtext to display below the workstream name.
-    /// Priority: PR title (#number) > branch name (only if different from workstream name)
+    private var headline: String {
+        if let prTitle { return prTitle }
+        if let taskDescription { return taskDescription }
+        return name
+    }
+
+    private var hasRichHeadline: Bool {
+        prTitle != nil || taskDescription != nil
+    }
+
     private var subtitle: String? {
         guard isPathValid else { return nil }
-        if let prTitle, let prNumber {
-            return "\(prTitle) #\(prNumber)"
-        }
-        if let taskDescription {
-            return taskDescription
+        if hasRichHeadline {
+            return branchName ?? name
         }
         if let branchName, branchName != name {
             return branchName
@@ -751,22 +788,19 @@ private struct WorkstreamRow: View {
     }
 
     var body: some View {
-        HStack {
-            if !isPathValid {
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .font(.system(size: 12))
-            }
+        HStack(spacing: 4) {
+            ActivityIndicator(isActive: isActive, isPathValid: isPathValid)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
-                    Text(name)
-                        .font(.system(.body))
+                    Text(headline)
+                        .font(.system(size: 12))
                         .strikethrough(!isPathValid)
                         .foregroundStyle(isPathValid ? .primary : .secondary)
+                        .lineLimit(1)
                     if hasActivePort {
                         Image(systemName: "circle.fill")
-                            .font(.system(size: 6))
+                            .font(.system(size: 5))
                             .foregroundStyle(.green)
                     }
                 }
@@ -780,7 +814,7 @@ private struct WorkstreamRow: View {
                         Text(subtitle)
                             .lineLimit(1)
                     }
-                    .font(.system(size: 10))
+                    .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(prState == "MERGED" ? AnyShapeStyle(.purple) : AnyShapeStyle(.tertiary))
                 }
             }
@@ -840,6 +874,38 @@ private struct WorkstreamRow: View {
                 Label("Purge", systemImage: "trash")
             }
         }
+    }
+}
+
+private struct ActivityIndicator: View {
+    let isActive: Bool
+    let isPathValid: Bool
+
+    @State private var isPulsing = false
+
+    var body: some View {
+        Group {
+            if !isPathValid {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.system(size: 10))
+            } else if isActive {
+                Circle()
+                    .fill(.green)
+                    .frame(width: 6, height: 6)
+                    .opacity(isPulsing ? 0.4 : 1.0)
+                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+                    .onAppear { isPulsing = true }
+                    .onChange(of: isActive) { _, active in
+                        isPulsing = active
+                    }
+            } else {
+                Circle()
+                    .fill(.tertiary)
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .frame(width: 12)
     }
 }
 
