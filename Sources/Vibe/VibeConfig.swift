@@ -39,7 +39,6 @@ struct VibeConfig: Codable, Sendable {
             "terraform.tfstate.backup",
             ".terraform",
             "volume",
-            "db/prisma-generated-clients",
         ],
         envPatterns: [".env", ".env.*"],
         postSetupCommands: []
