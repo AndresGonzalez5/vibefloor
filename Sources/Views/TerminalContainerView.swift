@@ -920,6 +920,7 @@ struct TerminalContainerView: View {
         tabs.append(tab)
         activeTab = tab
         saveTabSnapshot()
+        Telemetry.shared.track("tab_opened", url: "/tab/terminal", title: "Terminal Tab", data: ["kind": "terminal"])
     }
 
     private func addBrowser() {
@@ -929,6 +930,7 @@ struct TerminalContainerView: View {
         tabs.append(tab)
         activeTab = tab
         saveTabSnapshot()
+        Telemetry.shared.track("tab_opened", url: "/tab/browser", title: "Browser Tab", data: ["kind": "browser"])
     }
 
     private func openEditor() {
@@ -948,6 +950,7 @@ struct TerminalContainerView: View {
         activeTab = tab
         startFileTreeWatcherIfNeeded()
         saveTabSnapshot()
+        Telemetry.shared.track("tab_opened", url: "/tab/editor", title: "Editor Tab", data: ["kind": "editor"])
     }
 
     private func startFileTreeWatcherIfNeeded() {
@@ -1757,14 +1760,17 @@ struct SingleTerminalView: View {
                 surfaceCache.retrySurface(for: surfaceID)
             }
         } else {
-            TerminalSurfaceView(
-                surfaceID: surfaceID,
-                workingDirectory: workingDirectory,
-                command: command,
-                initialInput: initialInput,
-                isFocused: isFocused,
-                environmentVars: environmentVars
-            )
+            GeometryReader { geo in
+                TerminalSurfaceView(
+                    surfaceID: surfaceID,
+                    workingDirectory: workingDirectory,
+                    command: command,
+                    initialInput: initialInput,
+                    isFocused: isFocused,
+                    environmentVars: environmentVars,
+                    size: geo.size
+                )
+            }
         }
     }
 }
@@ -1801,6 +1807,7 @@ private struct TerminalSurfaceView: NSViewRepresentable {
     var initialInput: String?
     var isFocused: Bool = true
     var environmentVars: [String: String] = [:]
+    var size: CGSize
 
     @EnvironmentObject var surfaceCache: TerminalSurfaceCache
 
@@ -1833,6 +1840,14 @@ private struct TerminalSurfaceView: NSViewRepresentable {
                 terminalView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
                 terminalView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             ])
+        }
+
+        // Explicitly push the SwiftUI-measured size to the Ghostty surface.
+        // SwiftUI does not reliably call NSView.setFrameSize on resize
+        // (see Ghostty SurfaceView.swift:613-616), so we drive it from
+        // the GeometryReader instead.
+        if terminalView.window != nil {
+            terminalView.notifySizeChanged(size)
         }
 
         if isFocused {

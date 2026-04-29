@@ -426,6 +426,7 @@ struct ContentView: View {
                             worktreePath: worktreePath
                         )
                     }
+                    Telemetry.shared.track("workstream_created", url: "/workstream/create", title: "Workstream Created")
                     return
                 }
             }

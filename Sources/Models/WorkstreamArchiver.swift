@@ -75,6 +75,7 @@ enum WorkstreamArchiver {
             // Capture the branch name before the worktree is removed
             let branchName = GitOperations.currentBranch(at: worktreePath)
             archivingPaths.insert(standardizedPath)
+            Telemetry.shared.track("workstream_archived", url: "/workstream/archive", title: "Workstream Archived")
             Task.detached {
                 defer {
                     Task { @MainActor in
