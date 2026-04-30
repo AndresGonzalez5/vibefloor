@@ -15,6 +15,7 @@ struct ProjectOverviewView: View {
     @State private var worktrees: [WorktreeInfo] = []
     @State private var showingPruneConfirm = false
     @State private var isPruning = false
+    @State private var purgingPaths: Set<String> = []
 
     @AppStorage("factoryfloor.defaultTerminal") private var defaultTerminal: String = ""
     @State private var docFiles: [DocFile] = []
@@ -212,7 +213,7 @@ struct ProjectOverviewView: View {
                                 worktree: wt,
                                 projectDirectory: project.directory,
                                 isWorkstream: workstreamPaths.contains(Self.standardizedPath(wt.path)),
-                                isPurging: WorkstreamArchiver.archivingPaths.contains(Self.standardizedPath(wt.path)),
+                                isPurging: purgingPaths.contains(Self.standardizedPath(wt.path)),
                                 onAdopt: { adoptWorktree(wt) }
                             )
                         }
@@ -281,6 +282,7 @@ struct ProjectOverviewView: View {
         .onAppear {
             appEnv.refreshRepoInfo(for: project.directory)
             appEnv.refreshGitHubInfo(for: project.directory)
+            purgingPaths = WorkstreamArchiver.archivingPaths
             refreshWorktrees()
             loadDocFiles()
         }
@@ -290,13 +292,16 @@ struct ProjectOverviewView: View {
             worktrees = []
             docFiles = []
             selectedDoc = nil
+            purgingPaths = WorkstreamArchiver.archivingPaths
             refreshWorktrees()
             loadDocFiles()
         }
         .onReceive(NotificationCenter.default.publisher(for: WorkstreamArchiver.archivingDidComplete)) { _ in
+            purgingPaths = WorkstreamArchiver.archivingPaths
             refreshWorktrees()
         }
         .onReceive(NotificationCenter.default.publisher(for: WorkstreamArchiver.archivingDidStart)) { _ in
+            purgingPaths = WorkstreamArchiver.archivingPaths
             refreshWorktrees()
         }
         .popover(item: $selectedWorktreeForDetail, arrowEdge: .trailing) { wt in
@@ -496,6 +501,7 @@ private struct WorktreeInfoRow: View {
                                 .foregroundStyle(.green)
                         }
                     }
+                    .animation(nil, value: isPurging)
                 }
             }
             .frame(minHeight: 36, alignment: .leading)
