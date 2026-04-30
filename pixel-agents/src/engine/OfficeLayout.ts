@@ -122,17 +122,30 @@ const FLOOR_ZONES: FloorZone[] = [
 ];
 
 const DEFAULT_FLOOR_TILE = 2;
+const WORK_AREA_FLOOR_TILE = 5;
+const WORK_AREA_TINT = 'rgba(120,75,30,0.42)';
+
+// Decorative extension is laid out as a repeating 6-col module starting at coreCols.
+// `c` is the col offset relative to the start of the extension.
+//   c % 6 === 0 → row0: double_bookshelf
+//   c % 6 === 1 → row0: double_bookshelf, row1: desk + plant on row3 (only if next col exists)
+//   c % 6 === 2 → row1: pc (renderer auto-swaps to pc_off since no agent owns this tile)
+//   c % 6 === 3 → row1: bin
+//   c % 6 === 4 → row0: bookshelf, row1: desk + plant_2 on row3 (only if next col exists)
+//   c % 6 === 5 → row1: pc
+const EXTENSION_PERIOD = 6;
 
 export class OfficeLayout {
-  readonly cols = 17;
+  readonly coreCols = 17;
   readonly rows = 5;
   readonly tileSize = 16;
   readonly zoom = 3;
   readonly spawnTile: TileCoord = [0, 2];
-  readonly furniture: FurnitureItem[] = FURNITURE;
   readonly wanderTargets: WanderTarget[] = WANDER_TARGETS;
 
   private seats: Seat[];
+  private _extensionCols = 0;
+  private _extensionFurniture: FurnitureItem[] = [];
 
   constructor() {
     this.seats = SEATS.map((s) => ({
@@ -140,6 +153,70 @@ export class OfficeLayout {
       occupied: false,
       agentId: null,
     }));
+  }
+
+  get cols(): number {
+    return this.coreCols + this._extensionCols;
+  }
+
+  get extensionCols(): number {
+    return this._extensionCols;
+  }
+
+  get furniture(): FurnitureItem[] {
+    return this._extensionCols > 0 ? [...FURNITURE, ...this._extensionFurniture] : FURNITURE;
+  }
+
+  setExtensionCols(extra: number): void {
+    const clamped = Math.max(0, Math.floor(extra));
+    if (clamped === this._extensionCols) return;
+    this._extensionCols = clamped;
+    this._extensionFurniture = this.buildExtensionFurniture(clamped);
+  }
+
+  private buildExtensionFurniture(extra: number): FurnitureItem[] {
+    if (extra <= 0) return [];
+    const items: FurnitureItem[] = [];
+    for (let c = 0; c < extra; c++) {
+      const col = this.coreCols + c;
+      const mod = c % EXTENSION_PERIOD;
+      const hasNext = c + 1 < extra;
+
+      switch (mod) {
+        case 0:
+          items.push({ type: 'bookshelf', tile: [col, 0], spriteKey: 'double_bookshelf', blocksMovement: true });
+          break;
+        case 1:
+          items.push({ type: 'bookshelf', tile: [col, 0], spriteKey: 'double_bookshelf', blocksMovement: true });
+          if (hasNext) {
+            items.push({ type: 'desk', tile: [col, 1], spriteKey: 'desk_front', blocksMovement: true });
+            items.push({ type: 'plant', tile: [col, 3], spriteKey: 'plant', blocksMovement: true });
+          } else {
+            items.push({ type: 'plant', tile: [col, 1], spriteKey: 'plant', blocksMovement: true });
+          }
+          break;
+        case 2:
+          // PC sits on the desk emitted at c-1. Renderer swaps to pc_off when no agent owns the tile.
+          items.push({ type: 'pc', tile: [col, 1], spriteKey: 'pc_on', blocksMovement: true });
+          break;
+        case 3:
+          items.push({ type: 'bin', tile: [col, 1], spriteKey: 'bin', blocksMovement: false });
+          break;
+        case 4:
+          items.push({ type: 'bookshelf', tile: [col, 0], spriteKey: 'bookshelf', blocksMovement: true });
+          if (hasNext) {
+            items.push({ type: 'desk', tile: [col, 1], spriteKey: 'desk_front', blocksMovement: true });
+            items.push({ type: 'plant', tile: [col, 3], spriteKey: 'plant_2', blocksMovement: true });
+          } else {
+            items.push({ type: 'plant', tile: [col, 1], spriteKey: 'plant_2', blocksMovement: true });
+          }
+          break;
+        case 5:
+          items.push({ type: 'pc', tile: [col, 1], spriteKey: 'pc_on', blocksMovement: true });
+          break;
+      }
+    }
+    return items;
   }
 
   initBlockedTiles(tileMap: TileMap): void {
@@ -216,6 +293,10 @@ export class OfficeLayout {
         return zone.tileIndex;
       }
     }
+    // Extension area: continue the warm work-area flooring on rows 1-2
+    if (col >= this.coreCols && row >= 1 && row <= 2) {
+      return WORK_AREA_FLOOR_TILE;
+    }
     return DEFAULT_FLOOR_TILE;
   }
 
@@ -226,6 +307,9 @@ export class OfficeLayout {
           row >= zone.rowStart && row <= zone.rowEnd) {
         return zone.tint ?? null;
       }
+    }
+    if (col >= this.coreCols && row >= 1 && row <= 2) {
+      return WORK_AREA_TINT;
     }
     return null;
   }

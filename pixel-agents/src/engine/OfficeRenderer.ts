@@ -85,6 +85,18 @@ export class OfficeRenderer {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    if (this.layout && this.tileMap) {
+      const tilePx = TILE_SIZE * ZOOM;
+      const fittedCols = Math.max(this.layout.coreCols, Math.floor(w / tilePx));
+      const extra = fittedCols - this.layout.coreCols;
+      if (extra !== this.layout.extensionCols) {
+        this.layout.setExtensionCols(extra);
+        this.tileMap.setCols(this.layout.cols);
+        this.tileMap.clearBlocks();
+        this.layout.initBlockedTiles(this.tileMap);
+      }
+    }
   }
 
   private loop(time: number): void {
@@ -394,6 +406,25 @@ export class OfficeRenderer {
       if (smallPainting2) {
         const paintX = 10 * ts;
         this.sprites.drawFurniture(ctx, smallPainting2, paintX, CONTENT_TOP - smallPainting2.height * ZOOM + 6, ZOOM);
+      }
+
+      // Periodic paintings across the decorative extension. Extension cols where
+      // c % 6 === 5 are bookshelf-free on row 0, so paintings hang cleanly above them.
+      if (this.layout && this.layout.extensionCols > 0) {
+        const smallPainting = this.sprites.getFurniture('small_painting');
+        const smallPainting2Alt = this.sprites.getFurniture('small_painting_2') ?? smallPainting;
+        const coreCols = this.layout.coreCols;
+        const totalCols = this.layout.cols;
+        let alt = 0;
+        for (let col = coreCols; col < totalCols; col++) {
+          const c = col - coreCols;
+          if (c % 6 !== 5) continue;
+          const sprite = alt % 2 === 0 ? smallPainting : smallPainting2Alt;
+          alt++;
+          if (!sprite) continue;
+          const paintX = col * ts + (ts - sprite.width * ZOOM) / 2;
+          this.sprites.drawFurniture(ctx, sprite, paintX, CONTENT_TOP - sprite.height * ZOOM + 6, ZOOM);
+        }
       }
     } else {
       // Legacy: single painting centered

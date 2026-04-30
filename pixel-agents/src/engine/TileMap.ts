@@ -3,7 +3,7 @@
 export type TileCoord = [number, number]; // [col, row]
 
 export class TileMap {
-  readonly cols: number;
+  cols: number;
   readonly rows: number;
   private tileSize: number;
   private zoom: number;
@@ -18,6 +18,14 @@ export class TileMap {
 
   private key(col: number, row: number): string {
     return `${col},${row}`;
+  }
+
+  setCols(cols: number): void {
+    this.cols = cols;
+  }
+
+  clearBlocks(): void {
+    this.blocked.clear();
   }
 
   block(col: number, row: number): void {

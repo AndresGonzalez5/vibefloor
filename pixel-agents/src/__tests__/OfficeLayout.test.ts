@@ -10,8 +10,10 @@ describe('OfficeLayout', () => {
   });
 
   describe('constants', () => {
-    it('has 16 cols, 5 rows, tileSize 16, zoom 3', () => {
-      expect(layout.cols).toBe(16);
+    it('has 17 cols by default, 5 rows, tileSize 16, zoom 3', () => {
+      expect(layout.cols).toBe(17);
+      expect(layout.coreCols).toBe(17);
+      expect(layout.extensionCols).toBe(0);
       expect(layout.rows).toBe(5);
       expect(layout.tileSize).toBe(16);
       expect(layout.zoom).toBe(3);
