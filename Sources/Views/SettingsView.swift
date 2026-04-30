@@ -12,7 +12,6 @@ struct SettingsView: View {
     @AppStorage("factoryfloor.autoRenameBranch") private var autoRenameBranch: Bool = false
     @AppStorage("factoryfloor.defaultTerminal") private var defaultTerminal: String = ""
     @AppStorage("factoryfloor.defaultBrowser") private var defaultBrowser: String = ""
-    @AppStorage("factoryfloor.branchPrefix") private var branchPrefix: String = "ff"
     @AppStorage("factoryfloor.appearance") private var appearance: String = "system"
     @AppStorage("factoryfloor.symlinkEnv") private var symlinkEnv: Bool = true
     @AppStorage("factoryfloor.confirmQuit") private var confirmQuit: Bool = true
@@ -113,27 +112,6 @@ struct SettingsView: View {
                             }
                         }
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    LabeledContent("Branch prefix") {
-                        TextField("", text: Binding(
-                            get: { branchPrefix },
-                            set: { newValue in
-                                let filtered = String(newValue.lowercased().filter { $0.isLetter || $0 == "-" })
-                                    .replacingOccurrences(of: "--", with: "-")
-                                let trimmed = filtered.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-                                branchPrefix = trimmed
-                                // Explicit write to ensure empty strings persist in UserDefaults
-                                UserDefaults.standard.set(trimmed, forKey: "factoryfloor.branchPrefix")
-                            }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 150)
-                    }
-                    Text("e.g. \(branchPrefix.isEmpty ? "" : "\(branchPrefix)/")deploy-ludicrous-speed")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.tertiary)
                 }
 
                 SettingToggle(

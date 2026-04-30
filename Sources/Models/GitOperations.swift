@@ -148,14 +148,12 @@ enum GitOperations {
 
     /// Create a git worktree for a workstream, branching off the default branch.
     /// Returns the worktree path on success, nil on failure.
-    static func createWorktree(projectPath: String, projectName: String, workstreamName: String, branchPrefix: String = "ff", symlinkEnv: Bool = true) -> String? {
+    static func createWorktree(projectPath: String, projectName: String, workstreamName: String, symlinkEnv: Bool = true) -> String? {
         let worktreeDir = AppConstants.worktreesDirectory
             .appendingPathComponent(sanitize(projectName))
             .appendingPathComponent(sanitize(workstreamName))
 
-        let branchName = branchPrefix.isEmpty
-            ? workstreamName
-            : "\(branchPrefix)/\(workstreamName)"
+        let branchName = workstreamName
 
         // Fetch the default branch so worktrees start from the latest remote ref
         fetchDefaultBranch(at: projectPath)

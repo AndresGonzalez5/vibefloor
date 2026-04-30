@@ -57,14 +57,12 @@ actor AsyncSetupService {
     ///   - projectPath: Path to the main project/repo root
     ///   - projectName: Name of the project
     ///   - workstreamName: Name for the new workstream/branch
-    ///   - branchPrefix: Prefix for the git branch (default: "vibe")
     /// - Returns: The worktree path if worktree creation succeeded, nil otherwise.
     func setup(
         workstreamID: UUID,
         projectPath: String,
         projectName: String,
-        workstreamName: String,
-        branchPrefix: String = "vibe"
+        workstreamName: String
     ) async -> String? {
         // Step 1: Create worktree (must complete first)
         await updateState(for: workstreamID, to: .inProgress(step: "Creating worktree", progress: 0.1))
@@ -76,7 +74,6 @@ actor AsyncSetupService {
                     projectPath: projectPath,
                     projectName: projectName,
                     workstreamName: workstreamName,
-                    branchPrefix: branchPrefix,
                     symlinkEnv: false // We handle env files ourselves
                 )
                 continuation.resume(returning: path)
