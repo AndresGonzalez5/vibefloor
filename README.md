@@ -131,6 +131,7 @@ Every workstream terminal has access to:
 | `Cmd+T` | New Terminal |
 | `Cmd+B` | New Browser |
 | `Cmd+O` | New Editor |
+| `Cmd+J` | Toggle pixel agents |
 | `Cmd+S` | Save (Editor) |
 | `Cmd+Shift+S` | Save As (Editor) |
 | `Cmd+W` | Close tab |

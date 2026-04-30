@@ -165,6 +165,7 @@ Factory Floor prioriza el teclado. Aquí está todo.
 | ⌘Return | Foco en Coding Agent |
 | ⌘T | Nuevo Terminal |
 | ⌘B | Nuevo navegador |
+| ⌘J | Mostrar/ocultar agentes píxel |
 | ⌘W | Cerrar tab |
 | ⌘Shift+W | Archivar workstream |
 | ⌘L | Barra de direcciones (navegador) |

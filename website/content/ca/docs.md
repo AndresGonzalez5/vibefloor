@@ -165,6 +165,7 @@ Factory Floor prioritza el teclat. Aquí tens tot.
 | ⌘Return | Focus Coding Agent |
 | ⌘T | Nou Terminal |
 | ⌘B | Nou navegador |
+| ⌘J | Mostra/oculta agents píxel |
 | ⌘W | Tanca tab |
 | ⌘Shift+W | Arxiva workstream |
 | ⌘L | Barra d'adreces (navegador) |
