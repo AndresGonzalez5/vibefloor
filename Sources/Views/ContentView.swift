@@ -499,7 +499,7 @@ struct ContentView: View {
         }
     }
 
-    /// Update workstream names to match their branch name (without prefix).
+    /// Update workstream names to match their branch name.
     /// Called periodically so that when the agent renames a branch, the sidebar reflects it.
     private func syncWorkstreamNamesFromBranches() {
         var changed = false
@@ -507,10 +507,8 @@ struct ContentView: View {
             for wi in projects[pi].workstreams.indices {
                 let ws = projects[pi].workstreams[wi]
                 guard let branch = appEnvironment.branchName(for: ws.worktreePath) else { continue }
-                // Strip the prefix (everything up to and including the last "/")
-                let shortName = branch.contains("/") ? String(branch.split(separator: "/").last ?? Substring(branch)) : branch
-                if shortName != ws.name {
-                    projects[pi].workstreams[wi].name = shortName
+                if branch != ws.name {
+                    projects[pi].workstreams[wi].name = branch
                     changed = true
                 }
             }

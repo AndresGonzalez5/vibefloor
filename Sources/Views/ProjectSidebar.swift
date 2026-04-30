@@ -450,7 +450,6 @@ struct ProjectSidebar: View {
 
         let projectPath = project.directory
         let projectName = project.name
-        let prefix = branchPrefix
         let symlink = symlinkEnv
         let workstreamID = workstream.id
 
@@ -459,7 +458,6 @@ struct ProjectSidebar: View {
                 projectPath: projectPath,
                 projectName: projectName,
                 workstreamName: name,
-                branchPrefix: prefix,
                 symlinkEnv: symlink
             )
             DispatchQueue.main.async {
@@ -564,7 +562,6 @@ struct ProjectSidebar: View {
     }
 
     @AppStorage("factoryfloor.baseDirectory") private var baseDirectory: String = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
-    @AppStorage("factoryfloor.branchPrefix") private var branchPrefix: String = "ff"
 
     private func openDirectoryPicker() {
         let panel = NSOpenPanel()

@@ -22,13 +22,11 @@ enum VibeWorktreeCreator {
     ///   - projectPath: Path to the main project/repo root
     ///   - projectName: Name of the project (used for worktree directory naming)
     ///   - workstreamName: Name for the new workstream/branch
-    ///   - branchPrefix: Prefix for the git branch (default: "vibe")
     /// - Returns: SetupResult on success, nil if worktree creation failed
     static func create(
         projectPath: String,
         projectName: String,
-        workstreamName: String,
-        branchPrefix: String = "vibe"
+        workstreamName: String
     ) -> SetupResult? {
         let config = VibeConfig.load(from: projectPath)
         var errors: [String] = []
@@ -39,7 +37,6 @@ enum VibeWorktreeCreator {
             projectPath: projectPath,
             projectName: projectName,
             workstreamName: workstreamName,
-            branchPrefix: branchPrefix,
             symlinkEnv: false // We handle env files ourselves
         ) else {
             logger.warning("Failed to create git worktree")
