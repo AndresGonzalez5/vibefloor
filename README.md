@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/alltuner/factoryfloor/main/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" height="128" alt="Factory Floor">
+  <img src="https://raw.githubusercontent.com/AndresGonzalez5/vibefloor/main/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" height="128" alt="VibeFloor">
 </p>
 
-<h1 align="center">Factory Floor</h1>
+<h1 align="center">VibeFloor</h1>
 
 <p align="center">
   <strong>AI-powered development workspace for macOS</strong><br>
