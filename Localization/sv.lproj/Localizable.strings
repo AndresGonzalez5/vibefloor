@@ -96,6 +96,7 @@
 "Clean" = "Rent";
 "Uncommitted changes" = "Osparade ändringar";
 "Archiving..." = "Arkiverar...";
+"Purging..." = "Rensar...";
 "Commits ahead" = "Commits före";
 "Open as workstream" = "Öppna som arbetsflöde";
 "Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream." = "Arbetsträd på disk för detta repository. Rensning tar bort rena arbetsträd som inte är associerade med ett arbetsflöde.";

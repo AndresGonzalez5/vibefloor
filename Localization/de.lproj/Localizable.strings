@@ -95,6 +95,7 @@
 "Prune" = "Bereinigen";
 "Clean" = "Sauber";
 "Uncommitted changes" = "Nicht committete Änderungen";
+"Purging..." = "Wird gelöscht...";
 "Commits ahead" = "Commits voraus";
 "Open as workstream" = "Als Workstream öffnen";
 "Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream." = "Worktrees auf der Festplatte für dieses Repository. Beim Bereinigen werden saubere Worktrees entfernt, die keinem Workstream zugeordnet sind.";

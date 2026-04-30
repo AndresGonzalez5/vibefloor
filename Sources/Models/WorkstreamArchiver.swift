@@ -10,6 +10,9 @@ enum WorkstreamArchiver {
     /// Posted on MainActor when a background worktree removal finishes.
     static let archivingDidComplete = Notification.Name("FFWorktreeArchivingComplete")
 
+    /// Posted on MainActor when a background worktree removal begins.
+    static let archivingDidStart = Notification.Name("FFWorktreeArchivingStart")
+
     /// Removes a workstream from the project without deleting the worktree from disk.
     /// Kills running terminals and tmux sessions but leaves files intact.
     @MainActor
@@ -75,6 +78,7 @@ enum WorkstreamArchiver {
             // Capture the branch name before the worktree is removed
             let branchName = GitOperations.currentBranch(at: worktreePath)
             archivingPaths.insert(standardizedPath)
+            NotificationCenter.default.post(name: archivingDidStart, object: nil)
             Telemetry.shared.track("workstream_archived", url: "/workstream/archive", title: "Workstream Archived")
             Task.detached {
                 defer {

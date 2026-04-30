@@ -96,6 +96,7 @@
 "Clean" = "Limpio";
 "Uncommitted changes" = "Cambios sin confirmar";
 "Archiving..." = "Archivando...";
+"Purging..." = "Purgando...";
 "Commits ahead" = "Commits por delante";
 "Open as workstream" = "Abrir como flujo de trabajo";
 "Worktrees on disk for this repository. Pruning removes clean worktrees that are not associated with a workstream." = "Árboles de trabajo en disco para este repositorio. La limpieza elimina los árboles de trabajo limpios que no están asociados a un flujo de trabajo.";

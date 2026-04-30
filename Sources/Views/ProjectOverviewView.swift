@@ -212,6 +212,7 @@ struct ProjectOverviewView: View {
                                 worktree: wt,
                                 projectDirectory: project.directory,
                                 isWorkstream: workstreamPaths.contains(Self.standardizedPath(wt.path)),
+                                isPurging: WorkstreamArchiver.archivingPaths.contains(Self.standardizedPath(wt.path)),
                                 onAdopt: { adoptWorktree(wt) }
                             )
                         }
@@ -293,6 +294,9 @@ struct ProjectOverviewView: View {
             loadDocFiles()
         }
         .onReceive(NotificationCenter.default.publisher(for: WorkstreamArchiver.archivingDidComplete)) { _ in
+            refreshWorktrees()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: WorkstreamArchiver.archivingDidStart)) { _ in
             refreshWorktrees()
         }
         .popover(item: $selectedWorktreeForDetail, arrowEdge: .trailing) { wt in
@@ -425,6 +429,7 @@ private struct WorktreeInfoRow: View {
     let worktree: WorktreeInfo
     let projectDirectory: String
     let isWorkstream: Bool
+    var isPurging: Bool = false
     let onAdopt: () -> Void
 
     @EnvironmentObject var appEnv: AppEnvironment
@@ -460,7 +465,15 @@ private struct WorktreeInfoRow: View {
                                 .foregroundStyle(prColor)
                             }
                         }
-                        if worktree.isDirty {
+                        if isPurging {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Purging...")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        } else if worktree.isDirty {
                             HStack(spacing: 4) {
                                 Circle()
                                     .fill(.orange)
@@ -491,7 +504,7 @@ private struct WorktreeInfoRow: View {
                 Text("main")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if !isWorkstream {
+            } else if !isWorkstream && !isPurging {
                 Button(action: onAdopt) {
                     HStack(spacing: 4) {
                         Image(systemName: "plus.rectangle.on.folder")
