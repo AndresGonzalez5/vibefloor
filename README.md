@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/AndresGonzalez5/vibefloor/main/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" height="128" alt="VibeFloor">
+  <img src="https://raw.githubusercontent.com/AndresGonzalez5/vibefloor/main/Resources/Assets.xcassets/AppIconDebug.appiconset/256.png" width="128" height="128" alt="VibeFloor">
 </p>
 
 <h1 align="center">VibeFloor</h1>
