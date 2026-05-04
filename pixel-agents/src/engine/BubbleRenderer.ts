@@ -2,7 +2,7 @@
 // Phase 3: placeholder visuals (filled rect with border + triangle pointer).
 // API is designed for sprite-based rendering when hand-drawn icons are available.
 
-export type BubbleIcon = 'search' | 'edit' | 'terminal' | 'wait' | 'error' | 'done' | 'briefing' | 'reporting';
+export type BubbleIcon = 'search' | 'edit' | 'terminal' | 'wait' | 'permission' | 'error' | 'done' | 'briefing' | 'reporting';
 
 export interface BubbleState {
   icon: BubbleIcon;
@@ -41,6 +41,7 @@ const ICON_LABELS: Record<BubbleIcon, string> = {
   edit: '✏️',
   terminal: '💻',
   wait: '💭',
+  permission: '❗',
   error: '⚠️',
   done: '✅',
   briefing: '📋',

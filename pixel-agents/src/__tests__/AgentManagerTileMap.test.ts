@@ -519,14 +519,27 @@ describe('AgentManager with TileMap + OfficeLayout', () => {
       expect(agent.bubbleState!.holdDuration).toBe(1.5);
     });
 
-    it('agentWaiting creates wait bubble', () => {
+    it('agentWaiting creates persistent permission bubble', () => {
       manager.createAgent('a1', 'Alice');
       for (let i = 0; i < 30; i++) manager.updateAll(0.1);
 
       manager.handleEvent({ type: 'agentWaiting', agentId: 'a1' });
       const agent = manager.getAgent('a1')!;
       expect(agent.bubbleState).not.toBeNull();
-      expect(agent.bubbleState!.icon).toBe('wait');
+      expect(agent.bubbleState!.icon).toBe('permission');
+      expect(agent.bubbleState!.holdDuration).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    it('agentIdle clears the persistent permission bubble', () => {
+      manager.createAgent('a1', 'Alice');
+      for (let i = 0; i < 30; i++) manager.updateAll(0.1);
+
+      manager.handleEvent({ type: 'agentWaiting', agentId: 'a1' });
+      const agent = manager.getAgent('a1')!;
+      expect(agent.bubbleState!.icon).toBe('permission');
+
+      manager.handleEvent({ type: 'agentIdle', agentId: 'a1' });
+      expect(agent.bubbleState).toBeNull();
     });
 
     it('bubble state is cleared after full fade lifecycle', () => {

@@ -182,22 +182,34 @@ export class OfficeRenderer {
       for (const agent of agents) {
         if (agent.tileY !== row) continue;
         const sm = agent.stateMachine;
-        const isWorking = sm.state === 'type' || sm.state === 'read';
 
-        // Only draw chair when agent is actively working at the desk
-        if (isWorking && agent.targetSeat !== null) {
-          const seat = layout.getSeat(agent.id);
-          if (seat) {
-            const chairImg = this.sprites.getFurniture('chair_back');
-            if (chairImg) {
-              const chairPos = tileMap.tileToPixel(seat.chairTile[0], seat.chairTile[1]);
-              // Position chair behind (below) the agent sprite — chair back peeks out below
-              this.sprites.drawFurniture(ctx, chairImg, chairPos.x, chairPos.y + 16 * ZOOM, ZOOM);
-            }
+        // Draw chair whenever the agent is physically seated at its own
+        // chair tile and not in a transient effect. Gating on position
+        // (not state) keeps walking/wandering chair-less and lets idle/
+        // wait/type/read all read as "sitting at the computer."
+        const seat = agent.targetSeat !== null ? layout.getSeat(agent.id) : null;
+        const isSeated =
+          seat !== null &&
+          agent.path === null &&
+          agent.tileX === seat.chairTile[0] &&
+          agent.tileY === seat.chairTile[1] &&
+          sm.state !== 'spawning' &&
+          sm.state !== 'despawning' &&
+          sm.state !== 'wandering'; // fidget micro-behavior: stand momentarily
+        if (isSeated && seat) {
+          const chairImg = this.sprites.getFurniture('chair_back');
+          if (chairImg) {
+            const chairPos = tileMap.tileToPixel(seat.chairTile[0], seat.chairTile[1]);
+            this.sprites.drawFurniture(ctx, chairImg, chairPos.x, chairPos.y + 16 * ZOOM, ZOOM);
           }
         }
 
-        // Draw character at pixel position (with matrix effect if active)
+        // Draw character at pixel position (with matrix effect if active).
+        // When seated at desk in idle/wait, override the standing-neutral
+        // idle frame ([1]) with a seated pose (frame 3) so the agent reads
+        // as "sitting and thinking" instead of standing in front of the PC.
+        const seatedIdleFrame =
+          isSeated && (sm.state === 'idle' || sm.state === 'wait') ? 3 : null;
         if (agent.matrixState) {
           MatrixEffect.draw(ctx, this.sprites, agent, ZOOM);
         } else {
@@ -205,7 +217,7 @@ export class OfficeRenderer {
             ctx,
             agent.palette,
             sm.direction,
-            sm.getCurrentFrame(),
+            seatedIdleFrame ?? sm.getCurrentFrame(),
             agent.pixelX,
             agent.pixelY,
             ZOOM,
@@ -260,7 +272,12 @@ export class OfficeRenderer {
     for (let i = 0; i < Math.min(numStations, MAX_WORKSTATIONS); i++) {
       const sx = WORKSTATION_BASE_X + i * WORKSTATION_SPACING;
       const agent = agents[i];
-      const isWorking = agent && (agent.stateMachine.state === 'type' || agent.stateMachine.state === 'read');
+      const isWorking = agent && (
+        agent.stateMachine.state === 'type' ||
+        agent.stateMachine.state === 'read' ||
+        agent.stateMachine.state === 'idle' ||
+        agent.stateMachine.state === 'wait'
+      );
 
       // Layer 1: Chair (behind character)
       if (isWorking) {

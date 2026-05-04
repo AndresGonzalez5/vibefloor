@@ -662,7 +662,7 @@ export class AgentManager {
         agent.lastEventTime = performance.now();
         agent.idleTimer = 0;
         agent.stateMachine.transition('wait');
-        agent.bubbleState = BubbleRenderer.show('wait');
+        agent.bubbleState = BubbleRenderer.show('permission', Number.POSITIVE_INFINITY);
         break;
       }
     }
@@ -789,6 +789,10 @@ export class AgentManager {
           agent.lastEventTime = performance.now();
           agent.idleTimer = 0;
           agent.stateMachine.transition('idle');
+          // Clear the persistent permission bubble when leaving wait.
+          if (agent.bubbleState?.icon === 'permission') {
+            agent.bubbleState = null;
+          }
         }
         break;
       }
@@ -811,7 +815,7 @@ export class AgentManager {
         agent.lastEventTime = performance.now();
         agent.idleTimer = 0;
         agent.stateMachine.transition('wait');
-        agent.bubbleState = BubbleRenderer.show('wait');
+        agent.bubbleState = BubbleRenderer.show('permission', Number.POSITIVE_INFINITY);
         break;
       }
       case 'agentStatus': {
