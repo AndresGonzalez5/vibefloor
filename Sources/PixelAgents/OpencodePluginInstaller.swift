@@ -13,7 +13,10 @@ enum OpencodePluginInstaller {
     /// v9: remove debug file logging, deduplicate description handling.
     /// v10: session_id on all payloads, question-tool user-waiting signal,
     /// session_switched reset, bus/direct tool-event dedupe, per-session info fingerprint.
-    private static let pluginVersion = 10
+    /// v11: question-tool variants (askquestion/AskUserQuestion), explicit
+    /// replied signal distinct from the working heartbeat, subagent waits
+    /// raise row attention.
+    private static let pluginVersion = 11
 
     private static var pluginsDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser

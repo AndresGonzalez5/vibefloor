@@ -163,13 +163,20 @@ roster. The same guard exists for Claude: a changed `transcript_path`
 mid-stream drops the old snapshot (roster untouched — concurrent Claudes
 share the main run and can't be split).
 
-The `question` tool (no dedicated bus event exists) is reported as
-`tool_start` **plus** `permission_required`, so a pending user question shows
-the orange "Waiting for approval" state and never decays into "Stalled". Its
-activity text maps to "Asking question", never the raw tool name. Tool events
-are deduped between the direct `tool.execute.*` hooks (primary) and the
-`event:`-bus copies, so a future CLI version delivering both won't
-double-fire and mask real stalls.
+Question tools (`question`, `askquestion`, `AskUserQuestion` — normalized
+exact match, never substring, so editing question-related code doesn't count)
+are reported as `tool_start` **plus** `permission_required`, so a pending user
+question shows the orange "Waiting for approval" state and never decays into
+"Stalled". Permission prompts (`permission.asked`) and `question.asked` raise
+the same state — one intent: the user has to do something — from any live run,
+main or subagent. Replies arrive as an explicit `replied` signal, distinct
+from the `working` streaming heartbeat: heartbeats keep runs alive but never
+clear waiting, so a question answered mid-stream can't flip back to Working
+and then stall. Each waiting run carries its own flag; any live waiter
+suppresses the stall sweep. Activity text maps to "Asking question", never the
+raw tool name. Tool events are deduped between the direct `tool.execute.*`
+hooks (primary) and the `event:`-bus copies, so a future CLI version
+delivering both won't double-fire and mask real stalls.
 
 Limits come from `ContextLimits`: 200k tokens by default, 1M when the model
 ID contains `[1m]` or `-1m` (case-insensitive, e.g.
