@@ -784,4 +784,100 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.runs(for: wsID)[0].state, .working)
         XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
     }
+
+    // MARK: - Question-tool variants and waiting semantics
+
+    func testIsQuestionToolMatchesVariants() {
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("question"))
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("Question"))
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("askquestion"))
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("AskQuestion"))
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("AskUserQuestion"))
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("ask_user_question"))
+        XCTAssertTrue(HookEventReceiver.isQuestionTool("ask-question"))
+        XCTAssertFalse(HookEventReceiver.isQuestionTool("edit"))
+        XCTAssertFalse(HookEventReceiver.isQuestionTool("questionnaire"))
+        XCTAssertFalse(HookEventReceiver.isQuestionTool("faq_questions"))
+        XCTAssertFalse(HookEventReceiver.isQuestionTool(""))
+    }
+
+    /// Working *on* question-related code must not look like asking the user:
+    /// matching is exact-normalized, never substring or content-based.
+    func testWorkingOnQuestionCodeDoesNotCountAsAsking() {
+        XCTAssertFalse(HookEventReceiver.isQuestionTool("questionnaire"))
+        let filePathInput: [String: Any] = ["file_path": "/repo/Sources/Question.swift"]
+        XCTAssertEqual(
+            HookEventReceiver.activityDescription(toolName: "edit", toolInput: filePathInput),
+            String(format: NSLocalizedString("Editing %@", comment: ""), "Question.swift")
+        )
+        for tool in ["askquestion", "AskUserQuestion", "ask_user_question"] {
+            XCTAssertEqual(
+                HookEventReceiver.activityDescription(toolName: tool, toolInput: nil),
+                NSLocalizedString("Asking question", comment: "")
+            )
+        }
+    }
+
+    /// The streaming heartbeat must keep the run alive without answering the
+    /// prompt — this was the intermittent Working → Stalled flake.
+    func testHeartbeatDoesNotClearPermission() {
+        tracker.currentSelection = wsID
+        handle(.waiting(agentId: "main"))
+        handle(.status(agentId: "main", status: "permissionRequired"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+
+        handle(.toolStart(agentId: "main", tool: "respond"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+        XCTAssertEqual(tracker.runs(for: wsID)[0].activity, nil)
+    }
+
+    /// The explicit replied signal clears waiting immediately (distinct from
+    /// the heartbeat) and drops the "Asking question" activity text.
+    func testRepliedSignalClearsPermission() {
+        tracker.currentSelection = wsID
+        handle(.waiting(agentId: "main"))
+        handle(.toolStart(agentId: "main", tool: "question", activity: "Asking question"))
+        handle(.status(agentId: "main", status: "permissionRequired"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+
+        handle(.toolStart(agentId: "main", tool: "reply"))
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+        XCTAssertNil(tracker.runs(for: wsID)[0].activity)
+    }
+
+    /// A subagent waiting on input raises row-level attention too (the user
+    /// must act for it to proceed) and suppresses the stall sweep.
+    func testSubagentPermissionRaisesRowAttentionAndSkipsStall() {
+        tracker.currentSelection = wsID
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "ses_child", name: "build", palette: 1))
+        handle(.status(agentId: "ses_child", status: "permissionRequired"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+
+        backdateMainRun(secondsAgo: WorkstreamAgentStateTracker.stallThreshold + 10)
+        tracker._backdateRun(
+            agentId: "ses_child",
+            workstreamID: wsID,
+            lastEventAt: Date().addingTimeInterval(-(WorkstreamAgentStateTracker.stallThreshold + 10))
+        )
+        tracker.sweepForStalls(now: Date())
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+        XCTAssertTrue(tracker.runs(for: wsID).allSatisfy { $0.state == .working })
+    }
+
+    /// Clearing one waiter must not clear the row while another run still waits.
+    func testRowStaysInPermissionUntilLastWaiterReplies() {
+        tracker.currentSelection = wsID
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "ses_child", name: "build", palette: 1))
+        handle(.status(agentId: "main", status: "permissionRequired"))
+        handle(.status(agentId: "ses_child", status: "permissionRequired"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+
+        handle(.toolStart(agentId: "ses_child", tool: "reply"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+
+        handle(.toolStart(agentId: "main", tool: "reply"))
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
 }

@@ -250,9 +250,24 @@ final class HookEventReceiver: @unchecked Sendable {
         return palette
     }
 
+    /// True when the tool name is a user-question tool (OpenCode `question`,
+    /// legacy `askquestion`, Claude `AskUserQuestion`). Normalized exact match —
+    /// never substring — so editing code about questions (e.g. `Question.swift`
+    /// via `edit`) or unrelated tools like `questionnaire` do not match.
+    static func isQuestionTool(_ toolName: String) -> Bool {
+        let normalized = toolName.lowercased().replacingOccurrences(of: "_", with: "").replacingOccurrences(of: "-", with: "")
+        return normalized == "question" || normalized == "askquestion" || normalized == "askuserquestion"
+    }
+
     /// Maps a tool name (and, when available, its input) to a short human-readable
     /// activity description for the sidebar roster, e.g. "Editing Foo.swift".
     static func activityDescription(toolName: String, toolInput: [String: Any]?) -> String? {
+        // Question tools block on the user's answer. Never surface the raw
+        // tool name (see tool_start mapping, which raises permissionRequired
+        // alongside).
+        if isQuestionTool(toolName) {
+            return NSLocalizedString("Asking question", comment: "Agent is asking the user a question")
+        }
         let filePath = (toolInput?["file_path"] as? String) ?? (toolInput?["notebook_path"] as? String)
         let baseName = filePath.map { URL(fileURLWithPath: $0).lastPathComponent }
 
@@ -277,11 +292,6 @@ final class HookEventReceiver: @unchecked Sendable {
             return NSLocalizedString("Browsing", comment: "Agent is fetching web content")
         case "todowrite", "todoread":
             return NSLocalizedString("Planning", comment: "Agent is updating its task plan")
-        case "question":
-            // OpenCode's built-in question tool: the agent is blocked asking
-            // the user something. Never surface the raw tool name (see
-            // tool_start mapping, which raises permissionRequired alongside).
-            return NSLocalizedString("Asking question", comment: "Agent is asking the user a question")
         case "task":
             return NSLocalizedString("Delegating", comment: "Agent is delegating to a subagent")
         default:
@@ -326,7 +336,15 @@ final class HookEventReceiver: @unchecked Sendable {
             let aid = agentId(from: eventInput)
             let activity = Self.activityDescription(toolName: toolName, toolInput: eventInput["tool_input"] as? [String: Any])
             logger.info("Hook PreToolUse: \(toolName, privacy: .public) agent=\(aid, privacy: .public)")
-            return [AgentEvent.toolStart(agentId: aid, tool: toolName, activity: activity)]
+            let toolEvent = AgentEvent.toolStart(agentId: aid, tool: toolName, activity: activity)
+            // Claude's AskUserQuestion blocks on the user's answer like
+            // OpenCode's question tool. Tool event first, status second: the
+            // tracker clears permission on tool activity, so status must win.
+            if Self.isQuestionTool(toolName) {
+                let status = AgentEvent.status(agentId: aid, status: "permissionRequired")
+                return [toolEvent, status]
+            }
+            return [toolEvent]
 
         case "PostToolUse":
             let aid = agentId(from: eventInput)
@@ -396,13 +414,13 @@ final class HookEventReceiver: @unchecked Sendable {
             let activity = Self.activityDescription(toolName: toolName, toolInput: toolInput)
             var event = AgentEvent.toolStart(agentId: aid, tool: toolName, activity: activity, sessionID: sessionID)
             event.name = name
-            // The `question` tool blocks on the user's answer without ending
-            // the session and without a dedicated bus event (the plugin also
-            // sends permission_required for it, but belt-and-braces here
+            // Question tools block on the user's answer without ending the
+            // session and without a dedicated bus event (the plugin also
+            // sends permission_required for them, but belt-and-braces here
             // covers older plugin versions that only sent tool_start).
             // Tool event first, status second: the tracker clears permission
             // on tool activity, so status must win the ordering.
-            if toolName.lowercased() == "question" {
+            if Self.isQuestionTool(toolName) {
                 let status = AgentEvent.status(agentId: aid, status: "permissionRequired", sessionID: sessionID)
                 return [event, status]
             }
@@ -425,6 +443,15 @@ final class HookEventReceiver: @unchecked Sendable {
             event.name = name
             return [event]
 
+        case "replied":
+            // Explicit user-answered signal (permission/question reply).
+            // Distinct from the "respond" streaming heartbeat so the tracker
+            // can clear waiting immediately instead of waiting for the next
+            // real tool call.
+            var replied = AgentEvent.toolStart(agentId: aid, tool: "reply", sessionID: sessionID)
+            replied.name = name
+            return [replied]
+
         case "agent_info":
             // Attribute refresh (display name, model, context) — no state change.
             // Prefer the plugin-computed total; older plugins may send the raw
@@ -444,9 +471,10 @@ final class HookEventReceiver: @unchecked Sendable {
 
         case "permission_required":
             // Permission and question prompts both block on user input;
-            // they surface identically as row-level attention. Attribute to
-            // the requesting agent when the plugin reports one; the tracker
-            // only raises row-level attention for the main agent.
+            // they surface identically as row-level attention (one intent:
+            // the user has to do something). Attribute to the requesting
+            // agent when the plugin reports one; the tracker raises
+            // row-level attention for any live waiter, main or subagent.
             return [AgentEvent.status(agentId: aid, status: "permissionRequired", sessionID: sessionID)]
 
         case "session_switched":

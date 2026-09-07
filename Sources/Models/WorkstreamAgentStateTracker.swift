@@ -65,6 +65,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         /// (OpenCode subtask parts); rendered as a roster subtitle. Kept out of
         /// `name` so sprite selection keeps keying off the agent type.
         var taskDescription: String?
+        /// True while this run blocks on user input (permission prompt or
+        /// question tool). Waiting runs never sweep to stalled, and any live
+        /// waiter suppresses the row-level stall promotion.
+        var isWaitingForUser: Bool = false
         let startedAt: Date
         var lastEventAt: Date
     }
@@ -206,11 +210,31 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         liveSessionIDs.insert(wsID)
         detectSessionSwitch(wsID: wsID, event: event)
         updateRoster(wsID: wsID, event: event)
+        // Permission/question prompts block forward progress no matter which
+        // run asked — a subagent waiting on input still needs the user to act,
+        // so any live waiter raises row-level attention (decision: option A).
+        if event.type == .agentStatus, event.status == "permissionRequired" {
+            states[wsID] = .needsAttention(.permission)
+        }
         if event.agentId == "main" {
             updateMainState(wsID: wsID, event: event)
             if let transcriptPath = event.transcriptPath {
                 refreshContextUsage(wsID: wsID, transcriptPath: transcriptPath, force: event.type == .agentIdle)
             }
+        } else if event.type == .agentToolStart, event.tool != "respond" {
+            // A subagent resuming real tool activity clears row attention only
+            // once no live run still waits on the user.
+            clearPermissionIfNoWaiters(wsID: wsID, event: event)
+        }
+    }
+
+    /// Clears row-level permission attention after tool activity, unless some
+    /// other live run is still waiting on the user.
+    private func clearPermissionIfNoWaiters(wsID: UUID, event: AgentEvent) {
+        guard case .needsAttention(.permission) = states[wsID] else { return }
+        let stillWaiting = rosters[wsID]?.contains(where: { $0.isWaitingForUser }) ?? false
+        if !stillWaiting {
+            states[wsID] = .working
         }
     }
 
@@ -338,11 +362,23 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             list.removeAll { $0.id == event.agentId }
 
         case .agentToolStart:
+            // Tool kinds: "respond" is the streaming heartbeat (keeps the run
+            // alive but never answers a prompt); "reply" is an explicit
+            // user-answered signal from the plugin; anything else is real tool
+            // activity. A new user turn (agentWaiting) also clears waiting.
             upsert(event.agentId, name: event.name) { run in
-                run.activity = event.activity ?? run.activity
-                if run.state == .stalled { run.state = .working }
+                if event.tool == "reply" {
+                    run.activity = nil
+                    run.isWaitingForUser = false
+                } else if event.tool == "respond" {
+                    // Heartbeat only — keep activity text and waiting flag.
+                } else {
+                    run.activity = event.activity ?? run.activity
+                    run.isWaitingForUser = false
+                }
+                if run.state == .stalled, !run.isWaitingForUser { run.state = .working }
             }
-            if event.agentId == "main", state(for: wsID) == .stalled {
+            if event.agentId == "main", state(for: wsID) == .stalled, event.tool != "respond" {
                 states[wsID] = .working
             }
 
@@ -353,7 +389,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentWaiting:
-            upsert(event.agentId, name: event.name)
+            upsert(event.agentId, name: event.name) { run in
+                run.isWaitingForUser = false
+            }
 
         case .agentInfo:
             // Attribute-only refresh: update an existing run's name/model
@@ -414,8 +452,19 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             break
 
         case .agentStatus:
-            // Permission prompts don't change the roster; the sweep skips
-            // workstreams whose main agent is awaiting the user.
+            // A permission/question prompt marks that run as waiting on the
+            // user (row-level attention is raised in handle(), for any agent).
+            // Other statuses (e.g. idle nudges) just prove liveness.
+            // Waiting is keyed off tool identity and structured bus events,
+            // never off code content — editing files about questions or
+            // permissions does not land here.
+            if event.status == "permissionRequired" {
+                upsert(event.agentId, name: event.name) { run in
+                    run.isWaitingForUser = true
+                }
+            } else if let idx = list.firstIndex(where: { $0.id == event.agentId }) {
+                list[idx].lastEventAt = now
+            }
             break
         }
 
@@ -466,11 +515,21 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentToolStart, .agentToolDone:
-            // Tool activity while we were awaiting permission means the user
-            // already answered the prompt (there's no explicit "granted" hook).
-            // Otherwise no state change — prevents flicker between tools.
+            // Real tool activity while awaiting permission means the user
+            // answered the prompt (there's no explicit "granted" hook).
+            // The "respond" streaming heartbeat must never clear it — that's
+            // what used to flip question-waits back to Working right before
+            // they decayed into Stalled. Otherwise no state change — prevents
+            // flicker between tools. Only clears when no other live run still
+            // waits (a sibling may still block on the user).
+            if event.tool == "respond" { break }
             if case .needsAttention(.permission) = states[wsID] {
-                states[wsID] = .working
+                let stillWaiting = rosters[wsID]?.contains(where: {
+                    $0.isWaitingForUser && $0.id != event.agentId
+                }) ?? false
+                if !stillWaiting {
+                    states[wsID] = .working
+                }
             }
 
         case .agentCreated, .agentRemoved, .agentInfo:
@@ -512,9 +571,13 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             var updated = list
             var changed = false
             let rowState = states[wsID] ?? .idle
+            // Any live waiter (main or subagent) suppresses stalling: waiting
+            // on the user isn't stalling, even if row state hasn't caught up.
+            let anyWaiting = updated.contains(where: { $0.isWaitingForUser })
             for idx in updated.indices {
                 guard updated[idx].state == .working, updated[idx].lastEventAt < cutoff else { continue }
-                // Waiting on the user isn't stalling.
+                if updated[idx].isWaitingForUser { continue }
+                if anyWaiting { continue }
                 if case .needsAttention(.permission) = rowState { continue }
                 updated[idx].state = .stalled
                 changed = true

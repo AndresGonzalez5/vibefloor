@@ -103,6 +103,18 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
     return prev !== undefined && Date.now() - prev < TOOL_BUS_DEDUPE_WINDOW_MS
   }
 
+  // True for user-question tools (built-in `question`, legacy
+  // `askquestion`, Claude-parity `AskUserQuestion`). Normalized exact match —
+  // never substring — so working on question-related code (e.g. editing
+  // QuestionView.swift via `edit`) or unrelated tools like `questionnaire`
+  // never count as asking the user. Keep in sync with
+  // HookEventReceiver.isQuestionTool.
+  function isQuestionTool(tool) {
+    if (typeof tool !== "string") return false
+    const normalized = tool.toLowerCase().replace(/[_-]/g, "")
+    return normalized === "question" || normalized === "askquestion" || normalized === "askuserquestion"
+  }
+
   function cappedDescription(raw) {
     if (typeof raw !== "string") return ""
     const trimmed = raw.trim()
@@ -268,10 +280,10 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
             name: displayNameFor(sessionID),
             session_id: sessionID || undefined,
           })
-          // The `question` tool blocks mid-turn on the user's answer without
+          // Question tools block mid-turn on the user's answer without
           // ending the session and without a dedicated bus event; surface it
           // as user-waiting so the row doesn't sit on "Working" then stall.
-          if (tool === "question") {
+          if (isQuestionTool(tool)) {
             await send({
               kind: "permission_required",
               agent_id: aid,
@@ -394,9 +406,11 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
           break
         }
         case "permission.replied": {
+          // Explicit user-answered signal: distinct from the "working"
+          // streaming heartbeat so the app clears waiting immediately.
           const sessionID = extractSessionID(properties)
           await send({
-            kind: "working",
+            kind: "replied",
             agent_id: agentIdFor(sessionID),
             name: displayNameFor(sessionID),
             session_id: sessionID || undefined,
@@ -419,9 +433,11 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
         }
         case "question.replied":
         case "question.rejected": {
+          // Explicit user-answered signal: distinct from the "working"
+          // streaming heartbeat so the app clears waiting immediately.
           const sessionID = extractSessionID(properties)
           await send({
-            kind: "working",
+            kind: "replied",
             agent_id: agentIdFor(sessionID),
             name: displayNameFor(sessionID),
             session_id: sessionID || undefined,
@@ -557,7 +573,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
       // Primary question-tool signal: no dedicated question bus event exists
       // in current CLI versions (see the tool.execute.before bus case, which
       // mirrors this as a fallback if delivery ever moves to the bus).
-      if (tool === "question") {
+      if (isQuestionTool(tool)) {
         void send({
           kind: "permission_required",
           agent_id: aid,
