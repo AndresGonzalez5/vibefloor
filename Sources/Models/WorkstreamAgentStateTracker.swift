@@ -47,7 +47,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         /// later events may refine it once the harness reports the agent type.
         var name: String
         let palette: Int
-        let isMain: Bool
+        /// False for delegated subagents. Var, not let: a child's first event
+        /// can be a tool_start (creating a provisional main-flagged run)
+        /// before its session_created lands and reclassifies it.
+        var isMain: Bool
         /// Per-type occurrence slot: the lowest index not held by a live
         /// same-type run at creation. Drives sprite-set cycling in the roster
         /// (sprite shown is `variantIndex % setCount`).
@@ -244,6 +247,13 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     private func detectSessionSwitch(wsID: UUID, event: AgentEvent) {
         // Explicit harness signal (opencode `session_switched`) always wins.
         if event.type == .agentSessionSwitched, let sid = event.sessionID, !sid.isEmpty {
+            // A switch target matching a live roster run is a misattributed
+            // child session (e.g. a subagent prompt misread as a conversation
+            // switch), never a new conversation — ignore it, don't wipe.
+            if (rosters[wsID]?.contains(where: { $0.id == sid })) == true {
+                logger.info("Session switch to live run \(sid, privacy: .public) in workstream \(wsID) — ignoring")
+                return
+            }
             if currentSessionIDs[wsID] != sid {
                 logger.info("Session switched in workstream \(wsID) — resetting to new session")
                 resetToNewSession(wsID: wsID, sessionID: sid)
@@ -261,9 +271,23 @@ final class WorkstreamAgentStateTracker: ObservableObject {
            let sid = event.sessionID, !sid.isEmpty {
             if let current = currentSessionIDs[wsID] {
                 if current != sid {
-                    logger.info("New harness session in workstream \(wsID) — resetting to new session")
-                    resetToNewSession(wsID: wsID, sessionID: sid)
-                    currentTranscriptPaths.removeValue(forKey: wsID)
+                    // A new prompt on an unknown session usually means a
+                    // resumed/switched conversation — but with live subagents
+                    // it is more likely a misattributed straggler than a real
+                    // switch, so preserve the roster and only repoint the
+                    // tracked session + context. Explicit session_switched
+                    // still performs the full reset above.
+                    if (rosters[wsID]?.contains(where: { !$0.isMain })) == true {
+                        logger.info("New harness session with live subagents in workstream \(wsID) — preserving roster")
+                        currentSessionIDs[wsID] = sid
+                        contextUsage.removeValue(forKey: wsID)
+                        lastContextReadAt.removeValue(forKey: wsID)
+                        currentTranscriptPaths.removeValue(forKey: wsID)
+                    } else {
+                        logger.info("New harness session in workstream \(wsID) — resetting to new session")
+                        resetToNewSession(wsID: wsID, sessionID: sid)
+                        currentTranscriptPaths.removeValue(forKey: wsID)
+                    }
                 }
             } else {
                 currentSessionIDs[wsID] = sid
@@ -337,6 +361,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             let fallbackName = NSLocalizedString("Sub-agent", comment: "Fallback name for an unnamed subagent")
             let name = event.name ?? fallbackName
             if let idx = list.firstIndex(where: { $0.id == event.agentId }) {
+                // session_created is authoritative: this id is a subagent, even
+                // if its first-seen event (e.g. an early tool_start) provisionally
+                // created it as main.
+                list[idx].isMain = false
                 if !name.isEmpty, name != list[idx].name {
                     list[idx].name = name
                 }
@@ -366,7 +394,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // alive but never answers a prompt); "reply" is an explicit
             // user-answered signal from the plugin; anything else is real tool
             // activity. A new user turn (agentWaiting) also clears waiting.
-            upsert(event.agentId, name: event.name) { run in
+            // Only the "main" id is the main run — a child's early tool_start
+            // (before its session_created) must not mint a main-flagged ghost.
+            upsert(event.agentId, name: event.name, isMain: event.agentId == "main") { run in
                 if event.tool == "reply" {
                     run.activity = nil
                     run.isWaitingForUser = false
@@ -389,7 +419,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentWaiting:
-            upsert(event.agentId, name: event.name) { run in
+            upsert(event.agentId, name: event.name, isMain: event.agentId == "main") { run in
                 run.isWaitingForUser = false
             }
 
@@ -422,11 +452,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentIdle:
-            // Main going idle ends the whole turn; a child idling removes
-            // only that child. Snapshot the main run's last known context
-            // figures first — OpenCode reports them per-run only, and the
-            // roster is about to clear, but the row keeps showing usage
-            // until the next turn.
+            // Main going idle ends its own run; live subagents keep working
+            // (the parent often idles right after delegating). Snapshot the
+            // main run's last known context figures first — OpenCode reports
+            // them per-run only, and the row keeps showing usage until the
+            // next turn.
             if event.agentId == "main" {
                 // A late idle from a superseded session must not wipe the
                 // new conversation's live roster or re-snapshot stale figures.
@@ -441,7 +471,13 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                    limit > 0 {
                     contextUsage[wsID] = ContextUsage(usedTokens: used, limitTokens: limit)
                 }
-                list.removeAll()
+                // ponytail: main idle removes only main while children live;
+                // children leave via their own idle. Full clear only when alone.
+                if list.contains(where: { !$0.isMain }) {
+                    list.removeAll { $0.isMain }
+                } else {
+                    list.removeAll()
+                }
             } else {
                 list.removeAll { $0.id == event.agentId }
             }
@@ -459,7 +495,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // never off code content — editing files about questions or
             // permissions does not land here.
             if event.status == "permissionRequired" {
-                upsert(event.agentId, name: event.name) { run in
+                upsert(event.agentId, name: event.name, isMain: event.agentId == "main") { run in
                     run.isWaitingForUser = true
                 }
             } else if let idx = list.firstIndex(where: { $0.id == event.agentId }) {

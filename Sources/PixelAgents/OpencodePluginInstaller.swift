@@ -16,7 +16,13 @@ enum OpencodePluginInstaller {
     /// v11: question-tool variants (askquestion/AskUserQuestion), explicit
     /// replied signal distinct from the working heartbeat, subagent waits
     /// raise row attention.
-    private static let pluginVersion = 11
+    /// v12: flush subtask children buffered before the main session binds
+    /// (fresh worktree / resume), so delegated subagents always emit
+    /// session_created and appear in the sidebar.
+    /// v13: never treat a subagent's own prompt (chat.message with a child
+    /// session id) as a conversation switch — it hijacked currentSession and
+    /// wiped the just-created roster card via a bogus session_switched.
+    private static let pluginVersion = 13
 
     private static var pluginsDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser
