@@ -326,7 +326,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         let now = Date()
         var list = rosters[wsID] ?? []
 
-        func upsert(_ agentId: String, name: String? = nil, palette: Int = 0, isMain: Bool = true, variantIndex: Int = 0, mutate: (inout AgentRun) -> Void = { _ in }) {
+        func upsert(_ agentId: String, name: String? = nil, palette: Int = 0, isMain: Bool, variantIndex: Int = 0, mutate: (inout AgentRun) -> Void = { _ in }) {
             if let idx = list.firstIndex(where: { $0.id == agentId }) {
                 mutate(&list[idx])
                 // Harnesses may report the display name after a run's first
@@ -430,7 +430,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // that case create the MAIN run so its context figures land —
             // subagents are still never created from info alone.
             if event.agentId == "main", !list.contains(where: { $0.id == "main" }) {
-                upsert("main", name: event.name) { run in
+                upsert("main", name: event.name, isMain: true) { run in
                     run.model = event.model ?? run.model
                     run.contextUsedTokens = event.contextUsedTokens ?? run.contextUsedTokens
                     run.contextLimitTokens = event.contextLimitTokens ?? run.contextLimitTokens
@@ -537,6 +537,17 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             if let sid = event.sessionID,
                let current = currentSessionIDs[wsID],
                sid != current {
+                return
+            }
+            // The parent often idles right after delegating while subagents
+            // keep working — the row must keep showing working, not flip to
+            // idle/justFinished underneath live cards. A live permission
+            // waiter still wins over working.
+            if rosters[wsID]?.contains(where: { !$0.isMain }) == true {
+                if case .needsAttention(.permission) = states[wsID] {
+                    return
+                }
+                states[wsID] = .working
                 return
             }
             if currentSelection == wsID {

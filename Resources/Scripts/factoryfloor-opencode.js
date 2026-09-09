@@ -54,6 +54,12 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
 
   // childSessionID -> display name ("build", "plan", "general", custom agents)
   const children = new Map()
+  // Ids known to belong to delegated subagents: registered via a subtask
+  // part or a session.created with a parentID. Separate from `children`
+  // (which displayNameFor also populates for any unknown session) so a
+  // legitimate new conversation id seen on a tool event first is never
+  // mistaken for a subagent prompt.
+  const delegatedChildren = new Set()
   // Child sessions whose subtask description has already been forwarded; the
   // subtask part re-fires as it updates, so guard against duplicate posts.
   const describedChildren = new Set()
@@ -206,14 +212,14 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
     return !!sessionID && !!currentSession && sessionID !== currentSession
   }
 
-  /// True when the id belongs to a delegated subagent rather than the main
-  /// conversation: registered via a subtask part / session.created, or
-  /// buffered while the main session was still unknown. opencode fires the
-  /// chat.message hook for a subagent's own initial prompt with the CHILD
-  /// session id — without this guard that prompt hijacks currentSession and
-  /// emits a bogus session_switched that wipes the just-created roster card.
+  // True when the id belongs to a delegated subagent rather than the main
+  // conversation: registered via a subtask part / session.created, or
+  // buffered while the main session was still unknown. opencode fires the
+  // chat.message hook for a subagent's own initial prompt with the CHILD
+  // session id — without this guard that prompt hijacks currentSession and
+  // emits a bogus session_switched that wipes the just-created roster card.
   function isKnownChild(id) {
-    return !!id && (children.has(id) || pendingDescriptions.has(id))
+    return !!id && (delegatedChildren.has(id) || pendingDescriptions.has(id))
   }
 
   function agentIdFor(sessionID) {
@@ -292,6 +298,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
   function registerChild(sessionID, agentName) {
     if (!sessionID || !agentName) return false
     children.set(sessionID, agentName)
+    delegatedChildren.add(sessionID)
     return true
   }
 
@@ -408,9 +415,9 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
             // Also register the name now so flushPendingChildren can send the
             // real agent type once the main session binds.
             if (childID && description) pendingDescriptions.set(childID, description)
+            const isNew = childID ? !children.has(childID) : false
             if (childID) registerChild(childID, agentName)
             if (childID && currentSession && childID !== currentSession) {
-              const isNew = !children.has(childID)
               if (isNew || (description && !describedChildren.has(childID))) {
                 registerChild(childID, agentName)
                 if (description) {

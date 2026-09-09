@@ -457,6 +457,24 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["ses_a"])
     }
 
+    /// Parent idling after delegating must not flip the row to idle or
+    /// justFinished underneath live cards.
+    func testMainIdleWithLiveChildrenKeepsRowWorking() {
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
+        handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
+
+    /// A live permission waiter still wins over working when main idles.
+    func testMainIdleWithLiveChildrenPreservesPermission() {
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
+        handle(.status(agentId: "ses_a", status: "permissionRequired"))
+        handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+    }
+
     func testMainIdleAloneClearsRoster() {
         handle(.waiting(agentId: "main"))
         handle(.idle(agentId: "main"))
@@ -497,6 +515,12 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
         handle(.waiting(agentId: "main", sessionID: "ses_2"))
         XCTAssertEqual(tracker.runs(for: wsID).filter({ !$0.isMain }).map(\.id), ["ses_a"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+        // The tracked session repointed: a late idle from the old session
+        // must not wipe the preserved roster.
+        handle(.idle(agentId: "main", sessionID: "ses_1"))
+        XCTAssertEqual(tracker.runs(for: wsID).filter({ !$0.isMain }).map(\.id), ["ses_a"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
     }
 
     func testExplicitSwitchClearsLiveSubagents() {
