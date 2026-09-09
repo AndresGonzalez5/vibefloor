@@ -54,6 +54,12 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
 
   // childSessionID -> display name ("build", "plan", "general", custom agents)
   const children = new Map()
+  // Ids known to belong to delegated subagents: registered via a subtask
+  // part or a session.created with a parentID. Separate from `children`
+  // (which displayNameFor also populates for any unknown session) so a
+  // legitimate new conversation id seen on a tool event first is never
+  // mistaken for a subagent prompt.
+  const delegatedChildren = new Set()
   // Child sessions whose subtask description has already been forwarded; the
   // subtask part re-fires as it updates, so guard against duplicate posts.
   const describedChildren = new Set()
@@ -144,7 +150,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
     return active
   }
 
-  function adoptSession(id, { switched = false } = {}) {
+  async function adoptSession(id, { switched = false } = {}) {
     if (!id || typeof id !== "string") return
     if (currentSession === id) return
     // Quick actions run in the same worktree; never repoint the resume
@@ -167,10 +173,53 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
         previous_session_id: previous,
       })
     }
+    // Flush subtask children that arrived before the main session was bound
+    // (fresh worktree, deleted state file, resume without session.created).
+    // Without this their session_created was buffered but never sent and the
+    // roster never showed them.
+    await flushPendingChildren()
+  }
+
+  // Sends buffered session_created events for children seen while
+  // currentSession was still unknown. Called right after adoptSession binds.
+  async function flushPendingChildren() {
+    if (!currentSession) return
+    for (const [childID, desc] of [...pendingDescriptions]) {
+      if (!childID || childID === currentSession) {
+        pendingDescriptions.delete(childID)
+        continue
+      }
+      if (describedChildren.has(childID)) {
+        pendingDescriptions.delete(childID)
+        continue
+      }
+      const agentName = children.get(childID) || FALLBACK_AGENT_NAME
+      if (!children.has(childID)) children.set(childID, agentName)
+      describedChildren.add(childID)
+      pendingDescriptions.delete(childID)
+      if (pendingTaskQueue.length > 0 && pendingTaskQueue[0] === desc) pendingTaskQueue.shift()
+      await send({
+        kind: "session_created",
+        session_id: childID,
+        parent_session_id: currentSession,
+        agent_type: agentName,
+        ...(desc ? { description: desc } : {}),
+      })
+    }
   }
 
   function isChild(sessionID) {
     return !!sessionID && !!currentSession && sessionID !== currentSession
+  }
+
+  // True when the id belongs to a delegated subagent rather than the main
+  // conversation: registered via a subtask part / session.created, or
+  // buffered while the main session was still unknown. opencode fires the
+  // chat.message hook for a subagent's own initial prompt with the CHILD
+  // session id — without this guard that prompt hijacks currentSession and
+  // emits a bogus session_switched that wipes the just-created roster card.
+  function isKnownChild(id) {
+    return !!id && (delegatedChildren.has(id) || pendingDescriptions.has(id))
   }
 
   function agentIdFor(sessionID) {
@@ -249,6 +298,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
   function registerChild(sessionID, agentName) {
     if (!sessionID || !agentName) return false
     children.set(sessionID, agentName)
+    delegatedChildren.add(sessionID)
     return true
   }
 
@@ -362,9 +412,12 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
             }
             // Always remember the description for the session.created fallback
             // path, even when we cannot send yet (e.g. currentSession unknown).
+            // Also register the name now so flushPendingChildren can send the
+            // real agent type once the main session binds.
             if (childID && description) pendingDescriptions.set(childID, description)
+            const isNew = childID ? !children.has(childID) : false
+            if (childID) registerChild(childID, agentName)
             if (childID && currentSession && childID !== currentSession) {
-              const isNew = !children.has(childID)
               if (isNew || (description && !describedChildren.has(childID))) {
                 registerChild(childID, agentName)
                 if (description) {
@@ -500,7 +553,9 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
             // A fresh top-level session replaces the tracked conversation
             // (e.g. /new in the TUI). Resumed sessions emit no
             // session.created, so any new id here is a genuine switch.
-            adoptSession(id, { switched: true })
+            // Known subtask children are skipped: without parentID yet they
+            // would otherwise hijack the resume pointer (see chat.message).
+            if (!isKnownChild(id)) await adoptSession(id, { switched: true })
           }
           break
         }
@@ -515,13 +570,17 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
       // is the earliest bind signal. A message on an already-bound but
       // different session means the user switched (e.g. resumed another
       // session in the same worktree): reset, don't conflate.
-      if (inputSession && currentSession && inputSession !== currentSession) {
-        adoptSession(inputSession, { switched: true })
-      } else if (!currentSession && inputSession) {
-        adoptSession(inputSession)
+      // A subagent's own initial prompt also lands here with the CHILD id —
+      // it must never repoint the resume pointer or reset the roster for it;
+      // its session_created + tool events already represent it.
+      const childPrompt = isKnownChild(inputSession)
+      if (!childPrompt && inputSession && currentSession && inputSession !== currentSession) {
+        await adoptSession(inputSession, { switched: true })
+      } else if (!currentSession && inputSession && !childPrompt) {
+        await adoptSession(inputSession)
       }
 
-      if (!quickActionActive()) {
+      if (!childPrompt && !quickActionActive()) {
         await send({ kind: "waiting", agent_id: "main", name: "OpenCode", session_id: inputSession || undefined })
       }
 

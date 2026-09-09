@@ -450,11 +450,117 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["main"])
     }
 
-    func testMainIdleClearsRemainingChildren() {
+    func testMainIdlePreservesLiveChildren() {
         handle(.waiting(agentId: "main"))
         handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
         handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["ses_a"])
+    }
+
+    /// Parent idling after delegating must not flip the row to idle or
+    /// justFinished underneath live cards.
+    func testMainIdleWithLiveChildrenKeepsRowWorking() {
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
+        handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
+
+    /// A live permission waiter still wins over working when main idles.
+    func testMainIdleWithLiveChildrenPreservesPermission() {
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
+        handle(.status(agentId: "ses_a", status: "permissionRequired"))
+        handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+    }
+
+    func testMainIdleAloneClearsRoster() {
+        handle(.waiting(agentId: "main"))
+        handle(.idle(agentId: "main"))
         XCTAssertEqual(tracker.activeRunCount(for: wsID), 0)
+    }
+
+    /// Two parallel subagents each running one bash tool: both cards appear,
+    /// each clears independently, main idle does not wipe the survivor.
+    func testTwoParallelBashSubagents() {
+        handle(.waiting(agentId: "main", sessionID: "ses_main"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1, parentAgentId: "main", taskDescription: "First task"))
+        handle(.created(agentId: "ses_b", name: "Plan", palette: 2, parentAgentId: "main", taskDescription: "Second task"))
+        handle(.toolStart(agentId: "ses_a", tool: "bash", activity: "Running command", sessionID: "ses_a"))
+        handle(.toolStart(agentId: "ses_b", tool: "bash", activity: "Running command", sessionID: "ses_b"))
+
+        var subs = tracker.runs(for: wsID).filter { !$0.isMain }
+        XCTAssertEqual(subs.map(\.id).sorted(), ["ses_a", "ses_b"])
+        XCTAssertEqual(subs.first(where: { $0.id == "ses_a" })?.activity, "Running command")
+        XCTAssertEqual(subs.first(where: { $0.id == "ses_b" })?.activity, "Running command")
+
+        handle(.idle(agentId: "ses_a"))
+        subs = tracker.runs(for: wsID).filter { !$0.isMain }
+        XCTAssertEqual(subs.map(\.id), ["ses_b"])
+
+        // Parent idling after delegating must not wipe the live child.
+        handle(.idle(agentId: "main", sessionID: "ses_main"))
+        subs = tracker.runs(for: wsID).filter { !$0.isMain }
+        XCTAssertEqual(subs.map(\.id), ["ses_b"])
+
+        handle(.idle(agentId: "ses_b"))
+        XCTAssertTrue(tracker.runs(for: wsID).filter({ !$0.isMain }).isEmpty)
+    }
+
+    /// Implicit session switch with live subagents preserves the roster;
+    /// explicit session_switched still performs the full reset.
+    func testImplicitSwitchPreservesLiveSubagents() {
+        handle(.waiting(agentId: "main", sessionID: "ses_1"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
+        handle(.waiting(agentId: "main", sessionID: "ses_2"))
+        XCTAssertEqual(tracker.runs(for: wsID).filter({ !$0.isMain }).map(\.id), ["ses_a"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+        // The tracked session repointed: a late idle from the old session
+        // must not wipe the preserved roster.
+        handle(.idle(agentId: "main", sessionID: "ses_1"))
+        XCTAssertEqual(tracker.runs(for: wsID).filter({ !$0.isMain }).map(\.id), ["ses_a"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
+
+    func testExplicitSwitchClearsLiveSubagents() {
+        handle(.waiting(agentId: "main", sessionID: "ses_1"))
+        handle(.created(agentId: "ses_a", name: "Explore", palette: 1))
+        handle(.sessionSwitched(sessionID: "ses_2"))
+        XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+    }
+
+    /// A switch target matching a live roster run is a misattributed child
+    /// session (subagent prompt read as a conversation switch), never a new
+    /// conversation — the roster must survive it.
+    func testSessionSwitchedToLiveChildIsIgnored() {
+        handle(.waiting(agentId: "main", sessionID: "ses_main"))
+        handle(.created(agentId: "ses_a", name: "general", palette: 1))
+        handle(.sessionSwitched(sessionID: "ses_a"))
+        XCTAssertEqual(tracker.runs(for: wsID).filter({ !$0.isMain }).map(\.id), ["ses_a"])
+    }
+
+    /// A child's tool_start can precede its session_created (observed 8ms
+    /// earlier in the live log). The provisional run must reclassify as a
+    /// subagent once created lands — not stay a main-flagged ghost.
+    func testToolStartBeforeCreatedStillYieldsSubagent() {
+        handle(.waiting(agentId: "main", sessionID: "ses_main"))
+        handle(.toolStart(agentId: "ses_a", tool: "bash", activity: "Running command", sessionID: "ses_a"))
+        handle(.created(agentId: "ses_a", name: "general", palette: 1, parentAgentId: "main", taskDescription: "Run single bash"))
+        let sub = tracker.runs(for: wsID).first(where: { $0.id == "ses_a" })
+        XCTAssertNotNil(sub)
+        XCTAssertFalse(sub?.isMain ?? true)
+        XCTAssertEqual(sub?.taskDescription, "Run single bash")
+    }
+
+    /// A waiting event for a non-main id (e.g. a subagent prompt forwarded
+    /// by the harness) must not mint a main-flagged ghost run.
+    func testWaitingFromChildIdDoesNotCreateMainGhost() {
+        handle(.waiting(agentId: "main", sessionID: "ses_main"))
+        handle(.waiting(agentId: "ses_a", sessionID: "ses_a"))
+        let mains = tracker.runs(for: wsID).filter(\.isMain)
+        XCTAssertEqual(mains.map(\.id), ["main"])
+        XCTAssertEqual(tracker.runs(for: wsID).first(where: { $0.id == "ses_a" })?.isMain, false)
     }
 
     // MARK: - Name and attribute refinement
