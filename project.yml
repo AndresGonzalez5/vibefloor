@@ -203,6 +203,10 @@ targets:
     settings:
       base:
         PRODUCT_NAME: ff-run
+        # ff-run executes with the workstream directory as CWD, so coverage
+        # instrumentation (Xcode default ON) would dump default.profraw into
+        # the user's repo on every run. The helper has no unit-tested code.
+        ENABLE_CODE_COVERAGE: NO
         OTHER_LDFLAGS:
           - -lproc
       configs:
