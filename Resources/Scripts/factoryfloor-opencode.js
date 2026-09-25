@@ -4,6 +4,7 @@
 // ABOUTME: instructions from .factoryfloor-state/instructions.md to each turn.
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { spawn } from "node:child_process"
 
 const PORT_FILE = `${process.env.HOME}/Library/Caches/factoryfloor/hook-port`
 const STATE_DIR = ".factoryfloor-state"
@@ -79,6 +80,35 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
   const recentDirectToolSends = new Map() // windowKey -> timestamp ms
   const seenToolCallIDs = new Set()
   const TOOL_BUS_DEDUPE_WINDOW_MS = 1000
+
+  // Like Claude Code's built-in inhibitor: hold `caffeinate -i` while any
+  // session is busy so idle sleep (display off, power-button lock) can't
+  // suspend the turn. -w ties it to this process: a crash never leaves the
+  // Mac awake.
+  // ponytail: stays held while a turn waits on a permission/question prompt
+  // (Claude releases there). Wait/resume signals are spread over 5+ paths;
+  // a missed resume would sleep mid-turn. Revisit if overnight drain shows up.
+  const busySessions = new Set()
+  let caffeinate = null
+  function setBusy(sessionID, busy) {
+    if (process.platform !== "darwin" || !process.env.FF_WORKSTREAM_ID) return
+    const key = sessionID || "main"
+    if (busy) busySessions.add(key)
+    else busySessions.delete(key)
+    if (busySessions.size > 0 && !caffeinate) {
+      const child = spawn("caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore" })
+      // Never let a spawn failure surface as an unhandled error inside OpenCode.
+      child.on("error", () => {})
+      child.on("exit", () => {
+        if (caffeinate === child) caffeinate = null
+      })
+      child.unref()
+      caffeinate = child
+    } else if (busySessions.size === 0 && caffeinate) {
+      caffeinate.kill()
+      caffeinate = null
+    }
+  }
 
   function toolWindowKey(kind, aid, tool, sessionID) {
     return `${kind}|${aid}|${tool}|${sessionID || ""}`
@@ -501,6 +531,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
           const sessionID = extractSessionID(properties)
           const status = properties.status?.type || properties.status
           if (status === "busy" || status === "retry") {
+            setBusy(sessionID, true)
             await send({
               kind: "working",
               agent_id: agentIdFor(sessionID),
@@ -508,6 +539,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
               session_id: sessionID || undefined,
             })
           } else if (status === "idle") {
+            setBusy(sessionID, false)
             await send({
               kind: "idle",
               agent_id: agentIdFor(sessionID),
@@ -518,6 +550,7 @@ export const FactoryFloorPlugin = async ({ project, client, $, directory, worktr
         }
         case "session.idle": {
           const sessionID = extractSessionID(properties)
+          setBusy(sessionID, false)
           await send({
             kind: "idle",
             agent_id: agentIdFor(sessionID),
