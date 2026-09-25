@@ -188,7 +188,13 @@ stalled), preferring the transcript-derived figure and falling back to the
 per-run totals OpenCode reports (`WorkstreamAgentStateTracker.mainContextUsage(for:)`),
 while OpenCode child sessions carry their own figures
 (`AgentRun.contextUsedTokens` / `contextLimitTokens`) from `agent_info`
-events, shown on their roster cards. The meter itself is a 40×3pt bar plus a
+events, shown on their roster cards. Claude subagents get the same: their
+hooks carry only `agent_type` and the parent's `transcript_path`, so on each
+subagent event `HookEventReceiver` reads
+`<session>/subagents/agent-<id>.meta.json` (task `description`, written just
+after `SubagentStart`, so it usually lands on the first tool event) and the
+tail of `agent-<id>.jsonl` (per-run usage), forwarding them as the same
+`agentCreated` refinement and `agentInfo` events OpenCode sends. The meter itself is a 40×3pt bar plus a
 percentage: green below 60%, orange below 85%, red at 85% or more
 (`ContextMeter`).
 

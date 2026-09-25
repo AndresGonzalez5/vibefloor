@@ -778,6 +778,43 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(usage?.usedTokens, 42_000)
     }
 
+    // MARK: - Claude subagent description + context (hook receiver)
+
+    /// Payload shapes and file layout captured from Claude Code 2.1.282:
+    /// SubagentStart carries only agent_type; the meta file lands afterwards.
+    func testClaudeSubagentGetsTaskDescriptionAndContextFromSessionFiles() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("ff-sub-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let transcript = root.appendingPathComponent("session.jsonl").path
+        let prefix = HookEventReceiver.subagentFilePrefix(transcriptPath: transcript, agentId: "a1")
+        XCTAssertEqual(prefix, root.appendingPathComponent("session/subagents/agent-a1").path)
+
+        let receiver = HookEventReceiver.shared
+        let dir = "\(projectDir)-\(UUID().uuidString)"
+        let base: [String: Any] = ["transcript_path": transcript, "agent_id": "a1", "agent_type": "general-purpose"]
+        func map(_ hook: String, _ extra: [String: Any] = [:]) {
+            let input = base.merging(extra) { $1 }.merging(["hook_event_name": hook]) { $1 }
+            receiver.mapHookEvent(hookEventName: hook, eventInput: input, projectDir: dir).forEach(handle)
+        }
+
+        map("SubagentStart")
+        XCTAssertEqual(tracker.runs(for: wsID).first?.name, "general-purpose")
+        XCTAssertNil(tracker.runs(for: wsID).first?.taskDescription)
+
+        try FileManager.default.createDirectory(atPath: (prefix as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try #"{"agentType":"general-purpose","description":"Probe note reader"}"#
+            .write(toFile: prefix + ".meta.json", atomically: true, encoding: .utf8)
+        try #"{"type":"assistant","message":{"model":"claude-opus-5-5","usage":{"input_tokens":10,"cache_creation_input_tokens":2000,"cache_read_input_tokens":16000}}}"#
+            .write(toFile: prefix + ".jsonl", atomically: true, encoding: .utf8)
+        map("PreToolUse", ["tool_name": "Read", "tool_input": ["file_path": "/x/note.txt"]])
+
+        let sub = try XCTUnwrap(tracker.runs(for: wsID).first(where: { $0.id == "a1" }))
+        XCTAssertFalse(sub.isMain)
+        XCTAssertEqual(sub.taskDescription, "Probe note reader")
+        XCTAssertEqual(sub.contextUsedTokens, 18010)
+        XCTAssertEqual(sub.contextLimitTokens, 200_000)
+    }
+
     // MARK: - Session switching (multiple sessions, one worktree)
 
     /// An explicit session switch drops the old snapshot so the new
