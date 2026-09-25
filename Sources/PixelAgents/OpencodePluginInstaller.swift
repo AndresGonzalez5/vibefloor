@@ -22,7 +22,8 @@ enum OpencodePluginInstaller {
     /// v13: never treat a subagent's own prompt (chat.message with a child
     /// session id) as a conversation switch — it hijacked currentSession and
     /// wiped the just-created roster card via a bogus session_switched.
-    private static let pluginVersion = 13
+    /// v14: caffeinate sleep inhibitor while sessions are busy (keeps the Mac awake through lock/idle).
+    private static let pluginVersion = 14
 
     private static var pluginsDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser
