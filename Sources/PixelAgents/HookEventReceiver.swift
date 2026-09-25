@@ -29,6 +29,8 @@ final class HookEventReceiver: @unchecked Sendable {
     private struct ProjectState {
         var nextPalette: Int = 1 // 0 is reserved for main
         var knownAgents: Set<String> = []
+        /// Claude subagents whose task description has been forwarded.
+        var describedAgents: Set<String> = []
     }
 
     private var projectState: [String: ProjectState] = [:] // keyed by projectDir
@@ -201,6 +203,10 @@ final class HookEventReceiver: @unchecked Sendable {
             return
         }
 
+        // Respond before mapping: PreToolUse blocks Claude's tool call until
+        // ff-hook returns, and subagent mapping reads transcript files.
+        sendResponse(on: connection, status: "200 OK", body: "{\"ok\":true}")
+
         let source = json["source"] as? String
         let events: [AgentEvent]
         if source == "opencode" {
@@ -220,8 +226,6 @@ final class HookEventReceiver: @unchecked Sendable {
                 }
             }
         }
-
-        sendResponse(on: connection, status: "200 OK", body: "{\"ok\":true}")
     }
 
     // MARK: - Event Mapping
@@ -311,18 +315,54 @@ final class HookEventReceiver: @unchecked Sendable {
     }
 
     /// Maps a Claude Code hook event to zero or more `AgentEvent` values.
-    /// Must be called on `self.queue`.
-    private func mapHookEvent(hookEventName: String, eventInput: [String: Any], projectDir: String) -> [AgentEvent] {
+    /// Must be called on `self.queue`. Internal for tests.
+    func mapHookEvent(hookEventName: String, eventInput: [String: Any], projectDir: String) -> [AgentEvent] {
         // Every Claude Code hook payload carries the session transcript path;
         // attach it so the tracker can read context-window usage from its tail.
         let transcriptPath = eventInput["transcript_path"] as? String
-        let events = baseHookEvents(hookEventName: hookEventName, eventInput: eventInput, projectDir: projectDir)
+        var events = baseHookEvents(hookEventName: hookEventName, eventInput: eventInput, projectDir: projectDir)
         guard let transcriptPath else { return events }
+        let aid = agentId(from: eventInput)
+        if isSubagent(aid), hookEventName != "SubagentStop" {
+            events += subagentDetailEvents(agentId: aid, eventInput: eventInput, transcriptPath: transcriptPath, projectDir: projectDir)
+        }
         return events.map { event in
             var event = event
             event.transcriptPath = transcriptPath
             return event
         }
+    }
+
+    /// Claude Code writes each subagent's spawn metadata and transcript beside
+    /// the session transcript: `<session>/subagents/agent-<id>.{meta.json,jsonl}`.
+    static func subagentFilePrefix(transcriptPath: String, agentId: String) -> String {
+        (transcriptPath as NSString).deletingPathExtension + "/subagents/agent-\(agentId)"
+    }
+
+    /// Claude subagent hooks carry only `agent_type` and the parent's
+    /// transcript path. The task description (meta file, written just after
+    /// SubagentStart, so usually picked up on the first tool event) and the
+    /// run's own context usage live in the files above; forward them as the
+    /// same created/info events the OpenCode plugin sends.
+    private func subagentDetailEvents(agentId aid: String, eventInput: [String: Any], transcriptPath: String, projectDir: String) -> [AgentEvent] {
+        let prefix = Self.subagentFilePrefix(transcriptPath: transcriptPath, agentId: aid)
+        var events: [AgentEvent] = []
+        if projectState[projectDir]?.describedAgents.contains(aid) != true,
+           let data = FileManager.default.contents(atPath: prefix + ".meta.json"),
+           let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let description = Self.cappedTaskDescription(meta["description"] as? String)
+        {
+            let name = String((eventInput["agent_type"] as? String ?? "Sub-agent").prefix(20))
+            let palette = assignPalette(projectDir: projectDir, agentId: aid)
+            projectState[projectDir, default: ProjectState()].describedAgents.insert(aid)
+            events.append(.created(agentId: aid, name: name, palette: palette, parentAgentId: "main", taskDescription: description))
+        }
+        if let usage = TranscriptContextReader.usage(transcriptPath: prefix + ".jsonl") {
+            var info = AgentEvent.info(agentId: aid, name: nil, contextUsedTokens: usage.usedTokens)
+            info.contextLimitTokens = usage.limitTokens
+            events.append(info)
+        }
+        return events
     }
 
     private func baseHookEvents(hookEventName: String, eventInput: [String: Any], projectDir: String) -> [AgentEvent] {
