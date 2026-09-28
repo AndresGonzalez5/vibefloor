@@ -185,6 +185,10 @@ struct FF2App: App {
         }
         HookEventReceiver.shared.start()
 
+        // Hold a continuous sleep assertion while Claude Code sessions are busy;
+        // Claude's own caffeinate restart leaves gaps macOS can sleep in.
+        ClaudeSleepGuard.shared.start()
+
         // Install ff-hook into ~/.claude/settings.json so Claude Code forwards events
         if let hookURL = Bundle.main.url(forResource: "ff-hook", withExtension: nil, subdirectory: "Scripts") {
             HookInstaller.install(hookScriptPath: hookURL.path)
