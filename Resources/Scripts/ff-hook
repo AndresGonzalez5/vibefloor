@@ -1,6 +1,8 @@
 #!/bin/sh
 # ABOUTME: Claude Code hook script that forwards events to the VibeFloor app.
 # ABOUTME: Reads JSON from stdin, wraps it with CLAUDE_PROJECT_DIR, and POSTs to localhost.
+# Quick actions run headless claude with this set; their hooks must not reach the app.
+[ -n "$FF_HOOK_DISABLE" ] && exit 0
 INPUT=$(cat)
 PORT_FILE="$HOME/Library/Caches/factoryfloor/hook-port"
 [ -f "$PORT_FILE" ] || exit 0
