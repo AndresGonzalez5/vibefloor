@@ -72,7 +72,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         /// question tool). Waiting runs never sweep to stalled, and any live
         /// waiter suppresses the row-level stall promotion.
         var isWaitingForUser: Bool = false
-        let startedAt: Date
+        /// Var: a new user prompt restarts the main run's elapsed clock.
+        var startedAt: Date
         var lastEventAt: Date
     }
 
@@ -86,6 +87,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     }
 
     static let stallThreshold: TimeInterval = 45
+    /// Silence after which a non-waiting subagent is presumed gone (its stop
+    /// hook was lost) and swept out of the roster.
+    static let reapThreshold: TimeInterval = 120
     private static let sweepInterval: TimeInterval = 15
     private static let contextReadInterval: TimeInterval = 5
 
@@ -184,11 +188,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         currentSelection = nil
     }
 
-    /// Backdates a run's last-event timestamp. Used by stall sweep unit tests.
-    func _backdateRun(agentId: String, workstreamID: UUID, lastEventAt: Date) {
+    /// Backdates a run's timestamps. Used by stall sweep unit tests.
+    func _backdateRun(agentId: String, workstreamID: UUID, lastEventAt: Date, startedAt: Date? = nil) {
         guard var list = rosters[workstreamID],
               let idx = list.firstIndex(where: { $0.id == agentId }) else { return }
         list[idx].lastEventAt = lastEventAt
+        if let startedAt { list[idx].startedAt = startedAt }
         rosters[workstreamID] = list
     }
 
@@ -208,6 +213,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             logger.debug("No workstream match for projectDir: \(projectDir, privacy: .public)")
             return
         }
+        // Session over: nothing in it is live anymore, including children
+        // whose stop hooks never fired.
+        if event.type == .agentSessionEnded {
+            clear(workstreamID: wsID)
+            return
+        }
 
         ensureSweepTimer()
         liveSessionIDs.insert(wsID)
@@ -224,7 +235,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             if let transcriptPath = event.transcriptPath {
                 refreshContextUsage(wsID: wsID, transcriptPath: transcriptPath, force: event.type == .agentIdle)
             }
-        } else if event.type == .agentToolStart, event.tool != "respond" {
+        } else if event.type == .agentToolDone || (event.type == .agentToolStart && event.tool != "respond") {
             // A subagent resuming real tool activity clears row attention only
             // once no live run still waits on the user.
             clearPermissionIfNoWaiters(wsID: wsID, event: event)
@@ -325,6 +336,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     private func updateRoster(wsID: UUID, event: AgentEvent) {
         let now = Date()
         var list = rosters[wsID] ?? []
+        let fallbackName = NSLocalizedString("Sub-agent", comment: "Fallback name for an unnamed subagent")
 
         func upsert(_ agentId: String, name: String? = nil, palette: Int = 0, isMain: Bool, variantIndex: Int = 0, mutate: (inout AgentRun) -> Void = { _ in }) {
             if let idx = list.firstIndex(where: { $0.id == agentId }) {
@@ -338,7 +350,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             } else {
                 var run = AgentRun(
                     id: agentId,
-                    name: name ?? "Claude",
+                    name: name ?? (isMain ? "Claude" : fallbackName),
                     palette: palette,
                     isMain: isMain,
                     variantIndex: variantIndex,
@@ -358,7 +370,6 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // A duplicate create (OpenCode re-forwards the subtask part to
             // enrich an already-registered child) refines the existing run's
             // attributes instead of recreating it.
-            let fallbackName = NSLocalizedString("Sub-agent", comment: "Fallback name for an unnamed subagent")
             let name = event.name ?? fallbackName
             if let idx = list.firstIndex(where: { $0.id == event.agentId }) {
                 // session_created is authoritative: this id is a subagent, even
@@ -413,14 +424,26 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentToolDone:
+            // PostToolUse proves the run is alive and past any prompt it
+            // raised (the user answered it).
             if let idx = list.firstIndex(where: { $0.id == event.agentId }) {
                 list[idx].activity = nil
+                list[idx].state = .working
+                list[idx].isWaitingForUser = false
                 list[idx].lastEventAt = now
             }
 
         case .agentWaiting:
             upsert(event.agentId, name: event.name, isMain: event.agentId == "main") { run in
                 run.isWaitingForUser = false
+            }
+            // A new user prompt starts a fresh turn: restart main's clock and
+            // drop stale activity/stall; no tool prompt can still be pending.
+            if event.agentId == "main", let idx = list.firstIndex(where: { $0.id == "main" }) {
+                list[idx].startedAt = now
+                list[idx].activity = nil
+                list[idx].state = .working
+                for i in list.indices { list[i].isWaitingForUser = false }
             }
 
         case .agentInfo:
@@ -471,6 +494,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                    limit > 0 {
                     contextUsage[wsID] = ContextUsage(usedTokens: used, limitTokens: limit)
                 }
+                // Children already stalled at the end of the turn lost their
+                // stop hook; drop them with the turn instead of holding it open.
+                list.removeAll { !$0.isMain && $0.state == .stalled }
                 // ponytail: main idle removes only main while children live;
                 // children leave via their own idle. Full clear only when alone.
                 if list.contains(where: { !$0.isMain }) {
@@ -482,9 +508,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 list.removeAll { $0.id == event.agentId }
             }
 
-        case .agentSessionSwitched:
-            // Reset already performed in detectSessionSwitch before this ran;
-            // no roster mutation here.
+        case .agentSessionSwitched, .agentSessionEnded:
+            // Reset already performed in detectSessionSwitch / handle before
+            // this ran; no roster mutation here.
             break
 
         case .agentStatus:
@@ -562,6 +588,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentToolStart, .agentToolDone:
+            // A finished tool proves main is alive again (toolStart un-stalls
+            // the row in updateRoster).
+            if event.type == .agentToolDone, states[wsID] == .stalled {
+                states[wsID] = .working
+            }
             // Real tool activity while awaiting permission means the user
             // answered the prompt (there's no explicit "granted" hook).
             // The "respond" streaming heartbeat must never clear it — that's
@@ -579,7 +610,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 }
             }
 
-        case .agentCreated, .agentRemoved, .agentInfo:
+        case .agentCreated, .agentRemoved, .agentInfo, .agentSessionEnded:
             break
         }
     }
@@ -614,9 +645,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     /// Internal (not private) so tests can sweep with backdated timestamps.
     func sweepForStalls(now: Date = Date()) {
         let cutoff = now.addingTimeInterval(-Self.stallThreshold)
+        let reapCutoff = now.addingTimeInterval(-Self.reapThreshold)
         for (wsID, list) in rosters {
-            var updated = list
-            var changed = false
+            // Reap subagents silent past the reap threshold: their stop hook
+            // was lost. Waiting runs are blocked on the user, never reaped.
+            var updated = list.filter { $0.isMain || $0.isWaitingForUser || $0.lastEventAt >= reapCutoff }
+            var changed = updated.count != list.count
             let rowState = states[wsID] ?? .idle
             // Any live waiter (main or subagent) suppresses stalling: waiting
             // on the user isn't stalling, even if row state hasn't caught up.
@@ -630,6 +664,14 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 changed = true
             }
             guard changed else { continue }
+            if updated.isEmpty {
+                rosters.removeValue(forKey: wsID)
+                // Nothing left to work: settle the row like a main Stop would.
+                if rowState == .working || rowState == .stalled {
+                    states[wsID] = currentSelection == wsID ? .idle : .needsAttention(.justFinished)
+                }
+                continue
+            }
             rosters[wsID] = updated
             // Surface a stalled main run at row level unless something more
             // important already needs attention there. A fresh sibling run

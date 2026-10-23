@@ -1023,4 +1023,109 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         handle(.toolStart(agentId: "main", tool: "reply"))
         XCTAssertEqual(tracker.state(for: wsID), .working)
     }
+
+    // MARK: - Roster reaping and turn boundaries
+
+    private func backdate(_ agentId: String, secondsAgo: TimeInterval, startedSecondsAgo: TimeInterval? = nil) {
+        tracker._backdateRun(
+            agentId: agentId,
+            workstreamID: wsID,
+            lastEventAt: Date().addingTimeInterval(-secondsAgo),
+            startedAt: startedSecondsAgo.map { Date().addingTimeInterval(-$0) }
+        )
+    }
+
+    /// A child whose stop hook never arrived must not keep the row Working
+    /// forever: the sweep reaps it once it has been silent past the reap
+    /// threshold, and the empty roster settles the row.
+    func testGhostChildIsReapedAndRowSettles() {
+        for selected in [false, true] {
+            tracker.resetForTesting()
+            if selected { tracker.currentSelection = wsID }
+            handle(.waiting(agentId: "main"))
+            handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+            handle(.toolStart(agentId: "sub-1", tool: "Grep", activity: "Searching"))
+            handle(.idle(agentId: "main"))
+            XCTAssertEqual(tracker.state(for: wsID), .working)
+            XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["sub-1"])
+
+            backdate("sub-1", secondsAgo: WorkstreamAgentStateTracker.reapThreshold + 10)
+            tracker.sweepForStalls(now: Date())
+            XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+            XCTAssertEqual(tracker.state(for: wsID), selected ? .idle : .needsAttention(.justFinished))
+        }
+    }
+
+    func testWaitingChildIsNeverReaped() {
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+        handle(.status(agentId: "sub-1", status: "permissionRequired"))
+        backdate("sub-1", secondsAgo: WorkstreamAgentStateTracker.reapThreshold + 10)
+        tracker.sweepForStalls(now: Date())
+        XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["sub-1"])
+    }
+
+    /// Main's Stop drops children that already went quiet (stalled), so a
+    /// lost SubagentStop can't hold the roster open past the turn.
+    func testMainIdleDropsStalledChildren() {
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+        handle(.created(agentId: "sub-2", name: "Plan", palette: 2))
+        backdate("sub-1", secondsAgo: WorkstreamAgentStateTracker.stallThreshold + 5)
+        tracker.sweepForStalls(now: Date())
+        XCTAssertEqual(tracker.runs(for: wsID).first(where: { $0.id == "sub-1" })?.state, .stalled)
+
+        handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["sub-2"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
+
+    func testToolDoneUnstallsRunAndRow() {
+        handle(.waiting(agentId: "main"))
+        handle(.toolStart(agentId: "main", tool: "Bash", activity: "Running command"))
+        backdateMainRun(secondsAgo: WorkstreamAgentStateTracker.stallThreshold + 5)
+        tracker.sweepForStalls(now: Date())
+        XCTAssertEqual(tracker.state(for: wsID), .stalled)
+        XCTAssertEqual(tracker.runs(for: wsID)[0].state, .stalled)
+
+        handle(.toolDone(agentId: "main"))
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+        XCTAssertEqual(tracker.runs(for: wsID)[0].state, .working)
+    }
+
+    /// PostToolUse after a subagent's question means the user answered it.
+    func testSubagentToolDoneClearsWaitingAndPermission() {
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+        handle(.status(agentId: "sub-1", status: "permissionRequired"))
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+
+        handle(.toolDone(agentId: "sub-1"))
+        XCTAssertEqual(tracker.runs(for: wsID).first(where: { $0.id == "sub-1" })?.isWaitingForUser, false)
+        XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
+
+    /// A new user prompt starts a fresh turn on the existing main run: the
+    /// elapsed clock, activity, stall, and any pending waits all reset.
+    func testNewPromptResetsMainRun() {
+        handle(.toolStart(agentId: "main", tool: "Bash", activity: "Running command"))
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+        handle(.status(agentId: "sub-1", status: "permissionRequired"))
+        backdate("main", secondsAgo: WorkstreamAgentStateTracker.stallThreshold + 5, startedSecondsAgo: 300)
+
+        handle(.waiting(agentId: "main"))
+        let main = tracker.runs(for: wsID).first(where: \.isMain)
+        XCTAssertEqual(main?.startedAt.timeIntervalSinceNow ?? -999, 0, accuracy: 1)
+        XCTAssertNil(main?.activity)
+        XCTAssertEqual(main?.state, .working)
+        XCTAssertTrue(tracker.runs(for: wsID).allSatisfy { !$0.isWaitingForUser })
+    }
+
+    func testSessionEndedClearsWorkstream() {
+        handle(.toolStart(agentId: "main", tool: "Bash", activity: "Running command"))
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+
+        handle(.sessionEnded())
+        XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+        XCTAssertEqual(tracker.state(for: wsID), .idle)
+        XCTAssertFalse(tracker.hasLiveSession(for: wsID))
+    }
 }

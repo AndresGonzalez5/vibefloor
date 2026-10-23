@@ -44,6 +44,9 @@ struct AgentEvent: Codable, Sendable {
         /// The harness started a new top-level session in the same worktree
         /// (e.g. opencode `/new`); the tracker resets to the new conversation.
         case agentSessionSwitched
+        /// The harness session terminated (Claude `SessionEnd`); the tracker
+        /// drops the workstream's roster and live flag.
+        case agentSessionEnded
     }
 
     enum CodingKeys: String, CodingKey {
@@ -117,6 +120,11 @@ struct AgentEvent: Codable, Sendable {
         var event = AgentEvent(type: .agentSessionSwitched, agentId: "main")
         event.sessionID = sessionID
         return event
+    }
+
+    /// The worktree's harness session ended; nothing of it is live anymore.
+    static func sessionEnded() -> AgentEvent {
+        AgentEvent(type: .agentSessionEnded, agentId: "main")
     }
 
     /// Attribute refresh for an existing roster run (display name, model,
