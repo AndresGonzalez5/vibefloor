@@ -11,9 +11,9 @@ private let logger = Logger(subsystem: "factoryfloor", category: "agent-state")
 /// State transitions are driven by hook events (`UserPromptSubmit` / `Stop`,
 /// `PreToolUse` / `PostToolUse`, `SubagentStart` / `SubagentStop`). A run is
 /// created when its agent spawns and removed when its stop hook arrives, so
-/// the roster mirrors exactly what Claude Code reports — no artificial timers
-/// govern visibility. The only timer is the stall sweep: a run that stops
-/// emitting events while supposedly working flips to `.stalled`.
+/// the roster mirrors what Claude Code reports. The only timer is the stall
+/// sweep: a run that stops emitting events while supposedly working flips to
+/// `.stalled`, and a silent subagent (stop hook lost) is eventually reaped.
 ///
 /// The high-level `AgentRunState` (driving the sidebar row dot) is kept in
 /// sync alongside the roster.
@@ -90,6 +90,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     /// Silence after which a non-waiting subagent is presumed gone (its stop
     /// hook was lost) and swept out of the roster.
     static let reapThreshold: TimeInterval = 120
+    /// A run mid-tool is silent until the tool returns (builds and tests
+    /// routinely exceed 2 min; Claude's Bash tool allows up to 10).
+    static let reapThresholdInFlight: TimeInterval = 600
     private static let sweepInterval: TimeInterval = 15
     private static let contextReadInterval: TimeInterval = 5
 
@@ -219,6 +222,15 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             clear(workstreamID: wsID)
             return
         }
+        // Esc interrupts a turn without a Stop hook; Claude's idle_prompt
+        // notification is the only end-of-turn signal left. Without a live
+        // main run (Stop already handled) or with main blocked on a prompt,
+        // it just proves liveness below.
+        if event.type == .agentStatus, event.status == "idleNotification", event.agentId == "main",
+           rosters[wsID]?.contains(where: { $0.isMain && !$0.isWaitingForUser }) == true {
+            handle(projectDir: projectDir, event: .idle(agentId: "main", transcriptPath: event.transcriptPath, sessionID: event.sessionID))
+            return
+        }
 
         ensureSweepTimer()
         liveSessionIDs.insert(wsID)
@@ -236,8 +248,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 refreshContextUsage(wsID: wsID, transcriptPath: transcriptPath, force: event.type == .agentIdle)
             }
         } else if event.type == .agentToolDone || (event.type == .agentToolStart && event.tool != "respond") {
-            // A subagent resuming real tool activity clears row attention only
-            // once no live run still waits on the user.
+            // A child doing real work means the workstream is progressing even
+            // if main went quiet. Row attention clears only once no live run
+            // still waits on the user.
+            if states[wsID] == .stalled { states[wsID] = .working }
             clearPermissionIfNoWaiters(wsID: wsID, event: event)
         }
     }
@@ -496,7 +510,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 }
                 // Children already stalled at the end of the turn lost their
                 // stop hook; drop them with the turn instead of holding it open.
-                list.removeAll { !$0.isMain && $0.state == .stalled }
+                // One blocked on the user still needs them, so it stays.
+                list.removeAll { !$0.isMain && $0.state == .stalled && !$0.isWaitingForUser }
                 // ponytail: main idle removes only main while children live;
                 // children leave via their own idle. Full clear only when alone.
                 if list.contains(where: { !$0.isMain }) {
@@ -646,10 +661,14 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     func sweepForStalls(now: Date = Date()) {
         let cutoff = now.addingTimeInterval(-Self.stallThreshold)
         let reapCutoff = now.addingTimeInterval(-Self.reapThreshold)
+        let reapInFlightCutoff = now.addingTimeInterval(-Self.reapThresholdInFlight)
         for (wsID, list) in rosters {
             // Reap subagents silent past the reap threshold: their stop hook
-            // was lost. Waiting runs are blocked on the user, never reaped.
-            var updated = list.filter { $0.isMain || $0.isWaitingForUser || $0.lastEventAt >= reapCutoff }
+            // was lost. Waiting runs are blocked on the user, never reaped;
+            // a run mid-tool gets the longer in-flight allowance.
+            var updated = list.filter {
+                $0.isMain || $0.isWaitingForUser || $0.lastEventAt >= ($0.activity != nil ? reapInFlightCutoff : reapCutoff)
+            }
             var changed = updated.count != list.count
             let rowState = states[wsID] ?? .idle
             // Any live waiter (main or subagent) suppresses stalling: waiting

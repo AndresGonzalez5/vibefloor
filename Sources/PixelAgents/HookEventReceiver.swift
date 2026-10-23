@@ -440,7 +440,8 @@ final class HookEventReceiver: @unchecked Sendable {
             }
             let status = isPermission ? "permissionRequired" : "idleNotification"
             logger.info("Hook Notification: status=\(status, privacy: .public)")
-            return [AgentEvent.status(agentId: "main", status: status)]
+            // agent_id names the waiting subagent; absent means main.
+            return [AgentEvent.status(agentId: agentId(from: eventInput), status: status)]
 
         case "SessionStart", "SessionEnd":
             // A new (startup/clear) or ended conversation leaves nothing live;
@@ -450,7 +451,11 @@ final class HookEventReceiver: @unchecked Sendable {
             let source = eventInput["source"] as? String
             let ended = hookEventName == "SessionEnd" || source == "startup" || source == "clear"
             logger.info("Hook \(hookEventName, privacy: .public): source=\(source ?? "-", privacy: .public) ended=\(ended)")
-            return ended ? [AgentEvent.sessionEnded()] : []
+            guard ended else { return [] }
+            // An open, idle new session is still live (status re-marks it).
+            return hookEventName == "SessionEnd"
+                ? [AgentEvent.sessionEnded()]
+                : [AgentEvent.sessionEnded(), AgentEvent.status(agentId: "main", status: "sessionStarted")]
 
         default:
             logger.debug("Unhandled hook event: \(hookEventName, privacy: .public)")
