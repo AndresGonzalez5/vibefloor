@@ -35,8 +35,6 @@ struct MainAgentPortrait: View {
         }
     }
 
-    @State private var isPulsing = false
-
     var body: some View {
         Group {
             if !isPathValid {
@@ -46,13 +44,6 @@ struct MainAgentPortrait: View {
             }
         }
         .frame(width: size, height: size)
-        .onAppear { isPulsing = true }
-        .onChange(of: pulseDuration) { _, newValue in
-            // Restarting the pulse keeps newly swapped ring variants animating.
-            guard newValue != nil else { return }
-            isPulsing = false
-            DispatchQueue.main.async { isPulsing = true }
-        }
     }
 
     // MARK: - State tiers
@@ -61,12 +52,12 @@ struct MainAgentPortrait: View {
     private var statefulPortrait: some View {
         switch state {
         case .working:
-            ringedPortrait(color: .blue, pulses: true)
-                .shadow(color: .blue.opacity(isPulsing ? 0.2 : 0.5), radius: 3)
+            ringedPortrait(color: .blue)
+                .shadow(color: .blue.opacity(0.35), radius: 3)
                 .accessibilityLabel(Text("Agent is working"))
 
         case .stalled:
-            ringedPortrait(color: .yellow, pulses: true)
+            ringedPortrait(color: .yellow)
                 .accessibilityLabel(Text("Agent may be stalled"))
 
         case .needsAttention(.permission):
@@ -91,18 +82,10 @@ struct MainAgentPortrait: View {
         }
     }
 
-    /// Portrait with a state ring; `pulses` fades the ring while active.
-    private func ringedPortrait(color: Color, lineWidth: CGFloat = 1.5, pulses: Bool = false) -> some View {
+    /// Portrait with a state ring that pulses while the agent is active.
+    private func ringedPortrait(color: Color, lineWidth: CGFloat = 1.5) -> some View {
         ZStack {
-            Circle()
-                .strokeBorder(
-                    color.opacity(pulses && !isPulsing ? 0.35 : 1.0),
-                    lineWidth: lineWidth
-                )
-                .animation(
-                    pulses ? .easeInOut(duration: pulseDuration ?? 0.8).repeatForever(autoreverses: true) : nil,
-                    value: isPulsing
-                )
+            PulsingRing(color: color, lineWidth: lineWidth, period: pulsePeriod)
 
             portrait
                 .padding(1)
@@ -149,12 +132,34 @@ struct MainAgentPortrait: View {
         .clipShape(Circle())
     }
 
-    /// Pulse period for the current state, nil when the ring is static.
-    private var pulseDuration: TimeInterval? {
+    /// Full pulse cycle for the current state, nil when the ring is static.
+    private var pulsePeriod: TimeInterval? {
         switch state {
-        case .working: 0.8
-        case .stalled: 1.4
+        case .working: 1.6
+        case .stalled: 2.8
         case .needsAttention, .idle: nil
         }
+    }
+}
+
+/// Ring whose opacity follows the clock; nil period = static ring. No implicit
+/// animation, so a layout move during a List re-measure can never be captured
+/// into a repeating animation (the ring used to bounce after a space switch).
+struct PulsingRing: View {
+    let color: Color
+    var lineWidth: CGFloat = 1.5
+    /// Full bright→dim→bright cycle length; nil draws a static ring.
+    var period: TimeInterval?
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: period == nil)) { context in
+            Circle().strokeBorder(color.opacity(opacity(at: context.date)), lineWidth: lineWidth)
+        }
+    }
+
+    private func opacity(at date: Date) -> Double {
+        guard let period else { return 1 }
+        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+        return 0.675 + 0.325 * cos(2 * .pi * phase)   // 1.0 → 0.35 → 1.0
     }
 }

@@ -179,8 +179,6 @@ private struct RosterAvatar: View {
     let variant: Int
     let state: WorkstreamAgentStateTracker.AgentRun.RunState
 
-    @State private var isPulsing = false
-
     /// Mirrors MainAgentPortrait's state palette (blue working, yellow stalled).
     private var ringColor: Color {
         switch state {
@@ -191,23 +189,12 @@ private struct RosterAvatar: View {
 
     var body: some View {
         ZStack {
-            Circle()
-                .strokeBorder(
-                    ringColor.opacity(isPulsing && state == .working ? 0.35 : 0.9),
-                    lineWidth: 1.5
-                )
+            PulsingRing(color: ringColor, period: state == .working ? 1.6 : nil)
 
             portrait
                 .padding(1)
         }
         .frame(width: 30, height: 30)
-        .onChange(of: state) { _, newValue in
-            isPulsing = (newValue == .working)
-        }
-        .onAppear {
-            isPulsing = (state == .working)
-        }
-        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
     }
 
     private var portrait: some View {
