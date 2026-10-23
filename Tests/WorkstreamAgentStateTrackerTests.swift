@@ -815,6 +815,59 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(sub.contextLimitTokens, 200_000)
     }
 
+    /// Tool hooks fired inside a subagent carry agent_type; a run first seen
+    /// via a tool event (SubagentStart lost or raced) is named from it.
+    func testClaudeSubagentToolEventsCarryAgentType() throws {
+        let receiver = HookEventReceiver.shared
+        let dir = "\(projectDir)-\(UUID().uuidString)"
+        let input: [String: Any] = ["agent_id": "abc", "agent_type": "Explore", "tool_name": "Read"]
+
+        let pre = receiver.mapHookEvent(hookEventName: "PreToolUse", eventInput: input, projectDir: dir)
+        let start = try XCTUnwrap(pre.first(where: { $0.type == .agentToolStart }))
+        XCTAssertEqual(start.name, "Explore")
+        pre.forEach(handle)
+        XCTAssertEqual(tracker.runs(for: wsID).first(where: { $0.id == "abc" })?.name, "Explore")
+
+        let post = receiver.mapHookEvent(hookEventName: "PostToolUse", eventInput: input, projectDir: dir)
+        XCTAssertEqual(post.first(where: { $0.type == .agentToolDone })?.name, "Explore")
+
+        let main = receiver.mapHookEvent(hookEventName: "PreToolUse", eventInput: ["agent_type": "Explore", "tool_name": "Read"], projectDir: dir)
+        XCTAssertNil(main.first?.name)
+    }
+
+    /// notification_type is authoritative; the message text is only a
+    /// fallback for payloads that predate it.
+    func testClaudeNotificationTypeDecidesStatus() {
+        let receiver = HookEventReceiver.shared
+        func status(_ input: [String: Any]) -> String? {
+            receiver.mapHookEvent(hookEventName: "Notification", eventInput: input, projectDir: projectDir).first?.status
+        }
+        XCTAssertEqual(status(["notification_type": "permission_prompt", "message": "Claude wants to use Bash"]), "permissionRequired")
+        XCTAssertEqual(status(["notification_type": "agent_needs_input", "message": "Waiting"]), "permissionRequired")
+        XCTAssertEqual(status(["notification_type": "idle_prompt", "message": "Claude is waiting, no permission needed"]), "idleNotification")
+        XCTAssertEqual(status(["message": "Claude needs your permission to use Bash"]), "permissionRequired")
+    }
+
+    /// A fresh Claude conversation (startup/clear) or an ended one resets the
+    /// workstream; resume/compact/fork continue the same conversation.
+    func testClaudeSessionLifecycleHooks() {
+        let receiver = HookEventReceiver.shared
+        func types(_ hook: String, _ input: [String: Any]) -> [AgentEvent.EventType] {
+            receiver.mapHookEvent(hookEventName: hook, eventInput: input, projectDir: projectDir).map(\.type)
+        }
+        XCTAssertEqual(types("SessionEnd", ["reason": "prompt_input_exit"]), [.agentSessionEnded])
+        XCTAssertEqual(types("SessionStart", ["source": "startup"]), [.agentSessionEnded])
+        XCTAssertEqual(types("SessionStart", ["source": "clear"]), [.agentSessionEnded])
+        XCTAssertEqual(types("SessionStart", ["source": "compact"]), [])
+        XCTAssertEqual(types("SessionStart", ["source": "resume"]), [])
+        XCTAssertEqual(types("SessionStart", [:]), [])
+    }
+
+    func testHookInstallerRegistersSessionHooks() {
+        XCTAssertTrue(HookInstaller.hookEvents.contains("SessionStart"))
+        XCTAssertTrue(HookInstaller.hookEvents.contains("SessionEnd"))
+    }
+
     // MARK: - Session switching (multiple sessions, one worktree)
 
     /// An explicit session switch drops the old snapshot so the new

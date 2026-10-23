@@ -241,6 +241,14 @@ final class HookEventReceiver: @unchecked Sendable {
         !agentId.isEmpty && agentId != "main"
     }
 
+    /// Tool hooks fired inside a subagent carry `agent_type`; forwarding it
+    /// names a run first seen via a tool event (SubagentStart lost or raced).
+    /// Main events keep no name.
+    private func subagentName(_ agentId: String, from eventInput: [String: Any]) -> String? {
+        guard isSubagent(agentId), let type = eventInput["agent_type"] as? String, !type.isEmpty else { return nil }
+        return String(type.prefix(20))
+    }
+
     /// Assigns a roster palette slot for an agent within a project.
     /// Must be called on `self.queue`.
     private func assignPalette(projectDir: String, agentId: String) -> Int {
@@ -376,7 +384,8 @@ final class HookEventReceiver: @unchecked Sendable {
             let aid = agentId(from: eventInput)
             let activity = Self.activityDescription(toolName: toolName, toolInput: eventInput["tool_input"] as? [String: Any])
             logger.info("Hook PreToolUse: \(toolName, privacy: .public) agent=\(aid, privacy: .public)")
-            let toolEvent = AgentEvent.toolStart(agentId: aid, tool: toolName, activity: activity)
+            var toolEvent = AgentEvent.toolStart(agentId: aid, tool: toolName, activity: activity)
+            toolEvent.name = subagentName(aid, from: eventInput)
             // Claude's AskUserQuestion blocks on the user's answer like
             // OpenCode's question tool. Tool event first, status second: the
             // tracker clears permission on tool activity, so status must win.
@@ -389,7 +398,9 @@ final class HookEventReceiver: @unchecked Sendable {
         case "PostToolUse":
             let aid = agentId(from: eventInput)
             logger.info("Hook PostToolUse: agent=\(aid, privacy: .public)")
-            return [AgentEvent.toolDone(agentId: aid)]
+            var toolEvent = AgentEvent.toolDone(agentId: aid)
+            toolEvent.name = subagentName(aid, from: eventInput)
+            return [toolEvent]
 
         case "Stop":
             logger.info("Hook Stop: main agent goes idle")
@@ -417,14 +428,29 @@ final class HookEventReceiver: @unchecked Sendable {
 
         case "Notification":
             // Claude Code emits Notification for permission prompts and idle
-            // reminders. The message field is the only signal we have; over-
-            // reporting permission is preferable to under-reporting.
-            let message = (eventInput["message"] as? String) ?? ""
-            let lower = message.lowercased()
-            let isPermission = lower.contains("permission") || lower.contains("approval")
+            // reminders. notification_type says which; older payloads lack it,
+            // so fall back to the message, where over-reporting permission is
+            // preferable to under-reporting.
+            let isPermission: Bool
+            if let type = eventInput["notification_type"] as? String {
+                isPermission = type == "permission_prompt" || type == "agent_needs_input"
+            } else {
+                let lower = ((eventInput["message"] as? String) ?? "").lowercased()
+                isPermission = lower.contains("permission") || lower.contains("approval")
+            }
             let status = isPermission ? "permissionRequired" : "idleNotification"
             logger.info("Hook Notification: status=\(status, privacy: .public)")
             return [AgentEvent.status(agentId: "main", status: status)]
+
+        case "SessionStart", "SessionEnd":
+            // A new (startup/clear) or ended conversation leaves nothing live;
+            // resume/compact/fork continue the same one. Either way, recreated
+            // subagent ids must be described again.
+            projectState[projectDir]?.describedAgents.removeAll()
+            let source = eventInput["source"] as? String
+            let ended = hookEventName == "SessionEnd" || source == "startup" || source == "clear"
+            logger.info("Hook \(hookEventName, privacy: .public): source=\(source ?? "-", privacy: .public) ended=\(ended)")
+            return ended ? [AgentEvent.sessionEnded()] : []
 
         default:
             logger.debug("Unhandled hook event: \(hookEventName, privacy: .public)")
