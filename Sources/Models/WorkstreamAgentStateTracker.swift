@@ -196,7 +196,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         guard var list = rosters[workstreamID],
               let idx = list.firstIndex(where: { $0.id == agentId }) else { return }
         list[idx].lastEventAt = lastEventAt
-        if let startedAt { list[idx].startedAt = startedAt }
+        if let startedAt {
+            list[idx].startedAt = startedAt
+        }
         rosters[workstreamID] = list
     }
 
@@ -227,7 +229,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         // main run (Stop already handled) or with main blocked on a prompt,
         // it just proves liveness below.
         if event.type == .agentStatus, event.status == "idleNotification", event.agentId == "main",
-           rosters[wsID]?.contains(where: { $0.isMain && !$0.isWaitingForUser }) == true {
+           rosters[wsID]?.contains(where: { $0.isMain && !$0.isWaitingForUser }) == true
+        {
             handle(projectDir: projectDir, event: .idle(agentId: "main", transcriptPath: event.transcriptPath, sessionID: event.sessionID))
             return
         }
@@ -251,7 +254,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // A child doing real work means the workstream is progressing even
             // if main went quiet. Row attention clears only once no live run
             // still waits on the user.
-            if states[wsID] == .stalled { states[wsID] = .working }
+            if states[wsID] == .stalled {
+                states[wsID] = .working
+            }
             clearPermissionIfNoWaiters(wsID: wsID, event: event)
         }
     }
@@ -457,7 +462,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 list[idx].startedAt = now
                 list[idx].activity = nil
                 list[idx].state = .working
-                for i in list.indices { list[i].isWaitingForUser = false }
+                for i in list.indices {
+                    list[i].isWaitingForUser = false
+                }
             }
 
         case .agentInfo:

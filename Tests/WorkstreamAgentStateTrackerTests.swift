@@ -1094,7 +1094,9 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
     func testGhostChildIsReapedAndRowSettles() {
         for selected in [false, true] {
             tracker.resetForTesting()
-            if selected { tracker.currentSelection = wsID }
+            if selected {
+                tracker.currentSelection = wsID
+            }
             handle(.waiting(agentId: "main"))
             handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
             handle(.toolStart(agentId: "sub-1", tool: "Grep", activity: "Searching"))

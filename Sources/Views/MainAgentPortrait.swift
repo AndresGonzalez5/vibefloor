@@ -160,6 +160,6 @@ struct PulsingRing: View {
     private func opacity(at date: Date) -> Double {
         guard let period else { return 1 }
         let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
-        return 0.675 + 0.325 * cos(2 * .pi * phase)   // 1.0 → 0.35 → 1.0
+        return 0.675 + 0.325 * cos(2 * .pi * phase) // 1.0 → 0.35 → 1.0
     }
 }
