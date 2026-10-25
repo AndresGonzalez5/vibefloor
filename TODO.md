@@ -11,6 +11,7 @@
 ## Bugs
 
 - [ ] Two Claude Code sessions in one worktree share a single `main` run in the agent tracker, and a `SessionStart`/`SessionEnd` hook from either one clears the whole roster. Known limitation; fix needs runs keyed by `session_id`.
+- [ ] Switching workstreams with a dirty Editor or Changes tab silently drops the unsaved edits: the workspace view is rebuilt per workstream and reopens files from disk, with no save prompt.
 - [x] Branch name doesn't appear in sidebar after workstream creation until the 15s refresh timer fires. Fixed: call `refreshPathValidity` immediately in the `.workstreamWorktreeReady` handler.
 - [ ] Changes tab: added (status A) files show a constant ~4-line trailing blank gap after their diff; modified files size correctly. Sizing path (`max(modified, original) + HEIGHT_PADDING` in `editor/src/diff.js:resizeDiffEditor`) is symmetric for added/modified, and untracked files get real `changedLines` via `annotate`, so the cause is likely inside Monaco's measured `getContentHeight()` for pure-add inline diffs — needs runtime logging (`host.style.height` vs per-side `getContentHeight()`) to confirm before fixing.
 - [x] Changes tab: infinite "Refreshing…" (loading flags cleared only by JS `contentReady`, while the 10s timer + Refresh button were gated on those same flags — deadlock). Fixed: shells-first + chunked-body transport, tree decoupled from diff readiness, 15s Swift watchdog, timer skips (never cancels) in-flight git work.

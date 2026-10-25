@@ -1038,16 +1038,20 @@ struct TerminalContainerView: View {
                 startFileTreeWatcherIfNeeded()
             }
         }
-            .onDisappear {
-                if isActive {
-                    clearMenuFlags()
-                }
+        .onDisappear {
+            if isActive {
+                clearMenuFlags()
+            }
             // ContentView keys this view by workstream, so disappearing is
             // teardown: release objects whose callbacks capture this view.
+            // Nil the bridges so a reappearance rebuilds them in startWorkspace.
             editorBridge?.teardown()
+            editorBridge = nil
             diffBridge?.teardown()
+            diffBridge = nil
             directoryWatcher?.stop()
             directoryWatcher = nil
+            refreshDebounceTask?.cancel()
             guard workspaceStarted else { return }
             surfaceCache.saveTabSnapshot(for: workstreamID, snapshot: currentTabSnapshot())
         }
