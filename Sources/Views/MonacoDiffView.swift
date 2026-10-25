@@ -141,6 +141,26 @@ final class MonacoDiffBridge: ObservableObject {
         return wv
     }
 
+    /// Breaks the userContentController → Coordinator → bridge retain cycle and
+    /// drops view-captured callbacks. Call when the owning workspace view goes away.
+    func teardown() {
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "editor")
+        webView?.removeFromSuperview()
+        webView = nil
+        coordinator = nil
+        appearanceObserver = nil
+        pendingOps.removeAll()
+        onContentReady = nil
+        onLoadFile = nil
+        onViewedChanged = nil
+        onCollapsedChanged = nil
+        onContentChanged = nil
+        onSaveFile = nil
+        onRevertFile = nil
+        onOpenInEditor = nil
+        isReady = false
+    }
+
     // MARK: - Diff API
 
     /// Render shells for the given files: metadata-only entries (filePath,

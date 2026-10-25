@@ -1042,6 +1042,12 @@ struct TerminalContainerView: View {
                 if isActive {
                     clearMenuFlags()
                 }
+            // ContentView keys this view by workstream, so disappearing is
+            // teardown: release objects whose callbacks capture this view.
+            editorBridge?.teardown()
+            diffBridge?.teardown()
+            directoryWatcher?.stop()
+            directoryWatcher = nil
             guard workspaceStarted else { return }
             surfaceCache.saveTabSnapshot(for: workstreamID, snapshot: currentTabSnapshot())
         }
@@ -2909,7 +2915,7 @@ final class TerminalSurfaceCache: ObservableObject {
                   let app = TerminalApp.shared.app else { return }
 
             respawning.insert(id)
-            surfaces.removeValue(forKey: id)
+            surfaces.removeValue(forKey: id)?.destroy()
             let newView = TerminalView(app: app, workingDirectory: params.workingDirectory, command: params.command, initialInput: params.initialInput, environmentVars: params.environmentVars, waitAfterCommand: params.waitAfterCommand)
             newView.workstreamID = id
             surfaces[id] = newView

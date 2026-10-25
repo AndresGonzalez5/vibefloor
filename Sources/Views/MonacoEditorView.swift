@@ -166,6 +166,19 @@ final class MonacoEditorBridge {
         return wv
     }
 
+    /// Breaks the userContentController → Coordinator → bridge retain cycle and
+    /// drops view-captured callbacks. Call when the owning workspace view goes away.
+    func teardown() {
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "editor")
+        webView?.removeFromSuperview()
+        webView = nil
+        coordinator = nil
+        appearanceObserver = nil
+        pendingOps.removeAll()
+        onContentChanged = nil
+        isReady = false
+    }
+
     // MARK: - Model API
 
     func openFile(modelId: String, text: String, languageId: String, filePath: String? = nil) {
