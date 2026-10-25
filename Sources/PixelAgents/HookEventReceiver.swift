@@ -427,18 +427,27 @@ final class HookEventReceiver: @unchecked Sendable {
             return [AgentEvent.removed(agentId: aid)]
 
         case "Notification":
-            // Claude Code emits Notification for permission prompts and idle
-            // reminders. notification_type says which; older payloads lack it,
-            // so fall back to the message, where over-reporting permission is
+            // Claude Code emits Notification for prompts that block on the
+            // user, the idle reminder, and informational pings.
+            // notification_type says which; older payloads lack it, so fall
+            // back to the message, where over-reporting permission is
             // preferable to under-reporting.
-            let isPermission: Bool
-            if let type = eventInput["notification_type"] as? String {
-                isPermission = type == "permission_prompt" || type == "agent_needs_input"
-            } else {
+            let status: String
+            switch eventInput["notification_type"] as? String {
+            case "permission_prompt", "worker_permission_prompt", "agent_needs_input",
+                 "elicitation_dialog", "elicitation_url_dialog":
+                status = "permissionRequired"
+            case "idle_prompt":
+                status = "idleNotification"
+            case .some:
+                // agent_completed, auth_success, ...: liveness only, never a
+                // turn end (idleNotification ends an interrupted turn).
+                status = "notification"
+            case nil:
                 let lower = ((eventInput["message"] as? String) ?? "").lowercased()
-                isPermission = lower.contains("permission") || lower.contains("approval")
+                let isPermission = lower.contains("permission") || lower.contains("approval")
+                status = isPermission ? "permissionRequired" : "idleNotification"
             }
-            let status = isPermission ? "permissionRequired" : "idleNotification"
             logger.info("Hook Notification: status=\(status, privacy: .public)")
             // agent_id names the waiting subagent; absent means main.
             return [AgentEvent.status(agentId: agentId(from: eventInput), status: status)]

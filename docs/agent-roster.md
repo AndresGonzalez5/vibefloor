@@ -36,7 +36,7 @@ for these events:
 | `UserPromptSubmit` | User sent a message | `agentWaiting` | Main run starts (working ring on the row) |
 | `SubagentStart` | Subagent spawned | `agentCreated` | New roster card for the subagent |
 | `SubagentStop` | Subagent finished | `agentRemoved` | That roster card removed |
-| `Notification` | Permission prompt / idle nudge (`agent_id` names a waiting subagent) | `agentStatus` | Permission: orange ring + badge. `idle_prompt` while main is still marked working (Esc interrupted the turn, no `Stop`) ends the turn like `Stop` |
+| `Notification` | Prompt blocking on the user / idle nudge / informational ping (`agent_id` names a waiting subagent) | `agentStatus` | Permission, elicitation, and needs-input types: orange ring + badge. `idle_prompt` while main is still marked working (Esc interrupted the turn, no `Stop`) ends the turn like `Stop`. Other types (`agent_completed`, `auth_success`, ...) only prove liveness |
 | `SessionStart` | New conversation (`startup` / `clear`; `resume` / `compact` ignored) | `agentSessionEnded` + `agentStatus` | Roster cleared; session stays live |
 | `SessionEnd` | Conversation ended | `agentSessionEnded` | Roster cleared |
 
@@ -124,7 +124,7 @@ character with an orange warning-triangle badge instead of any state ring
   the stall sweep's reaper: a subagent silent for 120 s between tools, or
   600 s mid-tool (a long build or test), is dropped; runs waiting on the user
   are never reaped. Children already stalled when main's `Stop` arrives are
-  dropped with the turn unless they are waiting on the user.
+  dropped with the turn unless they are waiting on the user or mid-tool.
 - The roster lists **subagents only**. The main agent's state ring, current
   activity line, and context meter render on the workstream row itself
   (`WorkstreamRow`), so no information is duplicated.

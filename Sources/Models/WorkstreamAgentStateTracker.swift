@@ -517,8 +517,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 }
                 // Children already stalled at the end of the turn lost their
                 // stop hook; drop them with the turn instead of holding it open.
-                // One blocked on the user still needs them, so it stays.
-                list.removeAll { !$0.isMain && $0.state == .stalled && !$0.isWaitingForUser }
+                // One blocked on the user still needs them, and one mid-tool
+                // (a background build) is just quiet — both stay for the reaper.
+                list.removeAll { !$0.isMain && $0.state == .stalled && !$0.isWaitingForUser && $0.activity == nil }
                 // ponytail: main idle removes only main while children live;
                 // children leave via their own idle. Full clear only when alone.
                 if list.contains(where: { !$0.isMain }) {

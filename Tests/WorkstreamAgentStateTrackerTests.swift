@@ -844,8 +844,20 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         }
         XCTAssertEqual(status(["notification_type": "permission_prompt", "message": "Claude wants to use Bash"]), "permissionRequired")
         XCTAssertEqual(status(["notification_type": "agent_needs_input", "message": "Waiting"]), "permissionRequired")
+        XCTAssertEqual(status(["notification_type": "elicitation_dialog", "message": "MCP server needs input"]), "permissionRequired")
+        XCTAssertEqual(status(["notification_type": "worker_permission_prompt"]), "permissionRequired")
         XCTAssertEqual(status(["notification_type": "idle_prompt", "message": "Claude is waiting, no permission needed"]), "idleNotification")
+        XCTAssertEqual(status(["notification_type": "agent_completed", "message": "Agent finished"]), "notification")
         XCTAssertEqual(status(["message": "Claude needs your permission to use Bash"]), "permissionRequired")
+    }
+
+    /// An informational notification mid-turn (a background agent finished)
+    /// proves liveness; only idle_prompt ends an interrupted turn.
+    func testInformationalNotificationKeepsTurnWorking() {
+        handle(.waiting(agentId: "main"))
+        handle(.status(agentId: "main", status: "notification"))
+        XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["main"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
     }
 
     /// A fresh Claude conversation (startup/clear) or an ended one resets the
@@ -1284,6 +1296,21 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         handle(.status(agentId: "sub-1", status: "permissionRequired"))
         handle(.idle(agentId: "main"))
         XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["sub-1"])
+    }
+
+    /// A background child stalls during a long tool (build, tests); main's
+    /// Stop must keep it and the row working, leaving it to the reaper.
+    func testMainIdleKeepsStalledChildMidTool() {
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+        handle(.toolStart(agentId: "sub-1", tool: "Bash", activity: "Running command"))
+        backdate("sub-1", secondsAgo: WorkstreamAgentStateTracker.stallThreshold + 5)
+        tracker.sweepForStalls(now: Date())
+        XCTAssertEqual(tracker.runs(for: wsID).first(where: { $0.id == "sub-1" })?.state, .stalled)
+
+        handle(.idle(agentId: "main"))
+        XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["sub-1"])
+        XCTAssertEqual(tracker.state(for: wsID), .working)
     }
 
     func testRunsWithoutCreateGetFallbackNames() {
