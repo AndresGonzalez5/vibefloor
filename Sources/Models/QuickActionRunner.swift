@@ -176,7 +176,9 @@ final class QuickActionRunner: ObservableObject {
         args.append("--no-session-persistence")
         args.append("--dangerously-skip-permissions")
 
-        let innerCommand = args.joined(separator: " ")
+        // FF_HOOK_DISABLE keeps this headless fork's hooks (SessionStart/End,
+        // Stop, tools) from being misattributed to the interactive session.
+        let innerCommand = "FF_HOOK_DISABLE=1 " + args.joined(separator: " ")
         let shell = CommandBuilder.userShell
         runShellCommand(action: action, shell: shell, arguments: ["-lic", innerCommand], workingDirectory: workingDirectory, parseJSON: true)
     }

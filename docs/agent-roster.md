@@ -31,14 +31,19 @@ for these events:
 | Hook Event | What it means | AgentEvent | Sidebar effect |
 |---|---|---|---|
 | `PreToolUse` | Agent is about to use a tool | `agentToolStart` (+ activity) | Run's activity text updates |
-| `PostToolUse` | Tool execution finished | `agentToolDone` | Activity cleared |
+| `PostToolUse` | Tool execution finished | `agentToolDone` | Activity cleared, run un-stalled, waiting cleared (the user answered any prompt) |
 | `Stop` | Main agent finished its turn | `agentIdle` | Main run ends: activity line and context meter leave the row; blue "finished" ring if unselected |
 | `UserPromptSubmit` | User sent a message | `agentWaiting` | Main run starts (working ring on the row) |
 | `SubagentStart` | Subagent spawned | `agentCreated` | New roster card for the subagent |
 | `SubagentStop` | Subagent finished | `agentRemoved` | That roster card removed |
-| `Notification` | Permission prompt / idle nudge | `agentStatus` | Orange permission ring + badge |
+| `Notification` | Prompt blocking on the user / idle nudge / informational ping (`agent_id` names a waiting subagent) | `agentStatus` | Permission, elicitation, and needs-input types: orange ring + badge. `idle_prompt` while main is still marked working (Esc interrupted the turn, no `Stop`) ends the turn like `Stop`. Other types (`agent_completed`, `auth_success`, ...) only prove liveness |
+| `SessionStart` | New conversation (`startup` / `clear`; `resume` / `compact` ignored) | `agentSessionEnded` + `agentStatus` | Roster cleared; session stays live |
+| `SessionEnd` | Conversation ended | `agentSessionEnded` | Roster cleared |
 
 Each hook entry uses `type: "command"` pointing to the bundled `ff-hook` script.
+Quick actions (Commit / Create PR) run a headless `claude -p --fork-session` in
+the worktree with `FF_HOOK_DISABLE=1`, which makes `ff-hook` exit immediately so
+their hooks never touch the interactive session's roster.
 
 Every payload also carries the session's `transcript_path`; the tracker reads
 context-window usage from its tail (see [Context window usage](#context-window-usage)).
@@ -114,9 +119,12 @@ character with an orange warning-triangle badge instead of any state ring
 
 ## Roster lifecycle
 
-- A run exists exactly from its create event (`UserPromptSubmit` /
-  `SubagentStart`) to its stop event (`Stop` / `SubagentStop`) — no artificial
-  collapse timers.
+- A run exists from its create event (`UserPromptSubmit` / `SubagentStart`)
+  to its stop event (`Stop` / `SubagentStop`). Lost stop hooks are covered by
+  the stall sweep's reaper: a subagent silent for 120 s between tools, or
+  600 s mid-tool (a long build or test), is dropped; runs waiting on the user
+  are never reaped. Children already stalled when main's `Stop` arrives are
+  dropped with the turn unless they are waiting on the user or mid-tool.
 - The roster lists **subagents only**. The main agent's state ring, current
   activity line, and context meter render on the workstream row itself
   (`WorkstreamRow`), so no information is duplicated.

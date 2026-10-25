@@ -10,7 +10,7 @@ FF_HOOK_PATH="/Applications/VibeFloor.app/Contents/Resources/Scripts/ff-hook"
 PASS=0
 FAIL=0
 
-HOOK_EVENTS=("PreToolUse" "PostToolUse" "Stop" "SubagentStart" "SubagentStop" "UserPromptSubmit")
+HOOK_EVENTS=("PreToolUse" "PostToolUse" "Stop" "SubagentStart" "SubagentStop" "UserPromptSubmit" "SessionStart" "SessionEnd")
 
 check() {
   local label="$1"
@@ -60,7 +60,7 @@ if os.path.exists(path):
         settings = json.load(f)
 
 hooks = settings.get('hooks', {})
-events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit']
+events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit', 'SessionStart', 'SessionEnd']
 entry = {'matcher': '', 'hooks': [{'type': 'command', 'command': '$hook_path', 'timeout': 5}]}
 
 for evt in events:
@@ -96,7 +96,7 @@ hooks = settings.get('hooks', {})
 if not hooks:
     exit(0)
 
-events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit']
+events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit', 'SessionStart', 'SessionEnd']
 modified = False
 for evt in events:
     entries = hooks.get(evt, [])
@@ -125,20 +125,20 @@ rm -f "$SETTINGS"
 simulate_install "$FF_HOOK_PATH"
 
 if [ -f "$SETTINGS" ]; then
-  # Check all 6 events have ff-hook
+  # Check all 8 events have ff-hook
   count=$(python3 -c "
 import json
 with open('$SETTINGS') as f:
     d = json.load(f)
 hooks = d.get('hooks', {})
-events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit']
+events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit', 'SessionStart', 'SessionEnd']
 count = sum(1 for e in events if any(any('ff-hook' in h.get('command','') for h in entry.get('hooks',[])) for entry in hooks.get(e, [])))
 print(count)
 ")
-  if [ "$count" = "6" ]; then
-    check "Created settings.json with all 6 hook events" "pass"
+  if [ "$count" = "8" ]; then
+    check "Created settings.json with all 8 hook events" "pass"
   else
-    check "Created settings.json with all 6 hook events (got $count)" "fail"
+    check "Created settings.json with all 8 hook events (got $count)" "fail"
   fi
 else
   check "Created settings.json" "fail"
@@ -154,7 +154,7 @@ import json
 with open('$SETTINGS') as f:
     d = json.load(f)
 hooks = d.get('hooks', {})
-events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit']
+events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit', 'SessionStart', 'SessionEnd']
 total = 0
 for e in events:
     entries = hooks.get(e, [])
@@ -162,10 +162,10 @@ for e in events:
     total += len(ff_entries)
 print(total)
 ")
-if [ "$dup_count" = "6" ]; then
-  check "No duplicate entries after second install (6 total)" "pass"
+if [ "$dup_count" = "8" ]; then
+  check "No duplicate entries after second install (8 total)" "pass"
 else
-  check "No duplicate entries after second install (got $dup_count, expected 6)" "fail"
+  check "No duplicate entries after second install (got $dup_count, expected 8)" "fail"
 fi
 
 # --- Test 3: Uninstall removes only ff-hook entries ---
@@ -192,7 +192,7 @@ import json
 with open('$SETTINGS') as f:
     d = json.load(f)
 hooks = d.get('hooks', {})
-events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit']
+events = ['PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit', 'SessionStart', 'SessionEnd']
 ff_count = sum(1 for e in events for entry in hooks.get(e, []) if any('ff-hook' in h.get('command','') for h in entry.get('hooks',[])))
 other_count = sum(1 for entry in hooks.get('PreToolUse', []) if any('other-hook' in h.get('command','') for h in entry.get('hooks',[])))
 print(f'{ff_count},{other_count}')

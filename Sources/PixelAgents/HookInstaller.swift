@@ -9,7 +9,7 @@ private let logger = Logger(subsystem: "factoryfloor", category: "hook-installer
 enum HookInstaller {
 
     /// Hook event types that ff-hook should be registered for.
-    private static let hookEvents = [
+    static let hookEvents = [ // internal for tests
         "PreToolUse",
         "PostToolUse",
         "Stop",
@@ -17,6 +17,8 @@ enum HookInstaller {
         "SubagentStop",
         "UserPromptSubmit",
         "Notification",
+        "SessionStart",
+        "SessionEnd",
     ]
 
     /// Path to the Claude Code user settings file.
