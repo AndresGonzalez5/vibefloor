@@ -390,6 +390,7 @@
 
 /* Sidebar - Agent state indicator */
 "Agent is working" = "Agent is working";
+"Agent is compacting its context" = "Agent is compacting its context";
 "Agent finished — needs review" = "Agent finished — needs review";
 "Agent is awaiting permission" = "Agent is awaiting permission";
 "Agent is idle" = "Agent is idle";

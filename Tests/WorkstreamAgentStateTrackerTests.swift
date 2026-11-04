@@ -882,16 +882,16 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertTrue(HookInstaller.hookEvents.contains("PostCompact"))
     }
 
-    /// /compact is a turn of its own: Working · Compacting, no stall during
-    /// the silent ~60s, then the blue Done ring like a finished turn.
+    /// /compact is a turn of its own: purple Compacting, no stall during the
+    /// silent ~60s, then the green Done ring like a finished turn.
     func testManualCompactShowsCompactingThenFinishes() {
         let receiver = HookEventReceiver.shared
         receiver.mapHookEvent(hookEventName: "PreCompact", eventInput: ["trigger": "manual"], projectDir: projectDir).forEach(handle)
-        XCTAssertEqual(tracker.state(for: wsID), .working)
-        XCTAssertEqual(tracker.runs(for: wsID).first?.activity, "Compacting")
+        XCTAssertEqual(tracker.state(for: wsID), .compacting)
+        XCTAssertNil(tracker.runs(for: wsID).first?.activity)
 
         tracker.sweepForStalls(now: Date().addingTimeInterval(60))
-        XCTAssertEqual(tracker.state(for: wsID), .working)
+        XCTAssertEqual(tracker.state(for: wsID), .compacting)
         XCTAssertEqual(tracker.runs(for: wsID).first?.state, .working)
 
         receiver.mapHookEvent(hookEventName: "PostCompact", eventInput: ["trigger": "manual"], projectDir: projectDir).forEach(handle)
@@ -903,13 +903,23 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
     func testAutoCompactResumesTurn() {
         let receiver = HookEventReceiver.shared
         handle(.waiting(agentId: "main"))
+        handle(.toolStart(agentId: "main", tool: "Edit", activity: "Editing Foo.swift"))
         receiver.mapHookEvent(hookEventName: "PreCompact", eventInput: ["trigger": "auto"], projectDir: projectDir).forEach(handle)
-        XCTAssertEqual(tracker.runs(for: wsID).first?.activity, "Compacting")
+        XCTAssertEqual(tracker.state(for: wsID), .compacting)
+        XCTAssertNil(tracker.runs(for: wsID).first?.activity, "stale tool text must not sit beside Compacting")
 
         receiver.mapHookEvent(hookEventName: "PostCompact", eventInput: ["trigger": "auto"], projectDir: projectDir).forEach(handle)
         XCTAssertEqual(tracker.runs(for: wsID).map(\.id), ["main"])
         XCTAssertNil(tracker.runs(for: wsID).first?.activity)
         XCTAssertEqual(tracker.state(for: wsID), .working)
+    }
+
+    /// A compaction that never reports back (PostCompact lost) still
+    /// surfaces as Stalled once the in-flight allowance runs out.
+    func testCompactingWithoutPostCompactEventuallyStalls() {
+        HookEventReceiver.shared.mapHookEvent(hookEventName: "PreCompact", eventInput: ["trigger": "manual"], projectDir: projectDir).forEach(handle)
+        tracker.sweepForStalls(now: Date().addingTimeInterval(WorkstreamAgentStateTracker.reapThresholdInFlight + 1))
+        XCTAssertEqual(tracker.state(for: wsID), .stalled)
     }
 
     // MARK: - Session switching (multiple sessions, one worktree)

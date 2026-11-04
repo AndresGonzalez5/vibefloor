@@ -470,8 +470,7 @@ final class HookEventReceiver: @unchecked Sendable {
             // /compact starts a turn of its own; auto-compact runs mid-turn.
             let trigger = eventInput["trigger"] as? String
             logger.info("Hook PreCompact: trigger=\(trigger ?? "-", privacy: .public)")
-            let compacting = AgentEvent.toolStart(agentId: "main", tool: "compact",
-                activity: NSLocalizedString("Compacting", comment: "Agent is compacting its conversation context"))
+            let compacting = AgentEvent.toolStart(agentId: "main", tool: "compact")
             return trigger == "manual" ? [.waiting(agentId: "main"), compacting] : [compacting]
 
         case "PostCompact":

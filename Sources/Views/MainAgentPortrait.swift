@@ -27,6 +27,7 @@ struct MainAgentPortrait: View {
     ) -> Color? {
         switch state {
         case .working: .blue
+        case .compacting: .purple
         case .stalled: .yellow
         case .needsAttention(.permission): .orange
         case .needsAttention(.justFinished): .green
@@ -55,6 +56,10 @@ struct MainAgentPortrait: View {
             ringedPortrait(color: .blue)
                 .shadow(color: .blue.opacity(0.35), radius: 3)
                 .accessibilityLabel(Text("Agent is working"))
+
+        case .compacting:
+            ringedPortrait(color: .purple)
+                .accessibilityLabel(Text("Agent is compacting its context"))
 
         case .stalled:
             ringedPortrait(color: .yellow)
@@ -136,6 +141,8 @@ struct MainAgentPortrait: View {
     private var pulsePeriod: TimeInterval? {
         switch state {
         case .working: 1.6
+        // Busy, but not on the user's task: slower than working.
+        case .compacting: 2.4
         case .stalled: 2.8
         case .needsAttention, .idle: nil
         }

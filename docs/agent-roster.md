@@ -32,15 +32,15 @@ for these events:
 |---|---|---|---|
 | `PreToolUse` | Agent is about to use a tool | `agentToolStart` (+ activity) | Run's activity text updates |
 | `PostToolUse` | Tool execution finished | `agentToolDone` | Activity cleared, run un-stalled, waiting cleared (the user answered any prompt) |
-| `Stop` | Main agent finished its turn | `agentIdle` | Main run ends: activity line and context meter leave the row; blue "finished" ring if unselected |
+| `Stop` | Main agent finished its turn | `agentIdle` | Main run ends: activity line and context meter leave the row; green "Done" ring if unselected |
 | `UserPromptSubmit` | User sent a message | `agentWaiting` | Main run starts (working ring on the row) |
 | `SubagentStart` | Subagent spawned | `agentCreated` | New roster card for the subagent |
 | `SubagentStop` | Subagent finished | `agentRemoved` | That roster card removed |
 | `Notification` | Prompt blocking on the user / idle nudge / informational ping (`agent_id` names a waiting subagent) | `agentStatus` | Permission, elicitation, and needs-input types: orange ring + badge. `idle_prompt` while main is still marked working (Esc interrupted the turn, no `Stop`) ends the turn like `Stop`. Other types (`agent_completed`, `auth_success`, ...) only prove liveness |
 | `SessionStart` | New conversation (`startup` / `clear`; `resume` / `compact` ignored) | `agentSessionEnded` + `agentStatus` | Roster cleared; session stays live |
 | `SessionEnd` | Conversation ended | `agentSessionEnded` | Roster cleared |
-| `PreCompact` | Context compaction starting (`trigger`: `manual` for `/compact`, `auto` mid-turn) | `agentToolStart` (tool `compact`; `manual` adds `agentWaiting` first) | Row working with "Compacting" activity; exempt from the 45s stall |
-| `PostCompact` | Compaction finished | `manual`: `agentIdle`; `auto`: `agentToolDone` | `manual` ends the turn like `Stop` (blue ring, meter re-read); `auto` clears the activity and the turn continues |
+| `PreCompact` | Context compaction starting (`trigger`: `manual` for `/compact`, `auto` mid-turn) | `agentToolStart` (tool `compact`; `manual` adds `agentWaiting` first) | Row `.compacting`: purple ring + "Compacting" status word; exempt from the 45s stall |
+| `PostCompact` | Compaction finished | `manual`: `agentIdle`; `auto`: `agentToolDone` | `manual` ends the turn like `Stop` (green Done ring, meter drops to `compact_boundary` `postTokens`); `auto` returns the row to `.working` |
 
 Each hook entry uses `type: "command"` pointing to the bundled `ff-hook` script.
 Quick actions (Commit / Create PR) run a headless `claude -p --fork-session` in
@@ -104,10 +104,11 @@ encodes the state:
 |---|---|---|
 | `.idle` (live session) | Desaturated, slightly dimmed character with a thin gray ring | No active turn, but ≥1 hook event seen since app launch |
 | `.idle` (dormant) | Character at ~20% opacity, no ring | No active turn and no harness activity this launch |
-| `.working` | Full color, pulsing green ring + subtle green glow | `UserPromptSubmit`, tool activity after a permission grant |
-| `.stalled` | Pulsing orange ring | No hook events for 45s mid-turn (swept every 15s); a compacting run gets the 10-minute in-flight allowance instead |
+| `.working` | Full color, pulsing blue ring + subtle blue glow | `UserPromptSubmit`, tool activity after a permission grant |
+| `.compacting` | Slower-pulsing purple ring | `PreCompact` until `PostCompact` or the next main tool event |
+| `.stalled` | Slow-pulsing yellow ring | No hook events for 45s mid-turn (swept every 15s); a compacting run gets the 10-minute in-flight allowance instead |
 | `.needsAttention(.permission)` | Static orange ring + orange exclamation badge | Notification hook reports a permission prompt |
-| `.needsAttention(.justFinished)` | Static blue ring | `Stop` on an unselected workstream; cleared by `markSeen` when selected |
+| `.needsAttention(.justFinished)` | Static green ring | `Stop` on an unselected workstream; cleared by `markSeen` when selected |
 
 Whether an idle workstream counts as "live" comes from
 `WorkstreamAgentStateTracker.liveSessionIDs` — an in-memory set of
@@ -131,7 +132,7 @@ character with an orange warning-triangle badge instead of any state ring
   activity line, and context meter render on the workstream row itself
   (`WorkstreamRow`), so no information is duplicated.
 - Each live subagent renders as a two-line mini card: a 20pt circular portrait
-  with its own state ring (green pulsing while working, orange when stalled),
+  with its own state ring (blue pulsing while working, yellow when stalled),
   the agent name plus model chip on the first line, and the current activity
   on the second.
 - The trailing side of a card shows, in order of precedence: **"Stalled"**

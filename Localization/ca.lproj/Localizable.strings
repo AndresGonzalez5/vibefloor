@@ -390,6 +390,7 @@
 
 /* Sidebar - Agent state indicator */
 "Agent is working" = "L'agent està treballant";
+"Agent is compacting its context" = "L'agent està compactant el seu context";
 "Agent finished — needs review" = "L'agent ha acabat — cal revisar";
 "Agent is awaiting permission" = "L'agent espera permís";
 "Agent is idle" = "L'agent està inactiu";
