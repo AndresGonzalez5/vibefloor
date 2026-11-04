@@ -248,7 +248,11 @@ struct ContentView: View {
                 let work = DispatchWorkItem { ProjectStore.save(newValue) }
                 saveWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
-                refreshAgentStateLookup(projects: newValue)
+            }
+            .onReceive(projectList.$items) { items in
+                // Project/Workstream equate by id only, so onChange misses workstream
+                // adds/removes inside a project; @Published fires on every write.
+                refreshAgentStateLookup(projects: items)
             }
             .onChange(of: spaceList.items) { _, newValue in
                 // Space edits are infrequent; persist immediately to avoid a
@@ -460,11 +464,6 @@ struct ContentView: View {
                     projects[pi].workstreams[wi].worktreePath = worktreePath
                     ProjectStore.save(projects)
                     appEnvironment.refreshPathValidity(projects: projects)
-                    // Project/Workstream equate by id only, so onChange(of: projectList.items)
-                    // doesn't fire when worktreePath flips from nil to a real value. Refresh
-                    // the agent-state lookup explicitly so hook events for this new workstream
-                    // can resolve to its UUID.
-                    refreshAgentStateLookup(projects: projects)
                     logger.warning("[FF] workstreamWorktreeReady: updated \(workstreamID, privacy: .public) with path \(worktreePath, privacy: .public)")
                     // Trigger vibe background setup (env copy, symlinks, Claude settings, deps)
                     let projectPath = projects[pi].directory
