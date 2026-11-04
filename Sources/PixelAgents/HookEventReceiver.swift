@@ -466,6 +466,19 @@ final class HookEventReceiver: @unchecked Sendable {
                 ? [AgentEvent.sessionEnded()]
                 : [AgentEvent.sessionEnded(), AgentEvent.status(agentId: "main", status: "sessionStarted")]
 
+        case "PreCompact":
+            // /compact starts a turn of its own; auto-compact runs mid-turn.
+            let trigger = eventInput["trigger"] as? String
+            logger.info("Hook PreCompact: trigger=\(trigger ?? "-", privacy: .public)")
+            let compacting = AgentEvent.toolStart(agentId: "main", tool: "compact")
+            return trigger == "manual" ? [.waiting(agentId: "main"), compacting] : [compacting]
+
+        case "PostCompact":
+            // Manual compact ends the turn (green Done ring); auto resumes the turn.
+            let trigger = eventInput["trigger"] as? String
+            logger.info("Hook PostCompact: trigger=\(trigger ?? "-", privacy: .public)")
+            return trigger == "manual" ? [.idle(agentId: "main")] : [.toolDone(agentId: "main")]
+
         default:
             logger.debug("Unhandled hook event: \(hookEventName, privacy: .public)")
             return []

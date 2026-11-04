@@ -29,6 +29,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     enum AgentRunState: Equatable {
         case idle
         case working
+        /// Main agent is compacting its context (`PreCompact` → `PostCompact`).
+        case compacting
         /// No hook events for a while although the turn hasn't ended.
         case stalled
         case needsAttention(NeedsReason)
@@ -72,6 +74,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         /// question tool). Waiting runs never sweep to stalled, and any live
         /// waiter suppresses the row-level stall promotion.
         var isWaitingForUser: Bool = false
+        /// True while the run compacts its context. Compaction is silent for
+        /// ~60s, past the stall threshold, so it gets the in-flight cutoff.
+        var isCompacting: Bool = false
         /// Var: a new user prompt restarts the main run's elapsed clock.
         var startedAt: Date
         var lastEventAt: Date
@@ -433,7 +438,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 } else if event.tool == "respond" {
                     // Heartbeat only — keep activity text and waiting flag.
                 } else {
-                    run.activity = event.activity ?? run.activity
+                    // The row's status word says "Compacting"; drop stale tool text.
+                    run.isCompacting = event.tool == "compact"
+                    run.activity = run.isCompacting ? nil : event.activity ?? run.activity
                     run.isWaitingForUser = false
                 }
                 if run.state == .stalled, !run.isWaitingForUser { run.state = .working }
@@ -449,6 +456,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 list[idx].activity = nil
                 list[idx].state = .working
                 list[idx].isWaitingForUser = false
+                list[idx].isCompacting = false
                 list[idx].lastEventAt = now
             }
 
@@ -462,6 +470,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 list[idx].startedAt = now
                 list[idx].activity = nil
                 list[idx].state = .working
+                list[idx].isCompacting = false
                 for i in list.indices {
                     list[i].isWaitingForUser = false
                 }
@@ -611,9 +620,19 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentToolStart, .agentToolDone:
+            if event.tool == "compact" {
+                // A background subagent's pending prompt outranks compaction.
+                let siblingWaiting = rosters[wsID]?.contains { $0.isWaitingForUser && $0.id != event.agentId } ?? false
+                if !siblingWaiting { states[wsID] = .compacting }
+                break
+            }
             // A finished tool proves main is alive again (toolStart un-stalls
-            // the row in updateRoster).
+            // the row in updateRoster); any real tool after compaction
+            // (auto-compact's PostCompact is a toolDone) resumes the turn.
             if event.type == .agentToolDone, states[wsID] == .stalled {
+                states[wsID] = .working
+            }
+            if states[wsID] == .compacting, event.tool != "respond" {
                 states[wsID] = .working
             }
             // Real tool activity while awaiting permission means the user
@@ -683,7 +702,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // on the user isn't stalling, even if row state hasn't caught up.
             let anyWaiting = updated.contains(where: { $0.isWaitingForUser })
             for idx in updated.indices {
-                guard updated[idx].state == .working, updated[idx].lastEventAt < cutoff else { continue }
+                let stallCutoff = updated[idx].isCompacting ? reapInFlightCutoff : cutoff
+                guard updated[idx].state == .working, updated[idx].lastEventAt < stallCutoff else { continue }
                 if updated[idx].isWaitingForUser { continue }
                 if anyWaiting { continue }
                 if case .needsAttention(.permission) = rowState { continue }
@@ -709,7 +729,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
             if updated.contains(where: { $0.isMain && $0.state == .stalled }),
                !hasFreshActivity,
-               case .working = rowState
+               rowState == .working || rowState == .compacting
             {
                 states[wsID] = .stalled
             }

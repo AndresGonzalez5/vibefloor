@@ -1066,7 +1066,7 @@ private struct WorkstreamRow: View {
     /// True while the agent is actively spending context this turn.
     private var isAgentActive: Bool {
         switch agentState {
-        case .working, .stalled: true
+        case .working, .compacting, .stalled: true
         case .idle, .needsAttention: false
         }
     }
@@ -1079,6 +1079,7 @@ private struct WorkstreamRow: View {
     private var statusText: LocalizedStringKey? {
         switch agentState {
         case .working: "Working"
+        case .compacting: "Compacting"
         case .stalled: "Stalled"
         case .needsAttention(.permission): "Waiting for approval"
         case .needsAttention(.justFinished): "Done"

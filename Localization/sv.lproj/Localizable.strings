@@ -390,6 +390,7 @@
 
 /* Sidebar - Agent state indicator */
 "Agent is working" = "Agenten arbetar";
+"Agent is compacting its context" = "Agenten komprimerar sin kontext";
 "Agent finished — needs review" = "Agenten är klar — behöver granskas";
 "Agent is awaiting permission" = "Agenten väntar på tillstånd";
 "Agent is idle" = "Agenten är inaktiv";
@@ -427,6 +428,7 @@
 "Planning" = "Planerar";
 "Asking question" = "Ställer fråga";
 "Delegating" = "Delegerar";
+"Compacting" = "Komprimerar";
 "Sub-agent" = "Underagent";
 "+%d more" = "+%d till";
 "Stalled" = "Avstannad";

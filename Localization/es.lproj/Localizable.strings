@@ -390,6 +390,7 @@
 
 /* Sidebar - Agent state indicator */
 "Agent is working" = "El agente está trabajando";
+"Agent is compacting its context" = "El agente está compactando su contexto";
 "Agent finished — needs review" = "El agente terminó — requiere revisión";
 "Agent is awaiting permission" = "El agente espera permiso";
 "Agent is idle" = "El agente está inactivo";
@@ -427,6 +428,7 @@
 "Planning" = "Planificando";
 "Asking question" = "Haciendo una pregunta";
 "Delegating" = "Delegando";
+"Compacting" = "Compactando";
 "Sub-agent" = "Subagente";
 "+%d more" = "+%d más";
 "Stalled" = "Estancado";
