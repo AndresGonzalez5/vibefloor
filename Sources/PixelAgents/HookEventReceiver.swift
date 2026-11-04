@@ -474,7 +474,7 @@ final class HookEventReceiver: @unchecked Sendable {
             return trigger == "manual" ? [.waiting(agentId: "main"), compacting] : [compacting]
 
         case "PostCompact":
-            // Manual compact ends the turn (blue Done ring); auto resumes the turn.
+            // Manual compact ends the turn (green Done ring); auto resumes the turn.
             let trigger = eventInput["trigger"] as? String
             logger.info("Hook PostCompact: trigger=\(trigger ?? "-", privacy: .public)")
             return trigger == "manual" ? [.idle(agentId: "main")] : [.toolDone(agentId: "main")]

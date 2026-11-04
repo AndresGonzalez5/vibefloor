@@ -8,6 +8,10 @@ enum TranscriptContextReader {
     /// newest assistant entry is always near the end. Parsing only the last
     /// ~256KB keeps huge sessions cheap to poll.
     private static let tailByteCount = 256 * 1024
+    /// Fallback when the tail holds no usable line: right after compaction
+    /// Claude Code writes the summary and re-attached files (seen up to
+    /// ~550KB) after the boundary line.
+    private static let compactTailByteCount = 2 * 1024 * 1024
 
     /// Reads the tail of a Claude Code transcript and extracts context usage.
     /// Returns nil when the file is missing, unreadable, or has no usable line.
@@ -16,12 +20,15 @@ enum TranscriptContextReader {
         defer { try? handle.close() }
         do {
             let size = try handle.seekToEnd()
-            let start = size > UInt64(tailByteCount) ? size - UInt64(tailByteCount) : 0
-            try handle.seek(toOffset: start)
-            guard let data = try handle.read(upToCount: tailByteCount),
-                  let contents = String(data: data, encoding: .utf8)
-            else { return nil }
-            return usage(contents: contents)
+            for count in [tailByteCount, compactTailByteCount] {
+                let start = size > UInt64(count) ? size - UInt64(count) : 0
+                try handle.seek(toOffset: start)
+                // Lossy decode: a seek landing mid-character must not drop the whole tail.
+                let data = try handle.read(upToCount: count) ?? Data()
+                if let usage = usage(contents: String(decoding: data, as: UTF8.self)) { return usage }
+                if start == 0 { break }
+            }
+            return nil
         } catch {
             return nil
         }

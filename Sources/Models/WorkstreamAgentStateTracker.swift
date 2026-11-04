@@ -621,7 +621,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
 
         case .agentToolStart, .agentToolDone:
             if event.tool == "compact" {
-                states[wsID] = .compacting
+                // A background subagent's pending prompt outranks compaction.
+                let siblingWaiting = rosters[wsID]?.contains { $0.isWaitingForUser && $0.id != event.agentId } ?? false
+                if !siblingWaiting { states[wsID] = .compacting }
                 break
             }
             // A finished tool proves main is alive again (toolStart un-stalls

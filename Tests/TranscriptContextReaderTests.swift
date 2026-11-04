@@ -38,6 +38,20 @@ final class TranscriptContextReaderTests: XCTestCase {
         XCTAssertEqual(resumed?.usedTokens, 4 + 123 + 45000)
     }
 
+    /// Claude Code writes the summary and re-attached files after the boundary
+    /// in one batch, often past the 256KB tail; the reader must still find it.
+    func testCompactBoundaryFoundPastLargePostCompactBatch() throws {
+        let boundary = #"{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual","postTokens":29293}}"#
+        let attachment = #"{"type":"attachment","content":""# + String(repeating: "x", count: 300 * 1024) + #""}"#
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jsonl")
+        try [opusOneMLine, boundary, attachment].joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let usage = TranscriptContextReader.usage(transcriptPath: url.path)
+        XCTAssertEqual(usage?.usedTokens, 29293)
+        XCTAssertEqual(usage?.limitTokens, 1_000_000)
+    }
+
     func testMissingCacheFieldsDefaultToZero() {
         let line = #"{"type":"assistant","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":42}}}"#
         let usage = TranscriptContextReader.usage(contents: line)

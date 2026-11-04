@@ -922,6 +922,19 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.state(for: wsID), .stalled)
     }
 
+    /// A background subagent's pending prompt outranks main's auto-compact:
+    /// the row stays orange through PreCompact and PostCompact.
+    func testAutoCompactKeepsSubagentPermissionAttention() {
+        let receiver = HookEventReceiver.shared
+        handle(.waiting(agentId: "main"))
+        handle(.created(agentId: "sub-1", name: "Explore", palette: 1))
+        handle(.status(agentId: "sub-1", status: "permissionRequired"))
+        receiver.mapHookEvent(hookEventName: "PreCompact", eventInput: ["trigger": "auto"], projectDir: projectDir).forEach(handle)
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+        receiver.mapHookEvent(hookEventName: "PostCompact", eventInput: ["trigger": "auto"], projectDir: projectDir).forEach(handle)
+        XCTAssertEqual(tracker.state(for: wsID), .needsAttention(.permission))
+    }
+
     // MARK: - Session switching (multiple sessions, one worktree)
 
     /// An explicit session switch drops the old snapshot so the new
