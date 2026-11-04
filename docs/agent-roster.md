@@ -39,6 +39,8 @@ for these events:
 | `Notification` | Prompt blocking on the user / idle nudge / informational ping (`agent_id` names a waiting subagent) | `agentStatus` | Permission, elicitation, and needs-input types: orange ring + badge. `idle_prompt` while main is still marked working (Esc interrupted the turn, no `Stop`) ends the turn like `Stop`. Other types (`agent_completed`, `auth_success`, ...) only prove liveness |
 | `SessionStart` | New conversation (`startup` / `clear`; `resume` / `compact` ignored) | `agentSessionEnded` + `agentStatus` | Roster cleared; session stays live |
 | `SessionEnd` | Conversation ended | `agentSessionEnded` | Roster cleared |
+| `PreCompact` | Context compaction starting (`trigger`: `manual` for `/compact`, `auto` mid-turn) | `agentToolStart` (tool `compact`; `manual` adds `agentWaiting` first) | Row working with "Compacting" activity; exempt from the 45s stall |
+| `PostCompact` | Compaction finished | `manual`: `agentIdle`; `auto`: `agentToolDone` | `manual` ends the turn like `Stop` (blue ring, meter re-read); `auto` clears the activity and the turn continues |
 
 Each hook entry uses `type: "command"` pointing to the bundled `ff-hook` script.
 Quick actions (Commit / Create PR) run a headless `claude -p --fork-session` in
@@ -103,7 +105,7 @@ encodes the state:
 | `.idle` (live session) | Desaturated, slightly dimmed character with a thin gray ring | No active turn, but ≥1 hook event seen since app launch |
 | `.idle` (dormant) | Character at ~20% opacity, no ring | No active turn and no harness activity this launch |
 | `.working` | Full color, pulsing green ring + subtle green glow | `UserPromptSubmit`, tool activity after a permission grant |
-| `.stalled` | Pulsing orange ring | No hook events for 45s mid-turn (swept every 15s) |
+| `.stalled` | Pulsing orange ring | No hook events for 45s mid-turn (swept every 15s); a compacting run gets the 10-minute in-flight allowance instead |
 | `.needsAttention(.permission)` | Static orange ring + orange exclamation badge | Notification hook reports a permission prompt |
 | `.needsAttention(.justFinished)` | Static blue ring | `Stop` on an unselected workstream; cleared by `markSeen` when selected |
 

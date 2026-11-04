@@ -427,6 +427,7 @@
 "Planning" = "Planning";
 "Asking question" = "Asking question";
 "Delegating" = "Delegating";
+"Compacting" = "Compacting";
 "Sub-agent" = "Sub-agent";
 "+%d more" = "+%d more";
 "Stalled" = "Stalled";

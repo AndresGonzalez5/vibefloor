@@ -426,6 +426,7 @@
 "Planning" = "Plane";
 "Asking question" = "Frage stellen";
 "Delegating" = "Delegiert";
+"Compacting" = "Komprimiert";
 "Sub-agent" = "Unteragent";
 "+%d more" = "+%d weitere";
 "Stalled" = "Blockiert";

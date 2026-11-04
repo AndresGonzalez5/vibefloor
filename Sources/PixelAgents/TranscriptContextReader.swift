@@ -27,15 +27,27 @@ enum TranscriptContextReader {
         }
     }
 
-    /// Pure variant over JSONL contents: finds the LAST assistant line carrying
-    /// `message.usage` and sums its input-side token counts (missing → 0).
+    /// Pure variant over JSONL contents: finds the LAST usable line and returns
+    /// its usage. Assistant lines carrying `message.usage` sum their input-side
+    /// token counts (missing → 0); a `compact_boundary` system line reports its
+    /// `compactMetadata.postTokens`, so the meter drops right after compaction.
     /// Malformed lines are skipped; never throws. Returns nil when no usable line.
     static func usage(contents: String) -> (usedTokens: Int, limitTokens: Int)? {
         var latest: (usedTokens: Int, limitTokens: Int)?
         for line in contents.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let data = String(line).data(using: .utf8),
-                  let entry = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  entry["type"] as? String == "assistant",
+                  let entry = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+            if entry["type"] as? String == "system", entry["subtype"] as? String == "compact_boundary",
+               let postTokens = (entry["compactMetadata"] as? [String: Any])?["postTokens"] as? Int
+            {
+                // ponytail: boundary lines carry no model; with no earlier
+                // assistant line in the tail the limit falls back to 200k until
+                // the next turn. Read the model from the session if that matters.
+                latest = (postTokens, latest?.limitTokens ?? ContextLimits.limitTokens(forModel: nil))
+                continue
+            }
+            guard entry["type"] as? String == "assistant",
                   let message = entry["message"] as? [String: Any],
                   let usageDict = message["usage"] as? [String: Any]
             else { continue }

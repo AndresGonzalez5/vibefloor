@@ -26,6 +26,18 @@ final class TranscriptContextReaderTests: XCTestCase {
         XCTAssertEqual(usage?.limitTokens, 1_000_000)
     }
 
+    /// A compact boundary drops the meter to the post-compact size, keeping
+    /// the earlier limit; the next assistant line takes over again.
+    func testCompactBoundaryReportsPostTokens() {
+        let boundary = #"{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual","preTokens":180000,"postTokens":29293}}"#
+        let compacted = TranscriptContextReader.usage(contents: [opusOneMLine, boundary].joined(separator: "\n"))
+        XCTAssertEqual(compacted?.usedTokens, 29293)
+        XCTAssertEqual(compacted?.limitTokens, 1_000_000)
+
+        let resumed = TranscriptContextReader.usage(contents: [opusOneMLine, boundary, sonnetLine].joined(separator: "\n"))
+        XCTAssertEqual(resumed?.usedTokens, 4 + 123 + 45000)
+    }
+
     func testMissingCacheFieldsDefaultToZero() {
         let line = #"{"type":"assistant","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":42}}}"#
         let usage = TranscriptContextReader.usage(contents: line)

@@ -19,6 +19,8 @@ enum HookInstaller {
         "Notification",
         "SessionStart",
         "SessionEnd",
+        "PreCompact",
+        "PostCompact",
     ]
 
     /// Path to the Claude Code user settings file.
