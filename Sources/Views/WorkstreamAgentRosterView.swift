@@ -214,6 +214,58 @@ private struct RosterAvatar: View {
     }
 }
 
+// MARK: - Background tasks
+
+/// One line per background shell or monitor Claude is running in a workstream.
+/// Label and command come from Claude, so they are rendered verbatim.
+struct BackgroundTaskList: View {
+    let tasks: [WorkstreamAgentStateTracker.BackgroundTask]
+    let onSelect: () -> Void
+
+    private static let maxVisibleLines = 3
+
+    private var hiddenCount: Int {
+        max(0, tasks.count - Self.maxVisibleLines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(tasks.prefix(Self.maxVisibleLines)) { task in
+                HStack(alignment: .center, spacing: 6) {
+                    Image(systemName: task.kind == .shell ? "terminal" : "waveform.path.ecg")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30)
+                    Text(verbatim: task.label)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 0)
+                    ElapsedLabel(startedAt: task.startedAt, fontSize: 9)
+                }
+                .padding(.vertical, 2)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onSelect)
+                .help(task.command ?? task.label)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(kindWord(task.kind)) + Text(verbatim: ", \(task.label)"))
+            }
+            if hiddenCount > 0 {
+                Text(String(format: NSLocalizedString("+%d more", comment: "Additional agents beyond the visible roster lines"), hiddenCount))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 36)
+                    .onTapGesture(perform: onSelect)
+            }
+        }
+    }
+
+    private func kindWord(_ kind: WorkstreamAgentStateTracker.BackgroundTask.Kind) -> LocalizedStringKey {
+        kind == .shell ? "Background shell" : "Monitor"
+    }
+}
+
 // MARK: - Elapsed time
 
 /// Ticking "4m"-style label counting up from a run's start. Shared by roster

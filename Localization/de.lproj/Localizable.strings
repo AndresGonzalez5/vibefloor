@@ -430,6 +430,8 @@
 "Compacting" = "Komprimiert";
 "Sub-agent" = "Unteragent";
 "+%d more" = "+%d weitere";
+"Background shell" = "Hintergrund-Shell";
+"Monitor" = "Monitor";
 "Stalled" = "Blockiert";
 "Working" = "Arbeitet";
 "Waiting for approval" = "Wartet auf Freigabe";
