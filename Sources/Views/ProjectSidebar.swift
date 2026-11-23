@@ -242,6 +242,14 @@ struct ProjectSidebar: View {
                                 }
                                 .padding(.leading, 6)
                             }
+
+                            let bgTasks = agentStateTracker.backgroundTasks(for: workstream.id)
+                            if !bgTasks.isEmpty {
+                                BackgroundTaskList(tasks: bgTasks) {
+                                    selectAndFocusAgent(workstreamID: workstream.id)
+                                }
+                                .padding(.leading, 6)
+                            }
                         }
                         .tag(SidebarSelection.workstream(workstream.id))
                         .padding(.leading, 8)

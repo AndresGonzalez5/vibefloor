@@ -431,6 +431,8 @@
 "Compacting" = "Komprimerar";
 "Sub-agent" = "Underagent";
 "+%d more" = "+%d till";
+"Background shell" = "Bakgrundsskal";
+"Monitor" = "Övervakning";
 "Stalled" = "Avstannad";
 "Working" = "Arbetar";
 "Waiting for approval" = "Väntar på godkännande";

@@ -1,5 +1,5 @@
 // ABOUTME: Per-workstream Claude agent roster derived from lifecycle hook events.
-// ABOUTME: Tracks main + subagent runs (activity, stalls) and drives the sidebar UI.
+// ABOUTME: Tracks main + subagent runs (activity, stalls) and background tasks for the sidebar UI.
 
 import Foundation
 import os
@@ -82,6 +82,29 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         var lastEventAt: Date
     }
 
+    /// A Claude background shell or monitor. It outlives the turn that started
+    /// it, so it lives in its own list instead of the roster.
+    struct BackgroundTask: Identifiable, Equatable {
+        enum Kind { case shell, monitor }
+
+        /// Claude's task id.
+        let id: String
+        let kind: Kind
+        let label: String
+        let command: String?
+        let startedAt: Date
+        /// Main session transcript, scanned for the task's completion notification.
+        let transcriptPath: String
+        /// Agent that started the task ("main" or a subagent id).
+        let ownerAgentID: String
+        /// Claude kills the task, unannounced, when its owner finishes.
+        let endsWithOwner: Bool
+        /// Transcript filename without its extension, which is Claude's `session_id`.
+        var sessionID: String {
+            URL(fileURLWithPath: transcriptPath).deletingPathExtension().lastPathComponent
+        }
+    }
+
     /// Context-window consumption of a workstream's main session.
     struct ContextUsage: Equatable {
         let usedTokens: Int
@@ -108,7 +131,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     @Published private(set) var liveSessionIDs: Set<UUID> = []
     /// Latest known context-window usage for each workstream's MAIN session.
     @Published private(set) var contextUsage: [UUID: ContextUsage] = [:]
+    /// Live background shells and monitors per workstream. Never holds empty arrays.
+    @Published private(set) var backgroundTasks: [UUID: [BackgroundTask]] = [:]
 
+    /// Byte offset per watched transcript up to which completion
+    /// notifications have been scanned.
+    private var transcriptScanOffsets: [String: UInt64] = [:]
     private var lastContextReadAt: [UUID: Date] = [:]
     /// Harness session currently tracked per workstream (OpenCode `session_id`).
     /// A new conversation in the same worktree must reset roster and context
@@ -139,6 +167,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     /// Live agent runs for a workstream, main agent first.
     func runs(for id: UUID) -> [AgentRun] {
         rosters[id] ?? []
+    }
+
+    /// Live background tasks for a workstream, in start order.
+    func backgroundTasks(for id: UUID) -> [BackgroundTask] {
+        backgroundTasks[id] ?? []
     }
 
     /// Number of live agent runs (main + subagents).
@@ -173,7 +206,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     }
 
     /// Drops all tracked state for a workstream (called when it is removed).
-    func clear(workstreamID: UUID) {
+    /// A `sessionTranscript` keeps the background tasks of other Claude
+    /// sessions in the worktree and drops only that session's.
+    func clear(workstreamID: UUID, sessionTranscript: String? = nil) {
         states.removeValue(forKey: workstreamID)
         rosters.removeValue(forKey: workstreamID)
         liveSessionIDs.remove(workstreamID)
@@ -181,6 +216,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         lastContextReadAt.removeValue(forKey: workstreamID)
         currentSessionIDs.removeValue(forKey: workstreamID)
         currentTranscriptPaths.removeValue(forKey: workstreamID)
+        if let sessionTranscript {
+            removeBackgroundTasks(wsID: workstreamID) { $0.transcriptPath == sessionTranscript }
+        } else {
+            backgroundTasks.removeValue(forKey: workstreamID)
+        }
+        pruneScanOffsets()
     }
 
     /// Clears every tracked state. Used by tests to isolate cases.
@@ -192,6 +233,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         lastContextReadAt.removeAll()
         currentSessionIDs.removeAll()
         currentTranscriptPaths.removeAll()
+        backgroundTasks.removeAll()
+        transcriptScanOffsets.removeAll()
         workstreamLookup = nil
         currentSelection = nil
     }
@@ -224,9 +267,16 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             return
         }
         // Session over: nothing in it is live anymore, including children
-        // whose stop hooks never fired.
+        // whose stop hooks never fired. Hooks are global, so another session's
+        // background tasks in the worktree survive.
         if event.type == .agentSessionEnded {
-            clear(workstreamID: wsID)
+            clear(workstreamID: wsID, sessionTranscript: event.transcriptPath)
+            return
+        }
+        // Background tasks outlive turns, so they never touch the roster or row state.
+        if event.type == .backgroundTaskStarted || event.type == .backgroundTaskEnded {
+            ensureSweepTimer()
+            updateBackgroundTasks(wsID: wsID, event: event)
             return
         }
         // Esc interrupts a turn without a Stop hook; Claude's idle_prompt
@@ -244,6 +294,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         liveSessionIDs.insert(wsID)
         detectSessionSwitch(wsID: wsID, event: event)
         updateRoster(wsID: wsID, event: event)
+        if event.type == .agentRemoved {
+            // A synchronous subagent's background commands die with it, and no
+            // completion notification follows.
+            removeBackgroundTasks(wsID: wsID) { $0.endsWithOwner && $0.ownerAgentID == event.agentId }
+        }
         // Permission/question prompts block forward progress no matter which
         // run asked — a subagent waiting on input still needs the user to act,
         // so any live waiter raises row-level attention (decision: option A).
@@ -540,9 +595,8 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 list.removeAll { $0.id == event.agentId }
             }
 
-        case .agentSessionSwitched, .agentSessionEnded:
-            // Reset already performed in detectSessionSwitch / handle before
-            // this ran; no roster mutation here.
+        case .agentSessionSwitched, .agentSessionEnded, .backgroundTaskStarted, .backgroundTaskEnded:
+            // Handled in detectSessionSwitch / handle; no roster mutation here.
             break
 
         case .agentStatus:
@@ -652,7 +706,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 }
             }
 
-        case .agentCreated, .agentRemoved, .agentInfo, .agentSessionEnded:
+        case .agentCreated, .agentRemoved, .agentInfo, .agentSessionEnded, .backgroundTaskStarted, .backgroundTaskEnded:
             break
         }
     }
@@ -670,13 +724,125 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         return index
     }
 
+    // MARK: - Background Tasks
+
+    private func updateBackgroundTasks(wsID: UUID, event: AgentEvent) {
+        guard let taskID = event.backgroundTaskID else { return }
+        var list = backgroundTasks[wsID] ?? []
+        if event.type == .backgroundTaskStarted {
+            guard let path = event.transcriptPath, !list.contains(where: { $0.id == taskID }) else { return }
+            // A command that dies at once can be reported before this hook
+            // lands, and the scan below never looks back. Task ids are unique,
+            // so older text can't end the wrong task.
+            if Self.endedBackgroundTaskIDs(in: Self.transcriptTail(path)).contains(taskID) {
+                return
+            }
+            // Scan from the file's current end: the check above covered earlier text.
+            if transcriptScanOffsets[path] == nil {
+                let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? UInt64
+                transcriptScanOffsets[path] = size ?? 0
+            }
+            list.append(BackgroundTask(
+                id: taskID,
+                kind: event.tool == "Monitor" ? .monitor : .shell,
+                label: event.taskDescription ?? event.tool ?? "",
+                command: event.command,
+                startedAt: Date(),
+                transcriptPath: path,
+                ownerAgentID: event.agentId,
+                endsWithOwner: event.backgroundEndsWithOwner == true
+            ))
+        } else {
+            guard list.contains(where: { $0.id == taskID }) else { return }
+            list.removeAll { $0.id == taskID }
+        }
+        backgroundTasks[wsID] = list.isEmpty ? nil : list
+        pruneScanOffsets()
+    }
+
+    private func removeBackgroundTasks(wsID: UUID, where shouldRemove: (BackgroundTask) -> Bool) {
+        guard let list = backgroundTasks[wsID], list.contains(where: shouldRemove) else { return }
+        let kept = list.filter { !shouldRemove($0) }
+        backgroundTasks[wsID] = kept.isEmpty ? nil : kept
+        pruneScanOffsets()
+    }
+
+    /// Last 64 KiB of a transcript, lossily decoded; empty when unreadable.
+    private static func transcriptTail(_ path: String) -> String {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return "" }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(),
+              (try? handle.seek(toOffset: size - min(size, 65536))) != nil,
+              let data = try? handle.readToEnd() else { return "" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private func pruneScanOffsets() {
+        let watched = Set(backgroundTasks.values.joined().map(\.transcriptPath))
+        transcriptScanOffsets = transcriptScanOffsets.filter { watched.contains($0.key) }
+    }
+
+    /// Drops background tasks whose completion notification landed in their
+    /// transcript, or whose Claude session is gone. `liveSessions` nil means
+    /// unknown, so no task is dropped for it. Internal for tests.
+    func scanBackgroundTasks(liveSessions: @autoclosure () -> Set<String>? = ClaudeSleepGuard.liveSessionIDs()) {
+        // Before liveSessions is evaluated: the default lists ~/.claude/sessions.
+        guard !backgroundTasks.isEmpty else { return }
+        let liveSessions = liveSessions()
+        var ended = Set<String>()
+        for (path, offset) in transcriptScanOffsets {
+            guard let handle = FileHandle(forReadingAtPath: path) else { continue }
+            defer { try? handle.close() }
+            guard let size = try? handle.seekToEnd() else { continue }
+            if size < offset {
+                // Truncated or replaced: resume from the new end.
+                transcriptScanOffsets[path] = size
+                continue
+            }
+            guard size > offset,
+                  (try? handle.seek(toOffset: offset)) != nil,
+                  let data = try? handle.readToEnd(),
+                  let lastNewline = data.lastIndex(of: UInt8(ascii: "\n")) else { continue }
+            // Only complete lines; a partial trailing line is re-read next scan.
+            let complete = data[...lastNewline]
+            transcriptScanOffsets[path] = offset + UInt64(complete.count)
+            ended.formUnion(Self.endedBackgroundTaskIDs(in: String(decoding: complete, as: UTF8.self)))
+        }
+        let updated = backgroundTasks.compactMapValues { list -> [BackgroundTask]? in
+            let kept = list.filter { task in
+                !ended.contains(task.id) && (liveSessions?.contains(task.sessionID) ?? true)
+            }
+            return kept.isEmpty ? nil : kept
+        }
+        guard updated != backgroundTasks else { return }
+        backgroundTasks = updated
+        pruneScanOffsets()
+    }
+
+    /// Ids of background tasks that `text` reports as finished. Claude appends
+    /// a `<task-notification>` with a `<status>` when a task ends; Monitor
+    /// events carry no status. Works on raw JSONL, where newlines are escaped.
+    static func endedBackgroundTaskIDs(in text: String) -> Set<String> {
+        var ids = Set<String>()
+        for chunk in text.components(separatedBy: "<task-notification>").dropFirst() {
+            let body = chunk.components(separatedBy: "</task-notification>")[0]
+            guard body.contains("<status>"),
+                  let open = body.range(of: "<task-id>"),
+                  let close = body.range(of: "</task-id>", range: open.upperBound ..< body.endIndex) else { continue }
+            ids.insert(body[open.upperBound ..< close.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return ids
+    }
+
     // MARK: - Stall Detection
 
     private func ensureSweepTimer() {
         guard sweepTimer == nil else { return }
         let timer = Timer(timeInterval: Self.sweepInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.sweepForStalls()
+                guard let self else { return }
+                self.sweepForStalls()
+                self.scanBackgroundTasks()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -697,6 +863,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 $0.isMain || $0.isWaitingForUser || $0.lastEventAt >= ($0.activity != nil ? reapInFlightCutoff : reapCutoff)
             }
             var changed = updated.count != list.count
+            if changed {
+                // A reaped subagent gets no stop event, so release what its stop would have.
+                let live = Set(updated.map(\.id))
+                let reaped = Set(list.map(\.id)).subtracting(live)
+                removeBackgroundTasks(wsID: wsID) { $0.endsWithOwner && reaped.contains($0.ownerAgentID) }
+            }
             let rowState = states[wsID] ?? .idle
             // Any live waiter (main or subagent) suppresses stalling: waiting
             // on the user isn't stalling, even if row state hasn't caught up.

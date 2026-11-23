@@ -835,6 +835,76 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertNil(main.first?.name)
     }
 
+    // MARK: - Background task hooks
+
+    private func postToolUse(_ json: String) throws -> [AgentEvent] {
+        let input = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        return HookEventReceiver.shared.mapHookEvent(hookEventName: "PostToolUse", eventInput: input, projectDir: "\(projectDir)-\(UUID().uuidString)")
+    }
+
+    func testBackgroundBashMapsToStartedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"sleep 20","description":"tracer sleep","run_in_background":true},"tool_response":{"stdout":"","stderr":"","interrupted":false,"isImage":false,"noOutputExpected":false,"backgroundTaskId":"bf28bcg72"}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone, .backgroundTaskStarted])
+        let started = events[1]
+        XCTAssertEqual(started.backgroundTaskID, "bf28bcg72")
+        XCTAssertEqual(started.tool, "Bash")
+        XCTAssertEqual(started.taskDescription, "tracer sleep")
+        XCTAssertEqual(started.command, "sleep 20")
+    }
+
+    func testBackgroundBashLabelFallsBackToFirstCommandLine() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"\n  python3 -m http.server 8000\necho hi","run_in_background":true},"tool_response":{"backgroundTaskId":"b1"}}"#)
+        XCTAssertEqual(events.last?.taskDescription, "python3 -m http.server 8000")
+    }
+
+    func testBackgroundBashLabelCapsCommandAt60() throws {
+        let cmd = String(repeating: "x", count: 100)
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"\#(cmd)","run_in_background":true},"tool_response":{"backgroundTaskId":"b1"}}"#)
+        XCTAssertEqual(events.last?.taskDescription?.count, 60)
+    }
+
+    /// Ctrl+B (or a timed-out command) backgrounds a Bash call without `run_in_background`.
+    func testBashBackgroundedByUserMapsToStartedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"npm run dev","description":"Start dev server"},"tool_response":{"stdout":"","stderr":"","interrupted":false,"isImage":false,"noOutputExpected":false,"backgroundTaskId":"bctrlb001","backgroundedByUser":true}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone, .backgroundTaskStarted])
+        XCTAssertEqual(events[1].backgroundTaskID, "bctrlb001")
+        XCTAssertEqual(events[1].taskDescription, "Start dev server")
+    }
+
+    /// A synchronous subagent's background command is killed with it, unannounced.
+    func testSubagentBackgroundBashCarriesEndsWithOwnerFlag() throws {
+        let events = try postToolUse(#"{"hook_event_name":"PostToolUse","tool_name":"Bash","agent_id":"ad3653b20b0eddd37","agent_type":"general-purpose","tool_input":{"command":"sleep 40","description":"sub bg","run_in_background":true},"tool_response":{"stdout":"","stderr":"","interrupted":false,"isImage":false,"noOutputExpected":false,"backgroundTaskId":"buau35kyf","backgroundEndsWithFinalResponse":true}}"#)
+        let started = try XCTUnwrap(events.first(where: { $0.type == .backgroundTaskStarted }))
+        XCTAssertEqual(started.agentId, "ad3653b20b0eddd37")
+        XCTAssertEqual(started.backgroundTaskID, "buau35kyf")
+        XCTAssertEqual(started.backgroundEndsWithOwner, true)
+    }
+
+    func testForegroundBashEmitsOnlyToolDone() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"ls"},"tool_response":{"stdout":"","stderr":""}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone])
+    }
+
+    func testMonitorMapsToStartedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"Monitor","tool_input":{"command":"for i in 1 2; do echo tick $i; sleep 2; done","description":"tracer ticks","timeout_ms":30000},"tool_response":{"taskId":"b600qk6fu","timeoutMs":30000,"persistent":false}}"#)
+        let started = try XCTUnwrap(events.first(where: { $0.type == .backgroundTaskStarted }))
+        XCTAssertEqual(started.tool, "Monitor")
+        XCTAssertEqual(started.backgroundTaskID, "b600qk6fu")
+        XCTAssertEqual(started.taskDescription, "tracer ticks")
+    }
+
+    func testTaskStopMapsToEndedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"TaskStop","tool_input":{"task_id":"bf28bcg72"},"tool_response":{"message":"Successfully stopped task: bf28bcg72 (sleep 20)","task_id":"bf28bcg72","task_type":"local_bash","command":"sleep 20"}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone, .backgroundTaskEnded])
+        XCTAssertEqual(events[1].backgroundTaskID, "bf28bcg72")
+    }
+
+    func testTaskStopWithDeprecatedShellIDMapsToEndedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"TaskStop","tool_input":{"shell_id":"bold0001"},"tool_response":{"message":"Successfully stopped task: bold0001 (sleep 9)","task_id":"bold0001","task_type":"local_bash","command":"sleep 9"}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone, .backgroundTaskEnded])
+        XCTAssertEqual(events[1].backgroundTaskID, "bold0001")
+    }
+
     /// notification_type is authoritative; the message text is only a
     /// fallback for payloads that predate it.
     func testClaudeNotificationTypeDecidesStatus() {
@@ -1376,5 +1446,217 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
 
         handle(.toolStart(agentId: "main", tool: "Read"))
         XCTAssertEqual(tracker.runs(for: wsID).first(where: { $0.id == "main" })?.name, "Claude")
+    }
+
+    // MARK: - Background tasks
+
+    private func startBackground(
+        _ id: String,
+        tool: String = "Bash",
+        transcript: String = "/tmp/ff-no-such-dir/sess-1.jsonl",
+        agentId: String = "main",
+        endsWithOwner: Bool = false
+    ) {
+        var event = AgentEvent.backgroundTaskStarted(agentId: agentId, taskID: id, tool: tool, label: "label \(id)", command: "cmd \(id)")
+        event.transcriptPath = transcript
+        event.backgroundEndsWithOwner = endsWithOwner
+        handle(event)
+    }
+
+    private var backgroundIDs: [String] {
+        tracker.backgroundTasks(for: wsID).map(\.id)
+    }
+
+    /// `sess-1.jsonl` in a fresh temp directory, removed after the test.
+    private func makeSessionTranscript(_ contents: String = "") throws -> String {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("sess-1.jsonl")
+        try contents.write(to: url, atomically: true, encoding: .utf8)
+        return url.path
+    }
+
+    private func append(_ text: String, to path: String) throws {
+        let handle = try XCTUnwrap(FileHandle(forWritingAtPath: path))
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(text.utf8))
+    }
+
+    /// A raw transcript line (escaped `\n`, as Claude writes it) announcing a finished task.
+    private func notificationLine(_ id: String) -> String {
+        #"{"type":"queue-operation","operation":"enqueue","content":"<task-notification>\n<task-id>\#(id)</task-id>\n<status>completed</status>\n</task-notification>"}"# + "\n"
+    }
+
+    func testEndedBackgroundTaskIDsDetectsEveryStatus() {
+        for status in ["completed", "failed", "killed", "stopped"] {
+            let text = "<task-notification>\n<task-id> b1 </task-id>\n<status>\(status)</status>\n</task-notification>"
+            XCTAssertEqual(WorkstreamAgentStateTracker.endedBackgroundTaskIDs(in: text), ["b1"], status)
+        }
+    }
+
+    func testEndedBackgroundTaskIDsIgnoresMonitorEvents() {
+        let text = "<task-notification>\n<task-id>b600qk6fu</task-id>\n<summary>Monitor event: \"tracer ticks\"</summary>\n<event>tick 1</event>\n</task-notification>"
+        XCTAssertEqual(WorkstreamAgentStateTracker.endedBackgroundTaskIDs(in: text), [])
+    }
+
+    func testEndedBackgroundTaskIDsReadsRawJSONL() {
+        let line = #"{"type":"queue-operation","operation":"enqueue","timestamp":"2026-11-23T13:30:00.000Z","sessionId":"86b0718a","content":"<task-notification>\n<task-id>b600qk6fu</task-id>\n<status>completed</status>\n<summary>Monitor \"tracer ticks\" stream ended</summary>\n</task-notification>"}"#
+        XCTAssertEqual(WorkstreamAgentStateTracker.endedBackgroundTaskIDs(in: line), ["b600qk6fu"])
+    }
+
+    func testBackgroundTaskStartRecordsTask() {
+        startBackground("b1")
+        startBackground("m1", tool: "Monitor")
+        startBackground("b1")
+        let tasks = tracker.backgroundTasks(for: wsID)
+        XCTAssertEqual(tasks.map(\.id), ["b1", "m1"])
+        XCTAssertEqual(tasks.map(\.kind), [.shell, .monitor])
+        XCTAssertEqual(tasks[0].label, "label b1")
+        XCTAssertEqual(tasks[0].command, "cmd b1")
+        XCTAssertEqual(tasks[0].sessionID, "sess-1")
+    }
+
+    func testBackgroundTaskStartWithoutTranscriptIsIgnored() {
+        handle(.backgroundTaskStarted(agentId: "main", taskID: "b1", tool: "Bash", label: "x", command: nil))
+        XCTAssertEqual(backgroundIDs, [])
+    }
+
+    func testBackgroundTaskOutlivesTurnWithoutTouchingRoster() {
+        startBackground("b1")
+        XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+        XCTAssertEqual(tracker.state(for: wsID), .idle)
+        XCTAssertFalse(tracker.hasLiveSession(for: wsID))
+
+        handle(.waiting(agentId: "main"))
+        handle(.idle(agentId: "main"))
+        tracker.sweepForStalls(now: Date().addingTimeInterval(3600))
+        XCTAssertEqual(backgroundIDs, ["b1"])
+    }
+
+    func testBackgroundTaskEndedAndSessionEndedRemoveTasks() {
+        startBackground("b1")
+        startBackground("b2")
+        handle(.backgroundTaskEnded(agentId: "main", taskID: "b1"))
+        XCTAssertEqual(backgroundIDs, ["b2"])
+
+        handle(.sessionEnded())
+        XCTAssertEqual(backgroundIDs, [])
+        XCTAssertTrue(tracker.backgroundTasks.isEmpty)
+    }
+
+    /// Hooks are global: another Claude session ending (or starting) in the
+    /// worktree must not drop the first session's running tasks.
+    func testSessionEndedRemovesOnlyThatSessionsTasks() {
+        startBackground("a", transcript: "/x/a.jsonl")
+        startBackground("b", transcript: "/x/b.jsonl")
+        handle(.waiting(agentId: "main"))
+
+        var ended = AgentEvent.sessionEnded()
+        ended.transcriptPath = "/x/a.jsonl"
+        handle(ended)
+        XCTAssertEqual(backgroundIDs, ["b"])
+        XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+        XCTAssertEqual(tracker.state(for: wsID), .idle)
+        XCTAssertFalse(tracker.hasLiveSession(for: wsID))
+
+        startBackground("a", transcript: "/x/a.jsonl")
+        handle(.sessionEnded())
+        XCTAssertEqual(backgroundIDs, [])
+    }
+
+    func testSubagentStopRemovesOnlyItsEndsWithOwnerTasks() {
+        let sub = "ad3653b20b0eddd37"
+        startBackground("flagged", agentId: sub, endsWithOwner: true)
+        startBackground("async", agentId: sub)
+        startBackground("main-task")
+        handle(.removed(agentId: sub))
+        XCTAssertEqual(backgroundIDs, ["async", "main-task"])
+    }
+
+    /// A subagent whose stop hook was lost is reaped by the sweep, which must
+    /// release the same tasks its stop would have.
+    func testReapedSubagentRemovesItsEndsWithOwnerTasks() {
+        let sub = "ad3653b20b0eddd37"
+        handle(.created(agentId: sub, name: "build", palette: 1))
+        startBackground("flagged", agentId: sub, endsWithOwner: true)
+        startBackground("async", agentId: sub)
+        startBackground("main-task")
+        tracker._backdateRun(
+            agentId: sub,
+            workstreamID: wsID,
+            lastEventAt: Date().addingTimeInterval(-(WorkstreamAgentStateTracker.reapThreshold + 10))
+        )
+        tracker.sweepForStalls(now: Date())
+        XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+        XCTAssertEqual(backgroundIDs, ["async", "main-task"])
+    }
+
+    func testScanRemovesTaskWithCompletionNotification() throws {
+        let path = try makeSessionTranscript()
+        startBackground("A", transcript: path)
+        startBackground("B", transcript: path)
+        try append(notificationLine("A"), to: path)
+
+        tracker.scanBackgroundTasks(liveSessions: ["sess-1"])
+        XCTAssertEqual(backgroundIDs, ["B"])
+    }
+
+    /// A command that dies at once can be reported before its start hook lands.
+    func testStartIgnoresTaskAlreadyReportedEnded() throws {
+        let path = try makeSessionTranscript(notificationLine("B"))
+        startBackground("B", transcript: path)
+        XCTAssertEqual(backgroundIDs, [])
+    }
+
+    /// Same race on a watched path: a scan consumed B's notification while B was unknown.
+    func testStartIgnoresTaskWhoseNotificationAScanConsumed() throws {
+        let path = try makeSessionTranscript()
+        startBackground("A", transcript: path)
+        try append(notificationLine("B"), to: path)
+        tracker.scanBackgroundTasks(liveSessions: ["sess-1"])
+
+        startBackground("B", transcript: path)
+        XCTAssertEqual(backgroundIDs, ["A"])
+    }
+
+    /// Offsets are dropped once no task watches the path, so a later task
+    /// starts reading from the file's size at its own start.
+    func testScanOffsetResetsAfterAllTasksEnd() throws {
+        let path = try makeSessionTranscript()
+        startBackground("A", transcript: path)
+        handle(.backgroundTaskEnded(agentId: "main", taskID: "A"))
+        // Padding pushes it past the start-time tail check, so only the offset hides it.
+        try append(notificationLine("B") + String(repeating: "x", count: 65536) + "\n", to: path)
+        startBackground("B", transcript: path)
+
+        tracker.scanBackgroundTasks(liveSessions: ["sess-1"])
+        XCTAssertEqual(backgroundIDs, ["B"])
+    }
+
+    func testScanWaitsForPartialLineToComplete() throws {
+        let path = try makeSessionTranscript()
+        startBackground("B", transcript: path)
+        let line = notificationLine("B")
+        let cut = try XCTUnwrap(line.range(of: "</task-notification>")).lowerBound
+        // A complete line first, so the scan has a newline to stop at.
+        try append("{}\n" + String(line[..<cut]), to: path)
+
+        tracker.scanBackgroundTasks(liveSessions: ["sess-1"])
+        XCTAssertEqual(backgroundIDs, ["B"])
+
+        try append(String(line[cut...]), to: path)
+        tracker.scanBackgroundTasks(liveSessions: ["sess-1"])
+        XCTAssertEqual(backgroundIDs, [])
+    }
+
+    func testScanDropsTasksOfDeadSessionsOnlyWhenKnown() {
+        startBackground("b1")
+        tracker.scanBackgroundTasks(liveSessions: nil)
+        XCTAssertEqual(backgroundIDs, ["b1"])
+
+        tracker.scanBackgroundTasks(liveSessions: [])
+        XCTAssertEqual(backgroundIDs, [])
     }
 }

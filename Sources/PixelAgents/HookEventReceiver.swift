@@ -373,6 +373,54 @@ final class HookEventReceiver: @unchecked Sendable {
         return events
     }
 
+    /// Label for a background task line: description, else the first
+    /// non-empty command line, else the tool name.
+    static func backgroundTaskLabel(description: String?, command: String?, tool: String) -> String {
+        if let description = cappedTaskDescription(description) {
+            return description
+        }
+        let firstLine = command?
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first(where: { !$0.isEmpty })
+        if let firstLine {
+            return String(firstLine.prefix(60))
+        }
+        return tool
+    }
+
+    /// Background shell / monitor start and `TaskStop` events carried by a
+    /// PostToolUse payload.
+    private func backgroundTaskEvents(agentId: String, eventInput: [String: Any]) -> [AgentEvent] {
+        let tool = eventInput["tool_name"] as? String
+        let input = eventInput["tool_input"] as? [String: Any] ?? [:]
+        let response = eventInput["tool_response"] as? [String: Any] ?? [:]
+        func started(_ id: String?, _ tool: String) -> [AgentEvent] {
+            guard let id, !id.isEmpty else { return [] }
+            let command = input["command"] as? String
+            let label = Self.backgroundTaskLabel(description: input["description"] as? String, command: command, tool: tool)
+            // The command is only a tooltip; a heredoc script can run to kilobytes.
+            let tooltip = command.map { String($0.prefix(500)) }
+            var event = AgentEvent.backgroundTaskStarted(agentId: agentId, taskID: id, tool: tool, label: label, command: tooltip)
+            event.backgroundEndsWithOwner = response["backgroundEndsWithFinalResponse"] as? Bool == true
+            return [event]
+        }
+        switch tool {
+        case "Bash":
+            // The id alone: Ctrl+B and timeouts background a command without run_in_background.
+            return started(response["backgroundTaskId"] as? String, "Bash")
+        case "Monitor":
+            return started(response["taskId"] as? String, "Monitor")
+        case "TaskStop":
+            // shell_id is TaskStop's deprecated input name.
+            let ids = [response["task_id"], input["task_id"], input["shell_id"]].compactMap { $0 as? String }
+            guard let id = ids.first(where: { !$0.isEmpty }) else { return [] }
+            return [.backgroundTaskEnded(agentId: agentId, taskID: id)]
+        default:
+            return []
+        }
+    }
+
     private func baseHookEvents(hookEventName: String, eventInput: [String: Any], projectDir: String) -> [AgentEvent] {
         switch hookEventName {
         case "PreToolUse":
@@ -400,7 +448,7 @@ final class HookEventReceiver: @unchecked Sendable {
             logger.info("Hook PostToolUse: agent=\(aid, privacy: .public)")
             var toolEvent = AgentEvent.toolDone(agentId: aid)
             toolEvent.name = subagentName(aid, from: eventInput)
-            return [toolEvent]
+            return [toolEvent] + backgroundTaskEvents(agentId: aid, eventInput: eventInput)
 
         case "Stop":
             logger.info("Hook Stop: main agent goes idle")

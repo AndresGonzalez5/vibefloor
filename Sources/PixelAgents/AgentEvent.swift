@@ -31,6 +31,15 @@ struct AgentEvent: Codable, Sendable {
     /// Lets the tracker tell a new conversation in the same worktree apart
     /// from the previous one so their context figures and rosters don't mix.
     var sessionID: String?
+    /// Claude's id for a background shell or monitor (`backgroundTaskId` /
+    /// `taskId` in the tool response), used to pair start and stop.
+    var backgroundTaskID: String?
+    /// Full command of a background task, shown as its tooltip.
+    var command: String?
+    /// True when Claude kills the background task with the agent that started
+    /// it (`backgroundEndsWithFinalResponse`: a synchronous subagent's command).
+    /// No completion notification follows, so the owner's stop ends it.
+    var backgroundEndsWithOwner: Bool?
 
     enum EventType: String, Codable, Sendable {
         case agentCreated
@@ -47,6 +56,10 @@ struct AgentEvent: Codable, Sendable {
         /// The harness session terminated (Claude `SessionEnd`); the tracker
         /// drops the workstream's roster and live flag.
         case agentSessionEnded
+        /// Claude launched a background shell or monitor.
+        case backgroundTaskStarted
+        /// Claude stopped a background task via `TaskStop`.
+        case backgroundTaskEnded
     }
 
     enum CodingKeys: String, CodingKey {
@@ -64,6 +77,9 @@ struct AgentEvent: Codable, Sendable {
         case contextLimitTokens
         case taskDescription
         case sessionID
+        case backgroundTaskID
+        case command
+        case backgroundEndsWithOwner
     }
 
     // -- Factory methods --
@@ -125,6 +141,20 @@ struct AgentEvent: Codable, Sendable {
     /// The worktree's harness session ended; nothing of it is live anymore.
     static func sessionEnded() -> AgentEvent {
         AgentEvent(type: .agentSessionEnded, agentId: "main")
+    }
+
+    static func backgroundTaskStarted(agentId: String, taskID: String, tool: String, label: String, command: String?) -> AgentEvent {
+        var event = AgentEvent(type: .backgroundTaskStarted, agentId: agentId, tool: tool)
+        event.backgroundTaskID = taskID
+        event.taskDescription = label
+        event.command = command
+        return event
+    }
+
+    static func backgroundTaskEnded(agentId: String, taskID: String) -> AgentEvent {
+        var event = AgentEvent(type: .backgroundTaskEnded, agentId: agentId)
+        event.backgroundTaskID = taskID
+        return event
     }
 
     /// Attribute refresh for an existing roster run (display name, model,

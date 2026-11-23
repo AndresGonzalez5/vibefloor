@@ -431,6 +431,8 @@
 "Compacting" = "Compactant";
 "Sub-agent" = "Subagent";
 "+%d more" = "+%d més";
+"Background shell" = "Shell en segon pla";
+"Monitor" = "Monitor";
 "Stalled" = "Aturat";
 "Working" = "Treballant";
 "Waiting for approval" = "Esperant aprovació";

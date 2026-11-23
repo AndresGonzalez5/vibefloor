@@ -431,6 +431,8 @@
 "Compacting" = "Compacting";
 "Sub-agent" = "Sub-agent";
 "+%d more" = "+%d more";
+"Background shell" = "Background shell";
+"Monitor" = "Monitor";
 "Stalled" = "Stalled";
 "Working" = "Working";
 "Waiting for approval" = "Waiting for approval";

@@ -431,6 +431,8 @@
 "Compacting" = "Compactando";
 "Sub-agent" = "Subagente";
 "+%d more" = "+%d más";
+"Background shell" = "Shell en segundo plano";
+"Monitor" = "Monitor";
 "Stalled" = "Estancado";
 "Working" = "Trabajando";
 "Waiting for approval" = "Esperando aprobación";

@@ -1,5 +1,5 @@
 // ABOUTME: Tests for detecting busy Claude Code sessions from ~/.claude/sessions files.
-// ABOUTME: Covers status filtering, dead PIDs, untracked cwds, and malformed files.
+// ABOUTME: Covers status filtering, dead PIDs, untracked cwds, malformed files, and live session ids.
 
 @testable import FactoryFloor
 import XCTest
@@ -20,8 +20,9 @@ final class ClaudeSleepGuardTests: XCTestCase {
         super.tearDown()
     }
 
-    private func write(pid: Int32, status: String, cwd: String = "/tracked") {
-        let json = #"{"pid":\#(pid),"status":"\#(status)","cwd":"\#(cwd)","kind":"interactive"}"#
+    private func write(pid: Int32, status: String, cwd: String = "/tracked", sessionId: String? = nil) {
+        let sid = sessionId.map { #","sessionId":"\#($0)""# } ?? ""
+        let json = #"{"pid":\#(pid),"status":"\#(status)","cwd":"\#(cwd)","kind":"interactive"\#(sid)}"#
         try! json.write(to: tmpDir.appendingPathComponent("\(pid).json"), atomically: true, encoding: .utf8)
     }
 
@@ -61,5 +62,54 @@ final class ClaudeSleepGuardTests: XCTestCase {
     func testEmptyOrMissingDirectory() {
         XCTAssertFalse(hasBusy())
         XCTAssertFalse(hasBusy(tmpDir.appendingPathComponent("missing")))
+    }
+
+    // MARK: - liveSessionIDs
+
+    func testLiveSessionIDsListsAlivePids() {
+        write(pid: alive, status: "idle", sessionId: "abc")
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), ["abc"])
+    }
+
+    /// A dead pid is excluded even when its file lacks `sessionId`.
+    func testLiveSessionIDsSkipsDeadPid() throws {
+        try XCTSkipIf(kill(deadPid, 0) == 0, "pid \(deadPid) is alive on this machine")
+        write(pid: deadPid, status: "idle")
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), [])
+    }
+
+    func testLiveSessionIDsIsNilWhenAliveSessionLacksSessionId() {
+        write(pid: alive, status: "idle")
+        XCTAssertNil(ClaudeSleepGuard.liveSessionIDs(in: tmpDir))
+    }
+
+    /// A live session's file caught mid-rewrite must read as "unknown", not as
+    /// a gone session. hasBusySession keeps skipping it.
+    func testUnreadableFileOfLivePidMakesLiveSessionIDsUnknown() throws {
+        for contents in ["{not json", ""] {
+            try contents.write(to: tmpDir.appendingPathComponent("\(alive).json"), atomically: true, encoding: .utf8)
+            XCTAssertNil(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), contents)
+            XCTAssertFalse(hasBusy(), contents)
+        }
+    }
+
+    /// The pid comes from the filename, so a crashed session's torn file can't block reaping.
+    func testUnreadableFileOfDeadPidIsIgnored() throws {
+        try XCTSkipIf(kill(deadPid, 0) == 0, "pid \(deadPid) is alive on this machine")
+        write(pid: alive, status: "busy", sessionId: "abc")
+        try "{not json".write(to: tmpDir.appendingPathComponent("\(deadPid).json"), atomically: true, encoding: .utf8)
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), ["abc"])
+        XCTAssertTrue(hasBusy())
+    }
+
+    func testNonPidFilenamesAreIgnored() throws {
+        write(pid: alive, status: "busy", sessionId: "abc")
+        try "{not json".write(to: tmpDir.appendingPathComponent("notes.json"), atomically: true, encoding: .utf8)
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), ["abc"])
+        XCTAssertTrue(hasBusy())
+    }
+
+    func testLiveSessionIDsIsNilForMissingDirectory() {
+        XCTAssertNil(ClaudeSleepGuard.liveSessionIDs(in: tmpDir.appendingPathComponent("missing")))
     }
 }
