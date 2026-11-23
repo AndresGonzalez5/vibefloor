@@ -140,6 +140,17 @@ enum WorkspaceTab: Hashable {
         case .terminal, .browser, .editor: return true
         }
     }
+
+    var kind: String {
+        switch self {
+        case .info: return "info"
+        case .agent: return "agent"
+        case .changes: return "changes"
+        case .terminal: return "terminal"
+        case .browser: return "browser"
+        case .editor: return "editor"
+        }
+    }
 }
 
 /// Who started the dev server. Browsers used to own the server implicitly:
@@ -1060,6 +1071,7 @@ struct TerminalContainerView: View {
                 browserLastDefaultURLs[id] = browserDefaultURL
             }
             guard isActive else { return }
+            UsageLog.record("tab_selected", ["ws": workstreamID.uuidString, "kind": activeTab.kind, "path": workingDirectory])
             syncMenuFlags()
             surfaceCache.updateOcclusion(visibleSurfaceIDs: visibleSurfaceIDs)
             WorkspaceStateStore.save(RestorableWorkspaceTab(activeTab: activeTab), for: workstreamID)
@@ -1182,6 +1194,7 @@ struct TerminalContainerView: View {
                         }
 
                         GitHubActionMenu(
+                            workstreamID: workstreamID,
                             runner: quickActionRunner,
                             harness: harness,
                             agentPath: harnessBinaryPath,
@@ -1363,6 +1376,7 @@ struct TerminalContainerView: View {
     }
 
     private func stopRun() {
+        UsageLog.record("run_stop", ["ws": workstreamID.uuidString])
         let oldGeneration = runGeneration
         let oldRunID = runID
         let priorState = RunStateStore.load(for: workstreamID)
@@ -1389,6 +1403,7 @@ struct TerminalContainerView: View {
 
     private func restartRun() {
         guard resolvedRunCommand != nil else { return }
+        UsageLog.record("run_restart", ["ws": workstreamID.uuidString])
         let owner: RunOwner = runOwner == .none ? .info : runOwner
         let oldRunID = runID
         killRunProcessesAndStateFile()
@@ -1683,6 +1698,7 @@ struct TerminalContainerView: View {
 
     private func forceCloseTab(_ tab: WorkspaceTab) {
         guard let index = tabs.firstIndex(of: tab) else { return }
+        UsageLog.record("tab_closed", ["ws": workstreamID.uuidString, "kind": tab.kind])
         tabs.remove(at: index)
         // Clean up cached views
         switch tab {
@@ -1745,6 +1761,7 @@ struct TerminalContainerView: View {
     @MainActor
     private func startWorkspace(defaultBranch: String) {
         workspaceStarted = true
+        UsageLog.record("tab_selected", ["ws": workstreamID.uuidString, "kind": activeTab.kind, "path": workingDirectory])
         self.defaultBranch = defaultBranch
         quickActionRunner.onSuccess = { action in
             appEnv.refreshWorktreeState(for: workingDirectory, projectDirectory: projectDirectory)
@@ -2065,6 +2082,7 @@ private struct WorkspaceTabDropDelegate: DropDelegate {
 }
 
 private struct GitHubActionMenu: View {
+    let workstreamID: UUID
     @ObservedObject var runner: QuickActionRunner
     let harness: CodingHarness
     let agentPath: String?
@@ -2173,6 +2191,7 @@ private struct GitHubActionMenu: View {
 
     private func runAction(_ action: QuickAction) {
         guard disabledReason(for: action) == nil else { return }
+        UsageLog.record("quick_action", ["ws": workstreamID.uuidString, "action": action.rawValue])
         runner.run(
             action: action,
             harness: harness,

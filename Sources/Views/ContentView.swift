@@ -335,6 +335,13 @@ struct ContentView: View {
                 removedProjectNames = names
             }
             .onChange(of: selection) { oldValue, newValue in
+                switch newValue {
+                case let .project(id): UsageLog.record("selection", ["kind": "project", "id": id.uuidString])
+                case let .workstream(id): UsageLog.record("selection", ["kind": "workstream", "id": id.uuidString])
+                case .settings: UsageLog.record("selection", ["kind": "settings"])
+                case .help: UsageLog.record("selection", ["kind": "help"])
+                case nil: UsageLog.record("selection", ["kind": "none"])
+                }
                 logger.warning("[FF] selection changed: \(String(describing: oldValue), privacy: .public) -> \(String(describing: newValue), privacy: .public)")
                 if newValue == .settings || newValue == .help {
                     selectionBeforeSettings = oldValue

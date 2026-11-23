@@ -283,6 +283,7 @@ final class TerminalApp {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            UsageLog.record("app_active")
             guard let app = self?.app else { return }
             ghostty_app_set_focus(app, true)
         }
@@ -291,6 +292,7 @@ final class TerminalApp {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            UsageLog.record("app_inactive")
             guard let app = self?.app else { return }
             ghostty_app_set_focus(app, false)
         }

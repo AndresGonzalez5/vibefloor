@@ -38,6 +38,7 @@ enum WorkstreamArchiver {
         surfaceCache: TerminalSurfaceCache,
         tmuxPath: String?
     ) {
+        UsageLog.record("workstream_removed", ["ws": workstreamID.uuidString])
         if let ws = project.workstreams.first(where: { $0.id == workstreamID }) {
             let projName = project.name
             let wsName = ws.name

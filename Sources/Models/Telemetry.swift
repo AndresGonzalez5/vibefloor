@@ -38,6 +38,7 @@ final class Telemetry {
     }
 
     func track(_ event: String, url: String = "/app", title: String? = nil, data: [String: String] = [:]) {
+        UsageLog.record(event, data)
         guard isEnabled else { return }
 
         let screen = NSScreen.main?.frame.size
