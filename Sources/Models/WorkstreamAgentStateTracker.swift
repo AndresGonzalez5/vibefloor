@@ -95,6 +95,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         let startedAt: Date
         /// Main session transcript, scanned for the task's completion notification.
         let transcriptPath: String
+        /// Agent that started the task ("main" or a subagent id).
+        let ownerAgentID: String
+        /// Claude kills the task, unannounced, when its owner finishes.
+        let endsWithOwner: Bool
         /// Transcript filename without its extension, which is Claude's `session_id`.
         var sessionID: String {
             URL(fileURLWithPath: transcriptPath).deletingPathExtension().lastPathComponent
@@ -202,7 +206,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     }
 
     /// Drops all tracked state for a workstream (called when it is removed).
-    func clear(workstreamID: UUID) {
+    /// A `sessionTranscript` keeps the background tasks of other Claude
+    /// sessions in the worktree and drops only that session's.
+    func clear(workstreamID: UUID, sessionTranscript: String? = nil) {
         states.removeValue(forKey: workstreamID)
         rosters.removeValue(forKey: workstreamID)
         liveSessionIDs.remove(workstreamID)
@@ -210,7 +216,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         lastContextReadAt.removeValue(forKey: workstreamID)
         currentSessionIDs.removeValue(forKey: workstreamID)
         currentTranscriptPaths.removeValue(forKey: workstreamID)
-        backgroundTasks.removeValue(forKey: workstreamID)
+        if let sessionTranscript {
+            removeBackgroundTasks(wsID: workstreamID) { $0.transcriptPath == sessionTranscript }
+        } else {
+            backgroundTasks.removeValue(forKey: workstreamID)
+        }
         pruneScanOffsets()
     }
 
@@ -257,9 +267,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             return
         }
         // Session over: nothing in it is live anymore, including children
-        // whose stop hooks never fired.
+        // whose stop hooks never fired. Hooks are global, so another session's
+        // background tasks in the worktree survive.
         if event.type == .agentSessionEnded {
-            clear(workstreamID: wsID)
+            clear(workstreamID: wsID, sessionTranscript: event.transcriptPath)
             return
         }
         // Background tasks outlive turns, so they never touch the roster or row state.
@@ -283,6 +294,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         liveSessionIDs.insert(wsID)
         detectSessionSwitch(wsID: wsID, event: event)
         updateRoster(wsID: wsID, event: event)
+        if event.type == .agentRemoved {
+            // A synchronous subagent's background commands die with it, and no
+            // completion notification follows.
+            removeBackgroundTasks(wsID: wsID) { $0.endsWithOwner && $0.ownerAgentID == event.agentId }
+        }
         // Permission/question prompts block forward progress no matter which
         // run asked — a subagent waiting on input still needs the user to act,
         // so any live waiter raises row-level attention (decision: option A).
@@ -716,8 +732,11 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         var list = backgroundTasks[wsID] ?? []
         if event.type == .backgroundTaskStarted {
             guard let path = event.transcriptPath, !list.contains(where: { $0.id == taskID }) else { return }
-            // Start at the file's current end: notifications written before
-            // the task started can't be about it.
+            // A command that dies at once can be reported before this hook
+            // lands, and the scan below never looks back. Task ids are unique,
+            // so older text can't end the wrong task.
+            if Self.endedBackgroundTaskIDs(in: Self.transcriptTail(path)).contains(taskID) { return }
+            // Scan from the file's current end: the check above covered earlier text.
             if transcriptScanOffsets[path] == nil {
                 let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? UInt64
                 transcriptScanOffsets[path] = size ?? 0
@@ -728,7 +747,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 label: event.taskDescription ?? event.tool ?? "",
                 command: event.command,
                 startedAt: Date(),
-                transcriptPath: path
+                transcriptPath: path,
+                ownerAgentID: event.agentId,
+                endsWithOwner: event.backgroundEndsWithOwner == true
             ))
         } else {
             guard list.contains(where: { $0.id == taskID }) else { return }
@@ -736,6 +757,23 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         }
         backgroundTasks[wsID] = list.isEmpty ? nil : list
         pruneScanOffsets()
+    }
+
+    private func removeBackgroundTasks(wsID: UUID, where shouldRemove: (BackgroundTask) -> Bool) {
+        guard let list = backgroundTasks[wsID], list.contains(where: shouldRemove) else { return }
+        let kept = list.filter { !shouldRemove($0) }
+        backgroundTasks[wsID] = kept.isEmpty ? nil : kept
+        pruneScanOffsets()
+    }
+
+    /// Last 64 KiB of a transcript, lossily decoded; empty when unreadable.
+    private static func transcriptTail(_ path: String) -> String {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return "" }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(),
+              (try? handle.seek(toOffset: size - min(size, 65_536))) != nil,
+              let data = try? handle.readToEnd() else { return "" }
+        return String(decoding: data, as: UTF8.self)
     }
 
     private func pruneScanOffsets() {

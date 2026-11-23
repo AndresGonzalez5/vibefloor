@@ -395,15 +395,20 @@ final class HookEventReceiver: @unchecked Sendable {
             guard let id, !id.isEmpty else { return [] }
             let command = input["command"] as? String
             let label = Self.backgroundTaskLabel(description: input["description"] as? String, command: command, tool: tool)
-            return [.backgroundTaskStarted(agentId: agentId, taskID: id, tool: tool, label: label, command: command)]
+            var event = AgentEvent.backgroundTaskStarted(agentId: agentId, taskID: id, tool: tool, label: label, command: command)
+            event.backgroundEndsWithOwner = response["backgroundEndsWithFinalResponse"] as? Bool == true
+            return [event]
         }
         switch tool {
-        case "Bash" where input["run_in_background"] as? Bool == true:
+        case "Bash":
+            // The id alone: Ctrl+B and timeouts background a command without run_in_background.
             return started(response["backgroundTaskId"] as? String, "Bash")
         case "Monitor":
             return started(response["taskId"] as? String, "Monitor")
         case "TaskStop":
-            guard let id = input["task_id"] as? String, !id.isEmpty else { return [] }
+            // shell_id is TaskStop's deprecated input name.
+            let ids = [response["task_id"], input["task_id"], input["shell_id"]].compactMap { $0 as? String }
+            guard let id = ids.first(where: { !$0.isEmpty }) else { return [] }
             return [.backgroundTaskEnded(agentId: agentId, taskID: id)]
         default:
             return []

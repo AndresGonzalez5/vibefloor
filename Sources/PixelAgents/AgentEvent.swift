@@ -36,6 +36,10 @@ struct AgentEvent: Codable, Sendable {
     var backgroundTaskID: String?
     /// Full command of a background task, shown as its tooltip.
     var command: String?
+    /// True when Claude kills the background task with the agent that started
+    /// it (`backgroundEndsWithFinalResponse`: a synchronous subagent's command).
+    /// No completion notification follows, so the owner's stop ends it.
+    var backgroundEndsWithOwner: Bool?
 
     enum EventType: String, Codable, Sendable {
         case agentCreated
@@ -75,6 +79,7 @@ struct AgentEvent: Codable, Sendable {
         case sessionID
         case backgroundTaskID
         case command
+        case backgroundEndsWithOwner
     }
 
     // -- Factory methods --
