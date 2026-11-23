@@ -540,7 +540,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 list.removeAll { $0.id == event.agentId }
             }
 
-        case .agentSessionSwitched, .agentSessionEnded:
+        case .agentSessionSwitched, .agentSessionEnded, .backgroundTaskStarted, .backgroundTaskEnded:
             // Reset already performed in detectSessionSwitch / handle before
             // this ran; no roster mutation here.
             break
@@ -652,7 +652,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 }
             }
 
-        case .agentCreated, .agentRemoved, .agentInfo, .agentSessionEnded:
+        case .agentCreated, .agentRemoved, .agentInfo, .agentSessionEnded, .backgroundTaskStarted, .backgroundTaskEnded:
             break
         }
     }

@@ -835,6 +835,53 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertNil(main.first?.name)
     }
 
+    // MARK: - Background task hooks
+
+    private func postToolUse(_ json: String) throws -> [AgentEvent] {
+        let input = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        return HookEventReceiver.shared.mapHookEvent(hookEventName: "PostToolUse", eventInput: input, projectDir: "\(projectDir)-\(UUID().uuidString)")
+    }
+
+    func testBackgroundBashMapsToStartedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"sleep 20","description":"tracer sleep","run_in_background":true},"tool_response":{"stdout":"","stderr":"","interrupted":false,"isImage":false,"noOutputExpected":false,"backgroundTaskId":"bf28bcg72"}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone, .backgroundTaskStarted])
+        let started = events[1]
+        XCTAssertEqual(started.backgroundTaskID, "bf28bcg72")
+        XCTAssertEqual(started.tool, "Bash")
+        XCTAssertEqual(started.taskDescription, "tracer sleep")
+        XCTAssertEqual(started.command, "sleep 20")
+    }
+
+    func testBackgroundBashLabelFallsBackToFirstCommandLine() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"\n  python3 -m http.server 8000\necho hi","run_in_background":true},"tool_response":{"backgroundTaskId":"b1"}}"#)
+        XCTAssertEqual(events.last?.taskDescription, "python3 -m http.server 8000")
+    }
+
+    func testBackgroundBashLabelCapsCommandAt60() throws {
+        let cmd = String(repeating: "x", count: 100)
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"\#(cmd)","run_in_background":true},"tool_response":{"backgroundTaskId":"b1"}}"#)
+        XCTAssertEqual(events.last?.taskDescription?.count, 60)
+    }
+
+    func testForegroundBashEmitsOnlyToolDone() throws {
+        let events = try postToolUse(#"{"tool_name":"Bash","tool_input":{"command":"ls"},"tool_response":{"stdout":"","stderr":""}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone])
+    }
+
+    func testMonitorMapsToStartedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"Monitor","tool_input":{"command":"for i in 1 2; do echo tick $i; sleep 2; done","description":"tracer ticks","timeout_ms":30000},"tool_response":{"taskId":"b600qk6fu","timeoutMs":30000,"persistent":false}}"#)
+        let started = try XCTUnwrap(events.first(where: { $0.type == .backgroundTaskStarted }))
+        XCTAssertEqual(started.tool, "Monitor")
+        XCTAssertEqual(started.backgroundTaskID, "b600qk6fu")
+        XCTAssertEqual(started.taskDescription, "tracer ticks")
+    }
+
+    func testTaskStopMapsToEndedEvent() throws {
+        let events = try postToolUse(#"{"tool_name":"TaskStop","tool_input":{"task_id":"bf28bcg72"},"tool_response":{"message":"Successfully stopped task: bf28bcg72 (sleep 20)","task_id":"bf28bcg72","task_type":"local_bash","command":"sleep 20"}}"#)
+        XCTAssertEqual(events.map(\.type), [.agentToolDone, .backgroundTaskEnded])
+        XCTAssertEqual(events[1].backgroundTaskID, "bf28bcg72")
+    }
+
     /// notification_type is authoritative; the message text is only a
     /// fallback for payloads that predate it.
     func testClaudeNotificationTypeDecidesStatus() {
