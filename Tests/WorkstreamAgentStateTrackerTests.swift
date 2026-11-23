@@ -1463,7 +1463,9 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         handle(event)
     }
 
-    private var backgroundIDs: [String] { tracker.backgroundTasks(for: wsID).map(\.id) }
+    private var backgroundIDs: [String] {
+        tracker.backgroundTasks(for: wsID).map(\.id)
+    }
 
     /// `sess-1.jsonl` in a fresh temp directory, removed after the test.
     private func makeSessionTranscript(_ contents: String = "") throws -> String {
@@ -1504,7 +1506,7 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(WorkstreamAgentStateTracker.endedBackgroundTaskIDs(in: line), ["b600qk6fu"])
     }
 
-    func testBackgroundTaskStartRecordsTask() throws {
+    func testBackgroundTaskStartRecordsTask() {
         startBackground("b1")
         startBackground("m1", tool: "Monitor")
         startBackground("b1")
@@ -1608,7 +1610,7 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         startBackground("A", transcript: path)
         handle(.backgroundTaskEnded(agentId: "main", taskID: "A"))
         // Padding pushes it past the start-time tail check, so only the offset hides it.
-        try append(notificationLine("B") + String(repeating: "x", count: 65_536) + "\n", to: path)
+        try append(notificationLine("B") + String(repeating: "x", count: 65536) + "\n", to: path)
         startBackground("B", transcript: path)
 
         tracker.scanBackgroundTasks(liveSessions: ["sess-1"])

@@ -376,12 +376,16 @@ final class HookEventReceiver: @unchecked Sendable {
     /// Label for a background task line: description, else the first
     /// non-empty command line, else the tool name.
     static func backgroundTaskLabel(description: String?, command: String?, tool: String) -> String {
-        if let description = cappedTaskDescription(description) { return description }
+        if let description = cappedTaskDescription(description) {
+            return description
+        }
         let firstLine = command?
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .first(where: { !$0.isEmpty })
-        if let firstLine { return String(firstLine.prefix(60)) }
+        if let firstLine {
+            return String(firstLine.prefix(60))
+        }
         return tool
     }
 

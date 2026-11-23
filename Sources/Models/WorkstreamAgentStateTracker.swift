@@ -735,7 +735,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             // A command that dies at once can be reported before this hook
             // lands, and the scan below never looks back. Task ids are unique,
             // so older text can't end the wrong task.
-            if Self.endedBackgroundTaskIDs(in: Self.transcriptTail(path)).contains(taskID) { return }
+            if Self.endedBackgroundTaskIDs(in: Self.transcriptTail(path)).contains(taskID) {
+                return
+            }
             // Scan from the file's current end: the check above covered earlier text.
             if transcriptScanOffsets[path] == nil {
                 let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? UInt64
@@ -771,7 +773,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
         guard let handle = FileHandle(forReadingAtPath: path) else { return "" }
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd(),
-              (try? handle.seek(toOffset: size - min(size, 65_536))) != nil,
+              (try? handle.seek(toOffset: size - min(size, 65536))) != nil,
               let data = try? handle.readToEnd() else { return "" }
         return String(decoding: data, as: UTF8.self)
     }
@@ -840,7 +842,9 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 guard let self else { return }
                 self.sweepForStalls()
                 // The default argument lists ~/.claude/sessions; skip it when idle.
-                if !self.backgroundTasks.isEmpty { self.scanBackgroundTasks() }
+                if !self.backgroundTasks.isEmpty {
+                    self.scanBackgroundTasks()
+                }
             }
         }
         RunLoop.main.add(timer, forMode: .common)
