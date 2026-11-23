@@ -1575,6 +1575,24 @@ final class WorkstreamAgentStateTrackerTests: XCTestCase {
         XCTAssertEqual(backgroundIDs, ["async", "main-task"])
     }
 
+    /// A subagent whose stop hook was lost is reaped by the sweep, which must
+    /// release the same tasks its stop would have.
+    func testReapedSubagentRemovesItsEndsWithOwnerTasks() {
+        let sub = "ad3653b20b0eddd37"
+        handle(.created(agentId: sub, name: "build", palette: 1))
+        startBackground("flagged", agentId: sub, endsWithOwner: true)
+        startBackground("async", agentId: sub)
+        startBackground("main-task")
+        tracker._backdateRun(
+            agentId: sub,
+            workstreamID: wsID,
+            lastEventAt: Date().addingTimeInterval(-(WorkstreamAgentStateTracker.reapThreshold + 10))
+        )
+        tracker.sweepForStalls(now: Date())
+        XCTAssertTrue(tracker.runs(for: wsID).isEmpty)
+        XCTAssertEqual(backgroundIDs, ["async", "main-task"])
+    }
+
     func testScanRemovesTaskWithCompletionNotification() throws {
         let path = try makeSessionTranscript()
         startBackground("A", transcript: path)

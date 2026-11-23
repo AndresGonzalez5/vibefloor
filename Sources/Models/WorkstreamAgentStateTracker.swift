@@ -596,8 +596,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             }
 
         case .agentSessionSwitched, .agentSessionEnded, .backgroundTaskStarted, .backgroundTaskEnded:
-            // Reset already performed in detectSessionSwitch / handle before
-            // this ran; no roster mutation here.
+            // Handled in detectSessionSwitch / handle; no roster mutation here.
             break
 
         case .agentStatus:
@@ -786,8 +785,10 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     /// Drops background tasks whose completion notification landed in their
     /// transcript, or whose Claude session is gone. `liveSessions` nil means
     /// unknown, so no task is dropped for it. Internal for tests.
-    func scanBackgroundTasks(liveSessions: Set<String>? = ClaudeSleepGuard.liveSessionIDs()) {
+    func scanBackgroundTasks(liveSessions: @autoclosure () -> Set<String>? = ClaudeSleepGuard.liveSessionIDs()) {
+        // Before liveSessions is evaluated: the default lists ~/.claude/sessions.
         guard !backgroundTasks.isEmpty else { return }
+        let liveSessions = liveSessions()
         var ended = Set<String>()
         for (path, offset) in transcriptScanOffsets {
             guard let handle = FileHandle(forReadingAtPath: path) else { continue }
@@ -841,10 +842,7 @@ final class WorkstreamAgentStateTracker: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.sweepForStalls()
-                // The default argument lists ~/.claude/sessions; skip it when idle.
-                if !self.backgroundTasks.isEmpty {
-                    self.scanBackgroundTasks()
-                }
+                self.scanBackgroundTasks()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -865,6 +863,12 @@ final class WorkstreamAgentStateTracker: ObservableObject {
                 $0.isMain || $0.isWaitingForUser || $0.lastEventAt >= ($0.activity != nil ? reapInFlightCutoff : reapCutoff)
             }
             var changed = updated.count != list.count
+            if changed {
+                // A reaped subagent gets no stop event, so release what its stop would have.
+                let live = Set(updated.map(\.id))
+                let reaped = Set(list.map(\.id)).subtracting(live)
+                removeBackgroundTasks(wsID: wsID) { $0.endsWithOwner && reaped.contains($0.ownerAgentID) }
+            }
             let rowState = states[wsID] ?? .idle
             // Any live waiter (main or subagent) suppresses stalling: waiting
             // on the user isn't stalling, even if row state hasn't caught up.

@@ -399,7 +399,9 @@ final class HookEventReceiver: @unchecked Sendable {
             guard let id, !id.isEmpty else { return [] }
             let command = input["command"] as? String
             let label = Self.backgroundTaskLabel(description: input["description"] as? String, command: command, tool: tool)
-            var event = AgentEvent.backgroundTaskStarted(agentId: agentId, taskID: id, tool: tool, label: label, command: command)
+            // The command is only a tooltip; a heredoc script can run to kilobytes.
+            let tooltip = command.map { String($0.prefix(500)) }
+            var event = AgentEvent.backgroundTaskStarted(agentId: agentId, taskID: id, tool: tool, label: label, command: tooltip)
             event.backgroundEndsWithOwner = response["backgroundEndsWithFinalResponse"] as? Bool == true
             return [event]
         }
