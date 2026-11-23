@@ -1,5 +1,5 @@
 // ABOUTME: Tests for detecting busy Claude Code sessions from ~/.claude/sessions files.
-// ABOUTME: Covers status filtering, dead PIDs, untracked cwds, and malformed files.
+// ABOUTME: Covers status filtering, dead PIDs, untracked cwds, malformed files, and live session ids.
 
 @testable import FactoryFloor
 import XCTest
@@ -20,8 +20,9 @@ final class ClaudeSleepGuardTests: XCTestCase {
         super.tearDown()
     }
 
-    private func write(pid: Int32, status: String, cwd: String = "/tracked") {
-        let json = #"{"pid":\#(pid),"status":"\#(status)","cwd":"\#(cwd)","kind":"interactive"}"#
+    private func write(pid: Int32, status: String, cwd: String = "/tracked", sessionId: String? = nil) {
+        let sid = sessionId.map { #","sessionId":"\#($0)""# } ?? ""
+        let json = #"{"pid":\#(pid),"status":"\#(status)","cwd":"\#(cwd)","kind":"interactive"\#(sid)}"#
         try! json.write(to: tmpDir.appendingPathComponent("\(pid).json"), atomically: true, encoding: .utf8)
     }
 
@@ -61,5 +62,27 @@ final class ClaudeSleepGuardTests: XCTestCase {
     func testEmptyOrMissingDirectory() {
         XCTAssertFalse(hasBusy())
         XCTAssertFalse(hasBusy(tmpDir.appendingPathComponent("missing")))
+    }
+
+    // MARK: - liveSessionIDs
+
+    func testLiveSessionIDsListsAlivePids() {
+        write(pid: alive, status: "idle", sessionId: "abc")
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), ["abc"])
+    }
+
+    func testLiveSessionIDsSkipsDeadPid() throws {
+        try XCTSkipIf(kill(deadPid, 0) == 0, "pid \(deadPid) is alive on this machine")
+        write(pid: deadPid, status: "idle", sessionId: "dead")
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), [])
+    }
+
+    func testLiveSessionIDsSkipsFileWithoutSessionId() {
+        write(pid: alive, status: "idle")
+        XCTAssertEqual(ClaudeSleepGuard.liveSessionIDs(in: tmpDir), [])
+    }
+
+    func testLiveSessionIDsIsNilForMissingDirectory() {
+        XCTAssertNil(ClaudeSleepGuard.liveSessionIDs(in: tmpDir.appendingPathComponent("missing")))
     }
 }

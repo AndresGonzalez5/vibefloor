@@ -20,7 +20,7 @@ final class ClaudeSleepGuard {
 
     private init() {}
 
-    private static var sessionsDirectory: URL {
+    nonisolated static var sessionsDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/sessions")
     }
 
@@ -44,15 +44,36 @@ final class ClaudeSleepGuard {
     /// inhibitor: "shell" (idle with a background task such as a dev server) and
     /// "waiting" (permission prompt) would otherwise hold the Mac awake indefinitely.
     nonisolated static func hasBusySession(in dir: URL, isTracked: (String) -> Bool) -> Bool {
-        struct Entry: Decodable { let pid: Int32; let status: String; let cwd: String }
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        return files.contains { url in
+        (liveSessions(in: dir) ?? []).contains { entry in
+            guard entry.status == "busy", let cwd = entry.cwd else { return false }
+            return isTracked(cwd)
+        }
+    }
+
+    /// `sessionId`s of the live Claude sessions in `dir`; nil when the
+    /// directory can't be listed (unknown, as opposed to "none live").
+    nonisolated static func liveSessionIDs(in dir: URL = sessionsDirectory) -> Set<String>? {
+        liveSessions(in: dir).map { Set($0.compactMap(\.sessionId)) }
+    }
+
+    private struct SessionFile: Decodable {
+        let pid: Int32
+        let status: String?
+        let cwd: String?
+        let sessionId: String?
+    }
+
+    /// Session files whose process is alive; nil when `dir` can't be listed.
+    /// Malformed files are skipped.
+    private nonisolated static func liveSessions(in dir: URL) -> [SessionFile]? {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return nil }
+        return files.compactMap { url in
             guard url.pathExtension == "json",
                   let data = try? Data(contentsOf: url),
-                  let entry = try? JSONDecoder().decode(Entry.self, from: data) else { return false }
-            // ponytail: kill(pid, 0) drops files left "busy" by a crashed Claude;
+                  let entry = try? JSONDecoder().decode(SessionFile.self, from: data) else { return nil }
+            // ponytail: kill(pid, 0) drops files left behind by a crashed Claude;
             // PID reuse isn't checked (compare `procStart` if that ever matters).
-            return entry.status == "busy" && kill(entry.pid, 0) == 0 && isTracked(entry.cwd)
+            return kill(entry.pid, 0) == 0 ? entry : nil
         }
     }
 
