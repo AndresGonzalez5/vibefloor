@@ -51,9 +51,9 @@ final class ClaudeSleepGuard {
     }
 
     /// `sessionId`s of the live Claude sessions in `dir`. Nil means unknown, not
-    /// "none live": the directory can't be listed, some `.json` can't be read or
-    /// decoded (Claude rewrites them in place, so it may be mid-write), or a live
-    /// session lacks `sessionId`. Dead-pid files are excluded regardless.
+    /// "none live": the directory can't be listed, a live pid's file can't be
+    /// read or decoded (Claude rewrites them in place, so it may be mid-write),
+    /// or a live session lacks `sessionId`. Dead-pid files are excluded regardless.
     nonisolated static func liveSessionIDs(in dir: URL = sessionsDirectory) -> Set<String>? {
         guard let scan = scanSessions(in: dir), !scan.hasUnreadable else { return nil }
         let ids = scan.live.compactMap(\.sessionId)
@@ -61,28 +61,33 @@ final class ClaudeSleepGuard {
     }
 
     private struct SessionFile: Decodable {
-        let pid: Int32
         let status: String?
         let cwd: String?
         let sessionId: String?
     }
 
-    /// Session files in `dir` whose process is alive, and whether some `.json`
-    /// file couldn't be read or decoded. Nil when `dir` can't be listed.
+    /// Session files (`<pid>.json`) in `dir` whose process is alive, and whether
+    /// one of them couldn't be read or decoded. Nil when `dir` can't be listed.
     private nonisolated static func scanSessions(in dir: URL) -> (live: [SessionFile], hasUnreadable: Bool)? {
         guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return nil }
         var live: [SessionFile] = []
         var hasUnreadable = false
         for url in files where url.pathExtension == "json" {
+            // The pid comes from the filename, so a dead session's torn file
+            // never counts. Digits only: kill() on 0 or a negative pid
+            // targets a process group.
+            // ponytail: kill(pid, 0) drops files left behind by a crashed Claude;
+            // PID reuse isn't checked (compare `procStart` if that ever matters).
+            let stem = url.deletingPathExtension().lastPathComponent
+            guard stem.allSatisfy({ $0.isASCII && $0.isNumber }), let pid = Int32(stem), pid > 0,
+                  kill(pid, 0) == 0 else { continue }
             guard let data = try? Data(contentsOf: url),
                   let entry = try? JSONDecoder().decode(SessionFile.self, from: data)
             else {
                 hasUnreadable = true
                 continue
             }
-            // ponytail: kill(pid, 0) drops files left behind by a crashed Claude;
-            // PID reuse isn't checked (compare `procStart` if that ever matters).
-            if kill(entry.pid, 0) == 0 { live.append(entry) }
+            live.append(entry)
         }
         return (live, hasUnreadable)
     }
