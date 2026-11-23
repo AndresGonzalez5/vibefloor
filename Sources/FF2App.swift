@@ -168,6 +168,18 @@ struct FF2App: App {
     init() {
         guard !isRunningXCTest() else { return }
 
+        // Runs for every notification in the process: cheap prefix check first.
+        let internalNames: Set<String> = [
+            "factoryfloor.terminalTitleChanged", "factoryfloor.browserTitleChanged",
+            "factoryfloor.asyncSetupStateChanged", "factoryfloor.terminalSurfaceClosed",
+            "factoryfloor.terminalChildExited", "factoryfloor.terminalTabExited",
+        ]
+        NotificationCenter.default.addObserver(forName: nil, object: nil, queue: nil) { note in
+            let name = note.name.rawValue
+            guard name.hasPrefix("factoryfloor."), !internalNames.contains(name) else { return }
+            UsageLog.record("command", ["name": name])
+        }
+
         UserDefaults.standard.set(200, forKey: "NSInitialToolTipDelay") // 200ms vs system ~700-1000ms
 
         // Migrate Spaces before any view renders so the sidebar's first paint

@@ -124,7 +124,22 @@ final class WorkstreamAgentStateTracker: ObservableObject {
     private static let sweepInterval: TimeInterval = 15
     private static let contextReadInterval: TimeInterval = 5
 
-    @Published private(set) var states: [UUID: AgentRunState] = [:]
+    @Published private(set) var states: [UUID: AgentRunState] = [:] {
+        didSet {
+            for (id, state) in states where oldValue[id] != state {
+                let name: String
+                switch state {
+                case .idle: name = "idle"
+                case .working: name = "working"
+                case .compacting: name = "compacting"
+                case .stalled: name = "stalled"
+                case .needsAttention(.justFinished): name = "needs_attention_finished"
+                case .needsAttention(.permission): name = "needs_attention_permission"
+                }
+                UsageLog.record("agent_state", ["ws": id.uuidString, "state": name])
+            }
+        }
+    }
     @Published private(set) var rosters: [UUID: [AgentRun]] = [:]
     /// Workstreams that have seen harness activity during this app launch.
     /// In-memory only by design ("part of my work today").
